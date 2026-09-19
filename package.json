@@ -1,0 +1,16 @@
+{
+  "name": "college-hackathon-alpha-platform",
+  "version": "1.0.0",
+  "description": "College Hackathon Event ALPHA - Problem Statement Selection & Centralized Attendance Management Platform",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "server": "node server/server.js",
+    "client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "seed": "node -e \"require('axios').post('http://localhost:5000/api/admin/seed')\""
+  },
+  "keywords": ["hackathon", "problem-statement", "attendance", "single-device-login", "qr-scanner", "alpha"],
+  "author": "Google DeepMind Antigravity Pair Programmer",
+  "license": "MIT"
+}
