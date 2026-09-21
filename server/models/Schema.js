@@ -60,7 +60,7 @@ const ProblemStatementSchema = new mongoose.Schema({
   domain: { type: String, default: 'General' },
   difficulty: { type: String, default: 'Medium' },
   technologies: [{ type: String }],
-  maxTeamCapacity: { type: Number, default: 1 },
+  maxTeamCapacity: { type: Number, default: 2 },
   selectedCount: { type: Number, default: 0 },
   pdfUrl: { type: String, default: '' },
   status: { type: String, default: 'PUBLISHED' }
@@ -74,6 +74,7 @@ const ProblemSelectionSchema = new mongoose.Schema({
   selectedAt: { type: Date, default: Date.now },
   status: { type: String, default: 'CONFIRMED' }
 }, { timestamps: true });
+ProblemSelectionSchema.index({ teamId: 1 }, { unique: true });
 
 // 7. Attendance Session Schema
 const AttendanceSessionSchema = new mongoose.Schema({
@@ -127,10 +128,13 @@ const SystemSettingsSchema = new mongoose.Schema({
   readingEndsAt: { type: Date, default: null },
   selectionStartedAt: { type: Date, default: null },
   selectionEndsAt: { type: Date, default: null },
+  problemStatementsReleased: { type: Boolean, default: false },
+  selectionScheduledStart: { type: Date, default: null },
+  selectionManualState: { type: String, enum: ['NONE', 'OPEN', 'CLOSED'], default: 'NONE' },
   currentPhase: { 
     type: String, 
-    enum: ['NOT_STARTED', 'READING', 'SELECTION', 'CLOSED'], 
-    default: 'NOT_STARTED' 
+    enum: ['NOT_RELEASED', 'RELEASED_LOCKED', 'SELECTION_OPEN', 'SELECTION_CLOSED', 'NOT_STARTED', 'READING', 'SELECTION', 'CLOSED'], 
+    default: 'NOT_RELEASED' 
   },
   teamLeadAccessEnabled: { type: Boolean, default: true },
   volunteerAccessEnabled: { type: Boolean, default: true },

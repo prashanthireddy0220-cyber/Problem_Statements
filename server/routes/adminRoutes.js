@@ -10,7 +10,11 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 // 1. UPDATE TIMER SETTINGS & MODULE TOGGLES
 router.post('/settings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const { readingDurationMinutes, selectionDurationMinutes, teamLeadAccessEnabled, volunteerAccessEnabled, problemSelectionEnabled, attendanceEnabled } = req.body;
+    const { 
+      readingDurationMinutes, selectionDurationMinutes, 
+      teamLeadAccessEnabled, volunteerAccessEnabled, problemSelectionEnabled, attendanceEnabled,
+      problemStatementsReleased, selectionScheduledStart 
+    } = req.body;
 
     let settings = await SystemSettings.findOne();
     if (!settings) {
@@ -23,12 +27,16 @@ router.post('/settings', authenticateToken, requireRole('ADMIN'), async (req, re
     if (volunteerAccessEnabled !== undefined) settings.volunteerAccessEnabled = Boolean(volunteerAccessEnabled);
     if (problemSelectionEnabled !== undefined) settings.problemSelectionEnabled = Boolean(problemSelectionEnabled);
     if (attendanceEnabled !== undefined) settings.attendanceEnabled = Boolean(attendanceEnabled);
+    if (problemStatementsReleased !== undefined) settings.problemStatementsReleased = Boolean(problemStatementsReleased);
+    if (selectionScheduledStart !== undefined) {
+      settings.selectionScheduledStart = selectionScheduledStart ? new Date(selectionScheduledStart) : null;
+    }
 
     // If a phase is actively running, dynamically update active end time
     if (settings.currentPhase === 'READING' && settings.readingStartedAt && readingDurationMinutes !== undefined) {
       settings.readingEndsAt = new Date(new Date(settings.readingStartedAt).getTime() + Number(readingDurationMinutes) * 60 * 1000);
     }
-    if (settings.currentPhase === 'SELECTION' && settings.selectionStartedAt && selectionDurationMinutes !== undefined) {
+    if ((settings.currentPhase === 'SELECTION' || settings.currentPhase === 'SELECTION_OPEN') && settings.selectionStartedAt && selectionDurationMinutes !== undefined) {
       settings.selectionEndsAt = new Date(new Date(settings.selectionStartedAt).getTime() + Number(selectionDurationMinutes) * 60 * 1000);
     }
 
@@ -47,32 +55,47 @@ router.post('/settings', authenticateToken, requireRole('ADMIN'), async (req, re
   }
 });
 
-// 2. CONTROL SELECTION SESSION PHASE (Start Reading / Start Selection / Lock / Reset)
+// 2. CONTROL SELECTION SESSION PHASE (Release / Schedule / Open Now / Close / Reset)
 router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const { action } = req.body; // 'START_READING', 'START_SELECTION', 'LOCK', 'RESET'
+    const { action, scheduledTime } = req.body; // 'RELEASE_PROBLEMS', 'UNRELEASE_PROBLEMS', 'SCHEDULE_SELECTION', 'OPEN_NOW', 'CLOSE', 'RESET'
 
     let settings = await SystemSettings.findOne();
     if (!settings) settings = new SystemSettings();
 
     const now = new Date();
 
-    if (action === 'START_READING') {
+    if (action === 'RELEASE_PROBLEMS') {
+      settings.problemStatementsReleased = true;
+    } else if (action === 'UNRELEASE_PROBLEMS') {
+      settings.problemStatementsReleased = false;
+      settings.selectionManualState = 'NONE';
+    } else if (action === 'SCHEDULE_SELECTION') {
+      settings.problemStatementsReleased = true;
+      settings.selectionScheduledStart = scheduledTime ? new Date(scheduledTime) : null;
+      settings.selectionManualState = 'NONE';
+      if (scheduledTime) {
+        settings.selectionEndsAt = new Date(new Date(scheduledTime).getTime() + (settings.selectionDurationMinutes || 5) * 60 * 1000);
+      }
+    } else if (action === 'OPEN_NOW' || action === 'START_SELECTION') {
+      settings.problemStatementsReleased = true;
+      settings.selectionManualState = 'OPEN';
+      settings.selectionStartedAt = now;
+      settings.selectionEndsAt = new Date(now.getTime() + (settings.selectionDurationMinutes || 5) * 60 * 1000);
+    } else if (action === 'CLOSE' || action === 'LOCK' || action === 'END_SESSION') {
+      settings.selectionManualState = 'CLOSED';
+    } else if (action === 'START_READING') {
+      settings.problemStatementsReleased = true;
+      settings.selectionManualState = 'NONE';
       const readingEnd = new Date(now.getTime() + settings.readingDurationMinutes * 60 * 1000);
-      settings.currentPhase = 'READING';
       settings.readingStartedAt = now;
       settings.readingEndsAt = readingEnd;
-      settings.selectionStartedAt = null;
-      settings.selectionEndsAt = null;
-    } else if (action === 'START_SELECTION') {
-      const selectionEnd = new Date(now.getTime() + settings.selectionDurationMinutes * 60 * 1000);
-      settings.currentPhase = 'SELECTION';
-      settings.selectionStartedAt = now;
-      settings.selectionEndsAt = selectionEnd;
-    } else if (action === 'LOCK' || action === 'END_SESSION') {
-      settings.currentPhase = 'CLOSED';
+      settings.selectionScheduledStart = readingEnd;
     } else if (action === 'RESET') {
-      settings.currentPhase = 'NOT_STARTED';
+      settings.problemStatementsReleased = false;
+      settings.selectionScheduledStart = null;
+      settings.selectionManualState = 'NONE';
+      settings.currentPhase = 'NOT_RELEASED';
       settings.readingStartedAt = null;
       settings.readingEndsAt = null;
       settings.selectionStartedAt = null;
@@ -87,11 +110,12 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
       actor: req.user.username,
       role: 'ADMIN',
       action: `SESSION_${action}`,
-      target: settings.currentPhase
+      target: settings.currentPhase || action
     });
 
     return res.json({ message: `Session transition '${action}' applied successfully.`, settings });
   } catch (err) {
+    console.error('Session control error:', err);
     return res.status(500).json({ error: 'Failed to update session state.' });
   }
 });
@@ -103,6 +127,7 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
     const teams = await Team.find().sort({ name: 1 });
     const teamLeads = await TeamLead.find();
     const activeSessions = await ActiveSession.find({ role: 'TEAM_LEAD' });
+    const problemStatements = await ProblemStatement.find();
 
     const activeRegNums = new Set(activeSessions.map(s => s.registrationNumber));
 
@@ -114,7 +139,7 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
       if (team.selectionConfirmed) {
         statusStr = '✅ Selection Completed';
       } else if (isOnline) {
-        statusStr = settings.currentPhase === 'SELECTION' ? '🟠 Selecting' : '🟢 Reading';
+        statusStr = (settings.currentPhase === 'SELECTION_OPEN' || settings.currentPhase === 'SELECTION') ? '🟠 Selecting' : '🟢 Viewing';
       }
 
       return {
@@ -131,16 +156,24 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
       };
     });
 
+    const totalProblems = problemStatements.length;
+    const fullProblemsCount = problemStatements.filter(p => p.selectedCount >= (p.maxTeamCapacity || 2)).length;
+
     const summary = {
       totalTeams: teams.length,
       teamsLoggedIn: activeSessions.length,
-      teamsReading: activity.filter(a => a.statusStr.includes('Reading')).length,
+      teamsReading: activity.filter(a => a.statusStr.includes('Viewing')).length,
       teamsSelecting: activity.filter(a => a.statusStr.includes('Selecting')).length,
       selectionsCompleted: activity.filter(a => a.selectionConfirmed).length,
-      currentPhase: settings.currentPhase || 'NOT_STARTED'
+      totalProblems,
+      fullProblemsCount,
+      problemStatementsReleased: Boolean(settings.problemStatementsReleased),
+      selectionScheduledStart: settings.selectionScheduledStart,
+      selectionManualState: settings.selectionManualState || 'NONE',
+      currentPhase: settings.currentPhase || 'NOT_RELEASED'
     };
 
-    return res.json({ summary, teams: activity });
+    return res.json({ summary, teams: activity, problemStatements });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch live activity data.' });
   }

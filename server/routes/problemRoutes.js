@@ -11,63 +11,83 @@ async function getOrUpdateSystemState() {
     settings = await SystemSettings.create({
       readingDurationMinutes: config.READING_DURATION_MINUTES,
       selectionDurationMinutes: config.SELECTION_DURATION_MINUTES,
-      currentPhase: 'NOT_STARTED'
+      problemStatementsReleased: false,
+      selectionScheduledStart: null,
+      selectionManualState: 'NONE',
+      currentPhase: 'NOT_RELEASED'
     });
   }
 
   const now = new Date();
 
-  // Phase transition logic
-  if (settings.currentPhase === 'READING' && settings.readingEndsAt) {
-    if (now >= new Date(settings.readingEndsAt)) {
-      // Reading phase ended -> Automatically start Selection phase
-      const selStart = new Date(settings.readingEndsAt);
-      const selEnd = new Date(selStart.getTime() + settings.selectionDurationMinutes * 60 * 1000);
-      settings.currentPhase = 'SELECTION';
-      settings.selectionStartedAt = selStart;
-      settings.selectionEndsAt = selEnd;
-      await settings.save();
+  // Dynamic Phase Evaluation Logic
+  let computedPhase = 'NOT_RELEASED';
 
-      await AuditLog.create({
-        actor: 'SYSTEM',
-        role: 'SYSTEM',
-        action: 'PHASE_TRANSITION',
-        target: 'SELECTION',
-        metadata: { readingEndedAt: settings.readingEndsAt, selectionEndsAt: selEnd }
-      });
+  if (!settings.problemStatementsReleased) {
+    computedPhase = 'NOT_RELEASED';
+  } else {
+    // Problem Statements are Released
+    if (settings.selectionManualState === 'OPEN') {
+      computedPhase = 'SELECTION_OPEN';
+    } else if (settings.selectionManualState === 'CLOSED') {
+      computedPhase = 'SELECTION_CLOSED';
+    } else if (settings.selectionScheduledStart) {
+      const schedStart = new Date(settings.selectionScheduledStart);
+      if (now < schedStart) {
+        computedPhase = 'RELEASED_LOCKED';
+      } else {
+        // Scheduled time reached or passed
+        if (settings.selectionEndsAt && now >= new Date(settings.selectionEndsAt)) {
+          computedPhase = 'SELECTION_CLOSED';
+        } else {
+          computedPhase = 'SELECTION_OPEN';
+          // Auto set end time if not set
+          if (!settings.selectionEndsAt) {
+            settings.selectionEndsAt = new Date(schedStart.getTime() + (settings.selectionDurationMinutes || 5) * 60 * 1000);
+            await settings.save();
+          }
+        }
+      }
+    } else {
+      // Released, but no scheduled time set and manual state is NONE
+      // Fallback for legacy timer phases: READING -> RELEASED_LOCKED, SELECTION -> SELECTION_OPEN, CLOSED -> SELECTION_CLOSED
+      if (settings.currentPhase === 'SELECTION') {
+        computedPhase = 'SELECTION_OPEN';
+      } else if (settings.currentPhase === 'CLOSED') {
+        computedPhase = 'SELECTION_CLOSED';
+      } else {
+        computedPhase = 'RELEASED_LOCKED';
+      }
     }
   }
 
-  if (settings.currentPhase === 'SELECTION' && settings.selectionEndsAt) {
-    if (now >= new Date(settings.selectionEndsAt)) {
-      // Selection phase ended -> Automatically transition to CLOSED
-      settings.currentPhase = 'CLOSED';
-      await settings.save();
-
-      await AuditLog.create({
-        actor: 'SYSTEM',
-        role: 'SYSTEM',
-        action: 'PHASE_TRANSITION',
-        target: 'CLOSED'
-      });
-    }
+  if (settings.currentPhase !== computedPhase) {
+    settings.currentPhase = computedPhase;
+    await settings.save();
   }
 
-  // Calculate remaining seconds
-  let readingTimeRemainingSeconds = 0;
+  // Calculate remaining seconds strictly against server time
+  let timeUntilSelectionStartSeconds = 0;
   let selectionTimeRemainingSeconds = 0;
 
-  if (settings.currentPhase === 'READING' && settings.readingEndsAt) {
-    readingTimeRemainingSeconds = Math.max(0, Math.floor((new Date(settings.readingEndsAt) - now) / 1000));
-  } else if (settings.currentPhase === 'SELECTION' && settings.selectionEndsAt) {
+  if (settings.selectionScheduledStart && now < new Date(settings.selectionScheduledStart)) {
+    timeUntilSelectionStartSeconds = Math.max(0, Math.floor((new Date(settings.selectionScheduledStart) - now) / 1000));
+  } else if (settings.readingEndsAt && now < new Date(settings.readingEndsAt) && computedPhase === 'RELEASED_LOCKED') {
+    timeUntilSelectionStartSeconds = Math.max(0, Math.floor((new Date(settings.readingEndsAt) - now) / 1000));
+  }
+
+  if (computedPhase === 'SELECTION_OPEN' && settings.selectionEndsAt) {
     selectionTimeRemainingSeconds = Math.max(0, Math.floor((new Date(settings.selectionEndsAt) - now) / 1000));
   }
 
   return {
     settings,
     serverTime: now,
-    currentPhase: settings.currentPhase,
-    readingTimeRemainingSeconds,
+    currentPhase: computedPhase,
+    problemStatementsReleased: Boolean(settings.problemStatementsReleased),
+    selectionScheduledStart: settings.selectionScheduledStart,
+    selectionManualState: settings.selectionManualState,
+    timeUntilSelectionStartSeconds,
     selectionTimeRemainingSeconds,
     readingStartedAt: settings.readingStartedAt,
     readingEndsAt: settings.readingEndsAt,
@@ -91,6 +111,19 @@ router.get('/timer-state', async (req, res) => {
 // 2. GET LIST OF PROBLEM STATEMENTS
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    const state = await getOrUpdateSystemState();
+    const isAdmin = req.user && req.user.role === 'ADMIN';
+
+    // If problem statements are not released yet and user is not Admin, return empty array with state info
+    if (!state.problemStatementsReleased && !isAdmin) {
+      return res.json({
+        problems: [],
+        phase: state.currentPhase,
+        timerState: state,
+        message: 'Problem Statements will be released soon.'
+      });
+    }
+
     const { domain, search, difficulty } = req.query;
     let query = { status: 'PUBLISHED' };
 
@@ -109,7 +142,6 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 
     const problems = await ProblemStatement.find(query).sort({ problemId: 1 });
-    const state = await getOrUpdateSystemState();
 
     return res.json({
       problems,
@@ -134,7 +166,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// 4. SELECT A PROBLEM STATEMENT (Team Lead Only - Atomic Race-Condition Protected)
+// 4. SELECT A PROBLEM STATEMENT (Team Lead Only - Atomic Race-Condition Protected, 2-Team Limit)
 router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, res) => {
   try {
     const { problemId } = req.body;
@@ -148,19 +180,23 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
       return res.status(403).json({ error: 'Problem selection is currently disabled by the administrator.' });
     }
 
-    if (state.currentPhase === 'NOT_STARTED') {
-      return res.status(400).json({ error: 'Problem selection session has not been started yet.' });
+    if (!state.problemStatementsReleased) {
+      return res.status(400).json({ error: 'Problem statements have not been released by the admin yet.', code: 'NOT_RELEASED' });
     }
 
-    if (state.currentPhase === 'READING') {
+    if (state.currentPhase === 'RELEASED_LOCKED' || state.currentPhase === 'NOT_STARTED' || state.currentPhase === 'READING') {
       return res.status(400).json({
-        error: 'Problem selection is locked during the reading phase. Please wait until the selection period opens.',
-        code: 'READING_PHASE_ACTIVE'
+        error: 'Problem selection has not opened yet. Please wait until the selection period starts.',
+        code: 'SELECTION_LOCKED'
       });
     }
 
-    if (state.currentPhase === 'CLOSED') {
+    if (state.currentPhase === 'SELECTION_CLOSED' || state.currentPhase === 'CLOSED') {
       return res.status(400).json({ error: 'Problem selection period has closed.', code: 'SELECTION_CLOSED' });
+    }
+
+    if (state.currentPhase !== 'SELECTION_OPEN' && state.currentPhase !== 'SELECTION') {
+      return res.status(400).json({ error: 'Problem selection is currently not open.', code: 'SELECTION_NOT_OPEN' });
     }
 
     // B. Check Team Lead & Team Record
@@ -185,19 +221,20 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
       return res.status(404).json({ error: 'Selected problem statement is unavailable or unpublished.' });
     }
 
-    if (problem.selectedCount >= problem.maxTeamCapacity) {
+    const maxCapacity = problem.maxTeamCapacity || 2;
+    if (problem.selectedCount >= maxCapacity) {
       return res.status(400).json({
-        error: `Problem statement ${problem.problemId} is FULL (${problem.selectedCount}/${problem.maxTeamCapacity} teams). Please select another problem.`,
+        error: `This problem statement has already been selected by 2 teams. (${problem.selectedCount}/${maxCapacity} teams). Please select another problem.`,
         code: 'PROBLEM_FULL'
       });
     }
 
-    // D. CRITICAL ATOMIC TRANSACTION / CONDITIONAL UPDATE (Prevents Concurrent Overbooking)
+    // D. CRITICAL ATOMIC TRANSACTION / CONDITIONAL UPDATE (Prevents Concurrent Overbooking - Max 2 Teams)
     const updatedProblem = await ProblemStatement.findOneAndUpdate(
       {
         _id: problem._id,
         status: 'PUBLISHED',
-        selectedCount: { $lt: problem.maxTeamCapacity } // Atomic condition check
+        selectedCount: { $lt: maxCapacity } // Strict atomic condition check
       },
       { $inc: { selectedCount: 1 } },
       { new: true }
@@ -206,26 +243,62 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
     if (!updatedProblem) {
       // Race condition occurred: Another team claimed the last slot just milliseconds ago
       return res.status(400).json({
-        error: `Problem statement ${problem.problemId} was just filled by another team. Please choose another problem.`,
+        error: `This problem statement has already been selected by 2 teams. Please choose another problem.`,
         code: 'PROBLEM_FULL'
       });
     }
 
-    // E. Lock Team Selection
-    team.selectedProblemId = updatedProblem._id;
-    team.selectedProblemCode = updatedProblem.problemId;
-    team.selectionConfirmed = true;
-    team.selectedAt = new Date();
-    await team.save();
+    // E. Lock Team Selection Atomically (Prevents multi-tab double submission by same team)
+    const updatedTeam = await Team.findOneAndUpdate(
+      {
+        _id: team._id,
+        selectionConfirmed: false
+      },
+      {
+        $set: {
+          selectedProblemId: updatedProblem._id,
+          selectedProblemCode: updatedProblem.problemId,
+          selectionConfirmed: true,
+          selectedAt: new Date()
+        }
+      },
+      { new: true }
+    );
 
-    // F. Record Problem Selection Log
-    const selectionRecord = await ProblemSelection.create({
-      teamId: team._id,
-      teamLeadRegNum: req.user.registrationNumber,
-      problemStatementId: updatedProblem._id,
-      selectedAt: new Date(),
-      status: 'CONFIRMED'
-    });
+    if (!updatedTeam) {
+      // Rollback problem selectedCount if team had already selected in a parallel request
+      await ProblemStatement.findByIdAndUpdate(updatedProblem._id, { $inc: { selectedCount: -1 } });
+      return res.status(400).json({
+        error: 'Your team has already confirmed a problem statement selection.',
+        code: 'ALREADY_SELECTED'
+      });
+    }
+
+    // F. Record Problem Selection Log with DB level unique constraint protection
+    try {
+      await ProblemSelection.create({
+        teamId: updatedTeam._id,
+        teamLeadRegNum: req.user.registrationNumber,
+        problemStatementId: updatedProblem._id,
+        selectedAt: new Date(),
+        status: 'CONFIRMED'
+      });
+    } catch (selErr) {
+      if (selErr.code === 11000) {
+        // Duplicate selection record for team
+        await Team.findByIdAndUpdate(updatedTeam._id, {
+          selectedProblemId: null,
+          selectedProblemCode: null,
+          selectionConfirmed: false,
+          selectedAt: null
+        });
+        await ProblemStatement.findByIdAndUpdate(updatedProblem._id, { $inc: { selectedCount: -1 } });
+        return res.status(400).json({
+          error: 'Your team has already confirmed a problem statement selection.',
+          code: 'ALREADY_SELECTED'
+        });
+      }
+    }
 
     // G. Audit Log Entry
     await AuditLog.create({
@@ -233,17 +306,17 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
       role: 'TEAM_LEAD',
       action: 'SELECT_PROBLEM',
       target: updatedProblem.problemId,
-      metadata: { teamName: team.name, problemTitle: updatedProblem.title }
+      metadata: { teamName: updatedTeam.name, problemTitle: updatedProblem.title }
     });
 
     return res.json({
-      message: 'Problem statement selected and locked successfully!',
+      message: 'Problem Statement selected successfully.',
       selection: {
-        teamName: team.name,
+        teamName: updatedTeam.name,
         problemId: updatedProblem.problemId,
         problemTitle: updatedProblem.title,
         domain: updatedProblem.domain,
-        selectedAt: team.selectedAt,
+        selectedAt: updatedTeam.selectedAt,
         status: 'CONFIRMED'
       }
     });

@@ -53,16 +53,26 @@ export default function TeamLeadDashboard() {
     };
   }, [selectedDomain, selectedDifficulty, searchTerm]);
 
-  // Local 1-second countdown ticker based on server end timestamp
+  // Server-synchronized 1-second countdown ticker
   useEffect(() => {
     const updateCountdown = () => {
-      if (!timerState) return;
-      const targetEnd = timerState.currentPhase === 'READING'
-        ? timerState.readingEndsAt
-        : (timerState.currentPhase === 'SELECTION' ? timerState.selectionEndsAt : null);
+      if (!timerState || !timerState.serverTime) return;
+
+      const serverNow = new Date(timerState.serverTime).getTime();
+      const clientNow = Date.now();
+      const serverOffset = clientNow - serverNow; // Offset between client clock & server time
+
+      let targetEnd = null;
+
+      if (timerState.currentPhase === 'RELEASED_LOCKED' || timerState.currentPhase === 'READING') {
+        targetEnd = timerState.selectionScheduledStart || timerState.readingEndsAt;
+      } else if (timerState.currentPhase === 'SELECTION_OPEN' || timerState.currentPhase === 'SELECTION') {
+        targetEnd = timerState.selectionEndsAt;
+      }
 
       if (targetEnd) {
-        const remaining = Math.max(0, Math.floor((new Date(targetEnd).getTime() - Date.now()) / 1000));
+        const adjustedClientNow = Date.now() - serverOffset;
+        const remaining = Math.max(0, Math.floor((new Date(targetEnd).getTime() - adjustedClientNow) / 1000));
         setSecondsRemaining(remaining);
       } else {
         setSecondsRemaining(0);
@@ -74,11 +84,15 @@ export default function TeamLeadDashboard() {
     return () => clearInterval(ticker);
   }, [timerState]);
 
-  // Format seconds to MM:SS
+  // Format seconds to HH:MM:SS or MM:SS
   const formatTime = (totalSeconds) => {
-    if (!totalSeconds || totalSeconds <= 0) return '00:00';
-    const mins = Math.floor(totalSeconds / 60);
+    if (!totalSeconds || totalSeconds <= 0) return '00:00:00';
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
     const secs = totalSeconds % 60;
+    if (hrs > 0) {
+      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -108,9 +122,10 @@ export default function TeamLeadDashboard() {
     }
   };
 
-  const isSelectionPhase = timerState?.currentPhase === 'SELECTION';
-  const isReadingPhase = timerState?.currentPhase === 'READING';
-  const isClosedPhase = timerState?.currentPhase === 'CLOSED';
+  const isUnreleased = !timerState?.problemStatementsReleased || timerState?.currentPhase === 'NOT_RELEASED';
+  const isReleasedLocked = timerState?.problemStatementsReleased && (timerState?.currentPhase === 'RELEASED_LOCKED' || timerState?.currentPhase === 'READING' || timerState?.currentPhase === 'NOT_STARTED');
+  const isSelectionOpen = timerState?.currentPhase === 'SELECTION_OPEN' || timerState?.currentPhase === 'SELECTION';
+  const isSelectionClosed = timerState?.currentPhase === 'SELECTION_CLOSED' || timerState?.currentPhase === 'CLOSED';
 
   // Domains list for filtering
   const domains = ['ALL', 'IoT & Smart Energy', 'AI & Cybersecurity', 'Web3 & Blockchain', 'Smart Cities & AI', 'Healthcare & NLP'];
@@ -129,7 +144,7 @@ export default function TeamLeadDashboard() {
             🎉 PROBLEM STATEMENT SELECTED
           </h1>
           <p style={{ color: '#00E676', fontSize: '1.1rem', fontWeight: '700', marginBottom: '2rem', letterSpacing: '1px' }}>
-            SELECTION CONFIRMED & LOCKED ✅ (1-TO-1 RESERVED)
+            Problem Statement selected successfully. ✅
           </p>
 
           <div className="glass-card" style={{ padding: '2rem', textAlign: 'left', marginBottom: '2rem', borderLeft: '4px solid #00E676' }}>
@@ -165,177 +180,191 @@ export default function TeamLeadDashboard() {
           <div className="glass-panel" style={{
             padding: '1.75rem 2rem',
             marginBottom: '2rem',
-            borderColor: isSelectionPhase ? '#FFD700' : (isReadingPhase ? '#00F2FE' : 'rgba(255,255,255,0.1)'),
-            boxShadow: isSelectionPhase ? '0 0 35px rgba(255, 215, 0, 0.25)' : (isReadingPhase ? '0 0 35px rgba(0, 242, 254, 0.25)' : 'none')
+            borderColor: isSelectionOpen ? '#00E676' : (isReleasedLocked ? '#FFD700' : 'rgba(255,255,255,0.1)'),
+            boxShadow: isSelectionOpen ? '0 0 35px rgba(0, 230, 118, 0.25)' : (isReleasedLocked ? '0 0 35px rgba(255, 215, 0, 0.25)' : 'none')
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
               <div style={{ flex: 1, minWidth: '280px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.4rem' }}>
-                  {isReadingPhase && <span className="phase-pill reading">🟢 READING PHASE IN PROGRESS</span>}
-                  {isSelectionPhase && <span className="phase-pill selection">🟠 SELECTION PHASE OPEN</span>}
-                  {isClosedPhase && <span className="phase-pill closed">🔴 SELECTION CLOSED</span>}
-                  {timerState?.currentPhase === 'NOT_STARTED' && <span className="phase-pill" style={{ background: 'rgba(255,255,255,0.1)', color: '#94a3b8' }}>⚪ SESSION NOT STARTED</span>}
+                  {isUnreleased && <span className="phase-pill closed" style={{ background: 'rgba(255,75,75,0.15)', color: '#FF4B4B' }}>🔴 NOT RELEASED</span>}
+                  {isReleasedLocked && <span className="phase-pill reading" style={{ background: 'rgba(255,215,0,0.15)', color: '#FFD700' }}>🟡 PROBLEM STATEMENTS RELEASED</span>}
+                  {isSelectionOpen && <span className="phase-pill selection" style={{ background: 'rgba(0,230,118,0.2)', color: '#00E676' }}>🟢 SELECTION IS OPEN</span>}
+                  {isSelectionClosed && <span className="phase-pill closed">🔴 SELECTION CLOSED</span>}
                 </div>
                 
                 <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.4rem', color: '#F8FAFC', letterSpacing: '0.5px' }}>
-                  {isReadingPhase && `Problem Statement Reading Period (${timerState?.settings?.readingDurationMinutes || 30} Minutes)`}
-                  {isSelectionPhase && `Problem Selection Is Now OPEN (${timerState?.settings?.selectionDurationMinutes || 5} Minutes)`}
-                  {isClosedPhase && 'Problem Selection Period Ended'}
-                  {timerState?.currentPhase === 'NOT_STARTED' && 'Waiting for Admin to Start Selection Timer'}
+                  {isUnreleased && 'Problem Statements will be released soon.'}
+                  {isReleasedLocked && 'Problem Statements Released'}
+                  {isSelectionOpen && 'Selection is OPEN'}
+                  {isSelectionClosed && 'Problem Selection Period Ended'}
                 </h2>
 
                 <p style={{ color: '#CBD5E1', fontSize: '0.92rem', marginTop: '0.35rem', lineHeight: '1.5' }}>
-                  {isReadingPhase && 'Read and understand all problem statements below. Problem selection buttons will be ENABLED automatically when this reading timer reaches 00:00.'}
-                  {isSelectionPhase && 'Selection is OPEN! Note: Each Problem Statement can be selected by ONLY ONE Team (1-to-1 reservation). Confirm your choice quickly!'}
-                  {isClosedPhase && 'The selection period is closed. Unselected teams must contact the event administrator.'}
-                  {timerState?.currentPhase === 'NOT_STARTED' && 'The administrator has not started the reading phase yet. Please stand by for session activation.'}
+                  {isUnreleased && 'The administrator has not released the problem statements yet. Please stand by.'}
+                  {isReleasedLocked && 'Problem Statements are released for viewing. Selection will open automatically when the scheduled timer reaches 00:00:00.'}
+                  {isSelectionOpen && 'Selection is OPEN! Note: Each Problem Statement can be selected by a MAXIMUM OF 2 TEAMS (First-Come, First-Served basis).'}
+                  {isSelectionClosed && 'The problem selection period is now closed. Unselected teams must contact the event administrator.'}
                 </p>
               </div>
 
               {/* LIVE COUNTDOWN DISPLAY CARD */}
-              {(isReadingPhase || isSelectionPhase) && (
+              {(isReleasedLocked || isSelectionOpen) && (
                 <div style={{
                   background: 'rgba(15, 23, 42, 0.95)',
-                  border: `2px solid ${isSelectionPhase ? '#FFD700' : '#00F2FE'}`,
+                  border: `2px solid ${isSelectionOpen ? '#00E676' : '#FFD700'}`,
                   padding: '1.15rem 2rem',
                   borderRadius: '16px',
                   textAlign: 'center',
-                  boxShadow: `0 0 25px ${isSelectionPhase ? 'rgba(255, 215, 0, 0.35)' : 'rgba(0, 242, 254, 0.35)'}`
+                  boxShadow: `0 0 25px ${isSelectionOpen ? 'rgba(0, 230, 118, 0.35)' : 'rgba(255, 215, 0, 0.35)'}`
                 }}>
-                  <div style={{ fontSize: '0.75rem', color: isSelectionPhase ? '#FFD700' : '#00F2FE', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
-                    {isSelectionPhase ? 'SELECTION TIME REMAINING' : 'READING TIME REMAINING'}
+                  <div style={{ fontSize: '0.75rem', color: isSelectionOpen ? '#00E676' : '#FFD700', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
+                    {isSelectionOpen ? 'SELECTION TIME REMAINING' : 'SELECTION STARTS IN'}
                   </div>
                   <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '2.5rem', fontWeight: '900', color: '#F8FAFC', letterSpacing: '3px', marginTop: '0.2rem' }}>
-                    {formatTime(secondsRemaining || (isReadingPhase ? timerState?.readingTimeRemainingSeconds : timerState?.selectionTimeRemainingSeconds))}
+                    {formatTime(secondsRemaining || (isReleasedLocked ? timerState?.timeUntilSelectionStartSeconds : timerState?.selectionTimeRemainingSeconds))}
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* SEARCH & DOMAIN FILTERS */}
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
-              <input
-                type="text"
-                placeholder="Search problem title, ID, or keywords..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem 0.75rem 2.5rem',
-                  background: 'rgba(15, 23, 42, 0.8)',
-                  border: '1px solid var(--border-cyan)',
-                  borderRadius: '10px',
-                  color: '#FFFFFF',
-                  fontSize: '0.9rem',
-                  outline: 'none'
-                }}
-              />
-              <Search size={18} color="#94A3B8" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+          {/* UNRELEASED STATE PLACEHOLDER */}
+          {isUnreleased ? (
+            <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', margin: '2rem 0' }}>
+              <Lock size={48} color="#FF4B4B" style={{ margin: '0 auto 1rem' }} />
+              <h3 style={{ color: '#F8FAFC', fontSize: '1.3rem', marginBottom: '0.5rem' }}>Problem Statements Not Released</h3>
+              <p style={{ color: '#94A3B8', fontSize: '0.95rem' }}>
+                Problem Statements will be released soon. Please wait for the event organizer to publish them.
+              </p>
             </div>
-
-            {/* Domain Filter Pills */}
-            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
-              {domains.map((dom) => (
-                <button
-                  key={dom}
-                  onClick={() => setSelectedDomain(dom)}
-                  className={`btn-alpha-outline ${selectedDomain === dom ? 'active' : ''}`}
-                  style={{
-                    padding: '0.45rem 0.85rem',
-                    fontSize: '0.8rem',
-                    borderRadius: '20px',
-                    borderColor: selectedDomain === dom ? '#00F2FE' : 'rgba(255,255,255,0.1)',
-                    background: selectedDomain === dom ? 'rgba(0,242,254,0.15)' : 'rgba(255,255,255,0.03)',
-                    color: selectedDomain === dom ? '#00F2FE' : '#94A3B8'
-                  }}
-                >
-                  {dom}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* PROBLEM STATEMENTS GRID */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
-            {problems.map((prob) => {
-              const maxCap = prob.maxTeamCapacity || 1;
-              const isFull = prob.selectedCount >= maxCap;
-
-              return (
-                <div key={prob._id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: isFull ? 0.75 : 1 }}>
-                  <div>
-                    {/* Header Badges */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-                      <span style={{ fontFamily: 'Orbitron, monospace', fontSize: '0.9rem', fontWeight: '800', color: '#00F2FE', background: 'rgba(0, 242, 254, 0.1)', padding: '0.25rem 0.6rem', borderRadius: '6px' }}>
-                        {prob.problemId}
-                      </span>
-                      
-                      {/* 1-to-1 TEAM RESERVATION BADGE */}
-                      <span style={{
-                        fontSize: '0.78rem',
-                        fontWeight: '700',
-                        padding: '0.25rem 0.65rem',
-                        borderRadius: '12px',
-                        background: isFull ? 'rgba(255,75,75,0.2)' : 'rgba(0,230,118,0.15)',
-                        color: isFull ? '#FF4B4B' : '#00E676',
-                        border: `1px solid ${isFull ? 'rgba(255,75,75,0.4)' : 'rgba(0,230,118,0.3)'}`
-                      }}>
-                        {isFull ? 'TAKEN BY ANOTHER TEAM ❌ (1/1)' : 'AVAILABLE (0/1 Team Claimed)'}
-                      </span>
-                    </div>
-
-                    <h3 style={{ fontSize: '1.15rem', color: '#F8FAFC', marginBottom: '0.65rem', lineHeight: '1.35' }}>
-                      {prob.title}
-                    </h3>
-                    <p style={{ color: '#94A3B8', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '1rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {prob.description}
-                    </p>
-
-                    {/* Tech Badges */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '1.25rem' }}>
-                      {prob.technologies.map((tech) => (
-                        <span key={tech} style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.06)', color: '#CBD5E1', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                          {tech}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1rem', display: 'flex', gap: '0.75rem' }}>
-                    <button
-                      onClick={() => setActiveModalProblem(prob)}
-                      className="btn-alpha-outline"
-                      style={{ flex: 1, padding: '0.6rem', fontSize: '0.82rem', justifyContent: 'center' }}
-                    >
-                      View Details
-                    </button>
-
-                    <button
-                      onClick={() => setConfirmingProblem(prob)}
-                      disabled={!isSelectionPhase || isFull}
-                      className="btn-alpha-gold"
-                      style={{ flex: 1, padding: '0.6rem', fontSize: '0.82rem', justifyContent: 'center', opacity: (!isSelectionPhase || isFull) ? 0.45 : 1 }}
-                    >
-                      {isReadingPhase ? 'Locked 🔒 (Reading Phase)' : (isFull ? 'TAKEN ❌ (1/1)' : 'Select Problem')}
-                    </button>
-                  </div>
+          ) : (
+            <>
+              {/* SEARCH & DOMAIN FILTERS */}
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+                  <input
+                    type="text"
+                    placeholder="Search problem title, ID, or keywords..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem 0.75rem 2.5rem',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '1px solid var(--border-cyan)',
+                      borderRadius: '10px',
+                      color: '#FFFFFF',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                  />
+                  <Search size={18} color="#94A3B8" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Domain Filter Pills */}
+                <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+                  {domains.map((dom) => (
+                    <button
+                      key={dom}
+                      onClick={() => setSelectedDomain(dom)}
+                      className={`btn-alpha-outline ${selectedDomain === dom ? 'active' : ''}`}
+                      style={{
+                        padding: '0.45rem 0.85rem',
+                        fontSize: '0.8rem',
+                        borderRadius: '20px',
+                        borderColor: selectedDomain === dom ? '#00F2FE' : 'rgba(255,255,255,0.1)',
+                        background: selectedDomain === dom ? 'rgba(0,242,254,0.15)' : 'rgba(255,255,255,0.03)',
+                        color: selectedDomain === dom ? '#00F2FE' : '#94A3B8'
+                      }}
+                    >
+                      {dom}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* PROBLEM STATEMENTS GRID */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
+                {problems.map((prob) => {
+                  const maxCap = prob.maxTeamCapacity || 2;
+                  const count = prob.selectedCount || 0;
+                  const isFull = count >= maxCap;
+
+                  return (
+                    <div key={prob._id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: isFull ? 0.8 : 1 }}>
+                      <div>
+                        {/* Header Badges */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                          <span style={{ fontFamily: 'Orbitron, monospace', fontSize: '0.9rem', fontWeight: '800', color: '#00F2FE', background: 'rgba(0, 242, 254, 0.1)', padding: '0.25rem 0.6rem', borderRadius: '6px' }}>
+                            {prob.problemId}
+                          </span>
+                          
+                          {/* 2-TEAM CAPACITY BADGE */}
+                          <span style={{
+                            fontSize: '0.78rem',
+                            fontWeight: '700',
+                            padding: '0.25rem 0.65rem',
+                            borderRadius: '12px',
+                            background: isFull ? 'rgba(255,75,75,0.2)' : 'rgba(0,230,118,0.15)',
+                            color: isFull ? '#FF4B4B' : '#00E676',
+                            border: `1px solid ${isFull ? 'rgba(255,75,75,0.4)' : 'rgba(0,230,118,0.3)'}`
+                          }}>
+                            {isFull ? `FULL - ${count}/${maxCap} Teams` : `AVAILABLE (${count}/${maxCap} Teams Selected)`}
+                          </span>
+                        </div>
+
+                        <h3 style={{ fontSize: '1.15rem', color: '#F8FAFC', marginBottom: '0.65rem', lineHeight: '1.35' }}>
+                          {prob.title}
+                        </h3>
+                        <p style={{ color: '#94A3B8', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '1rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {prob.description}
+                        </p>
+
+                        {/* Tech Badges */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '1.25rem' }}>
+                          {prob.technologies.map((tech) => (
+                            <span key={tech} style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.06)', color: '#CBD5E1', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1rem', display: 'flex', gap: '0.75rem' }}>
+                        <button
+                          onClick={() => setActiveModalProblem(prob)}
+                          className="btn-alpha-outline"
+                          style={{ flex: 1, padding: '0.6rem', fontSize: '0.82rem', justifyContent: 'center' }}
+                        >
+                          View Details
+                        </button>
+
+                        <button
+                          onClick={() => setConfirmingProblem(prob)}
+                          disabled={!isSelectionOpen || isFull}
+                          className="btn-alpha-gold"
+                          style={{ flex: 1, padding: '0.6rem', fontSize: '0.82rem', justifyContent: 'center', opacity: (!isSelectionOpen || isFull) ? 0.45 : 1 }}
+                        >
+                          {isReleasedLocked ? 'SELECTION NOT STARTED' : (isFull ? `FULL (${count}/${maxCap} Teams)` : (isSelectionClosed ? 'SELECTION CLOSED' : 'Select Problem'))}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {/* CONFIRMATION MODAL */}
           {confirmingProblem && (
             <div className="modal-overlay">
               <div className="modal-content">
                 <h3 style={{ fontFamily: 'var(--font-heading)', color: '#FFD700', fontSize: '1.35rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <AlertCircle size={22} color="#FFD700" /> CONFIRM 1-TO-1 PROBLEM SELECTION
+                  <AlertCircle size={22} color="#FFD700" /> CONFIRM PROBLEM SELECTION
                 </h3>
                 <p style={{ color: '#94A3B8', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-                  Selecting <strong>{confirmingProblem.problemId}</strong> will claim this problem statement exclusively for your team (1 Team per Problem). Once confirmed, no other team can select it and your choice cannot be changed.
+                  Selecting <strong>{confirmingProblem.problemId}</strong> will claim a slot for your team (Maximum 2 Teams per Problem Statement). Once confirmed, your selection cannot be changed.
                 </p>
 
                 <div className="glass-card" style={{ padding: '1rem', marginBottom: '1.5rem', borderLeft: '4px solid #FFD700' }}>

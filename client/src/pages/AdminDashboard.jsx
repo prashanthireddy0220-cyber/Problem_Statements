@@ -22,7 +22,7 @@ export default function AdminDashboard() {
   const [newProblem, setNewProblem] = useState({
     problemId: '', title: '', description: '', background: '', expectedSolution: '',
     requirements: '', constraints: '', domain: 'IoT & Smart Energy', difficulty: 'Medium',
-    technologies: 'React, Node.js', maxTeamCapacity: 5, status: 'PUBLISHED'
+    technologies: 'React, Node.js', maxTeamCapacity: 2, status: 'PUBLISHED'
   });
 
   // State for Timers & Access Settings
@@ -105,17 +105,28 @@ export default function AdminDashboard() {
     }
   };
 
+  const [scheduledTimeInput, setScheduledTimeInput] = useState('');
+
   // Phase transition handler
-  const handlePhaseAction = async (actionStr) => {
+  const handlePhaseAction = async (actionStr, extraData = {}) => {
     try {
-      const res = await axios.post('/api/admin/session-control', { action: actionStr });
-      setActionMsg(`Session transition: ${actionStr} successful!`);
+      const res = await axios.post('/api/admin/session-control', { action: actionStr, ...extraData });
+      setActionMsg(`Session action '${actionStr}' applied successfully!`);
       setTimeout(() => setActionMsg(''), 3000);
       fetchAllData();
       fetchSettings();
     } catch (e) {
       alert('Failed to update session phase.');
     }
+  };
+
+  const handleScheduleSelection = async (e) => {
+    e.preventDefault();
+    if (!scheduledTimeInput) {
+      alert('Please select a valid date and time to schedule selection.');
+      return;
+    }
+    await handlePhaseAction('SCHEDULE_SELECTION', { scheduledTime: scheduledTimeInput });
   };
 
   // Seed Initial Demo Data
@@ -292,46 +303,120 @@ export default function AdminDashboard() {
         <div>
           {/* SESSION PHASE CONTROLLER CARDS */}
           <div className="glass-panel" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '1.1rem', color: '#FFD700', marginBottom: '1rem', fontFamily: 'var(--font-heading)' }}>
-              ⚡ HACKATHON SELECTION SESSION PHASE CONTROL
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.15rem', color: '#FFD700', fontFamily: 'var(--font-heading)' }}>
+                ⚡ PROBLEM STATEMENT SELECTION CONTROLLER
+              </h3>
+              
+              {/* CURRENT SELECTION STATUS BADGE */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Problem Statement Status:</span>
+                <span style={{
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: '20px',
+                  fontSize: '0.85rem',
+                  fontWeight: '800',
+                  background: !liveData.summary?.problemStatementsReleased ? 'rgba(255,75,75,0.2)' :
+                              (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION' ? 'rgba(0,230,118,0.2)' :
+                              (liveData.summary?.currentPhase === 'SELECTION_CLOSED' || liveData.summary?.currentPhase === 'CLOSED' ? 'rgba(255,75,75,0.2)' : 'rgba(255,215,0,0.2)')),
+                  color: !liveData.summary?.problemStatementsReleased ? '#FF4B4B' :
+                         (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION' ? '#00E676' :
+                         (liveData.summary?.currentPhase === 'SELECTION_CLOSED' || liveData.summary?.currentPhase === 'CLOSED' ? '#FF4B4B' : '#FFD700')),
+                  border: `1px solid ${!liveData.summary?.problemStatementsReleased ? '#FF4B4B' :
+                          (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION' ? '#00E676' :
+                          (liveData.summary?.currentPhase === 'SELECTION_CLOSED' || liveData.summary?.currentPhase === 'CLOSED' ? '#FF4B4B' : '#FFD700'))}`
+                }}>
+                  {!liveData.summary?.problemStatementsReleased ? '🔴 Not Released' :
+                   (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION' ? '🟢 Selection Open' :
+                   (liveData.summary?.currentPhase === 'SELECTION_CLOSED' || liveData.summary?.currentPhase === 'CLOSED' ? '🔴 Selection Closed' : '🟡 Released / Selection Locked'))}
+                </span>
+              </div>
+            </div>
 
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <button onClick={() => handlePhaseAction('START_READING')} className="btn-alpha-cyan" style={{ padding: '0.75rem 1.25rem' }}>
-                <Clock size={18} /> Start {settings.readingDurationMinutes || 30}-Min Reading Phase
-              </button>
-              <button onClick={() => handlePhaseAction('START_SELECTION')} className="btn-alpha-gold" style={{ padding: '0.75rem 1.25rem' }}>
-                <Zap size={18} /> Start {settings.selectionDurationMinutes || 5}-Min Selection Phase
-              </button>
-              <button onClick={() => handlePhaseAction('LOCK')} className="btn-alpha-outline" style={{ borderColor: '#FF4B4B', color: '#FF4B4B', padding: '0.75rem 1.25rem' }}>
-                <Lock size={18} /> Lock & Close Selection
-              </button>
-              <button onClick={() => handlePhaseAction('RESET')} className="btn-alpha-outline" style={{ padding: '0.75rem 1.25rem' }}>
-                <RefreshCw size={18} /> Reset Session State
+            {/* ADMIN CONTROL BUTTONS & SCHEDULER */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+              {/* Release Toggle */}
+              <div className="glass-card" style={{ padding: '1rem' }}>
+                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>1. PUBLISH CONTROL</div>
+                {liveData.summary?.problemStatementsReleased ? (
+                  <button onClick={() => handlePhaseAction('UNRELEASE_PROBLEMS')} className="btn-alpha-outline" style={{ width: '100%', borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center' }}>
+                    <Lock size={16} /> Unrelease / Hide Problems
+                  </button>
+                ) : (
+                  <button onClick={() => handlePhaseAction('RELEASE_PROBLEMS')} className="btn-alpha-cyan" style={{ width: '100%', justifyContent: 'center' }}>
+                    <Unlock size={16} /> Release Problem Statements
+                  </button>
+                )}
+              </div>
+
+              {/* Schedule Timer Input */}
+              <div className="glass-card" style={{ padding: '1rem' }}>
+                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>2. SCHEDULE SELECTION TIMER</div>
+                <form onSubmit={handleScheduleSelection} style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="datetime-local"
+                    value={scheduledTimeInput}
+                    onChange={(e) => setScheduledTimeInput(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem',
+                      background: '#0F172A',
+                      border: '1px solid var(--border-cyan)',
+                      color: '#FFF',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem'
+                    }}
+                  />
+                  <button type="submit" className="btn-alpha-cyan" style={{ padding: '0.45rem 0.75rem', fontSize: '0.8rem' }}>
+                    Schedule
+                  </button>
+                </form>
+              </div>
+
+              {/* Open Now Button */}
+              <div className="glass-card" style={{ padding: '1rem' }}>
+                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>3. IMMEDIATE OPEN</div>
+                <button onClick={() => handlePhaseAction('OPEN_NOW')} className="btn-alpha-gold" style={{ width: '100%', justifyContent: 'center' }}>
+                  <Zap size={16} /> Open Selection Now
+                </button>
+              </div>
+
+              {/* Close Button */}
+              <div className="glass-card" style={{ padding: '1rem' }}>
+                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>4. CLOSE / LOCK</div>
+                <button onClick={() => handlePhaseAction('CLOSE')} className="btn-alpha-outline" style={{ width: '100%', borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center' }}>
+                  <Lock size={16} /> Close Selection
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => handlePhaseAction('RESET')} className="btn-alpha-outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}>
+                <RefreshCw size={14} /> Reset Session State
               </button>
             </div>
           </div>
 
           {/* METRIC SUMMARY CARDS */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+            <div className="glass-card" style={{ padding: '1.25rem' }}>
+              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Problem Statements</div>
+              <div style={{ fontSize: '2rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>
+                {liveData.summary?.totalProblems || liveData.problemStatements?.length || 0}
+              </div>
+            </div>
+
+            <div className="glass-card" style={{ padding: '1.25rem' }}>
+              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Full Problems (2/2 Teams)</div>
+              <div style={{ fontSize: '2rem', fontWeight: '800', color: liveData.summary?.fullProblemsCount > 0 ? '#FF4B4B' : '#00E676', fontFamily: 'Orbitron, monospace' }}>
+                {liveData.summary?.fullProblemsCount || 0}
+              </div>
+            </div>
+
             <div className="glass-card" style={{ padding: '1.25rem' }}>
               <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Registered Teams</div>
-              <div style={{ fontSize: '2rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>
+              <div style={{ fontSize: '2rem', fontWeight: '800', color: '#F8FAFC', fontFamily: 'Orbitron, monospace' }}>
                 {liveData.summary?.totalTeams || 0}
-              </div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Active Online Sessions</div>
-              <div style={{ fontSize: '2rem', fontWeight: '800', color: '#00E676', fontFamily: 'Orbitron, monospace' }}>
-                {liveData.summary?.teamsLoggedIn || 0}
-              </div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Teams Reading</div>
-              <div style={{ fontSize: '2rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>
-                {liveData.summary?.teamsReading || 0}
               </div>
             </div>
 
@@ -339,6 +424,13 @@ export default function AdminDashboard() {
               <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Selections Completed</div>
               <div style={{ fontSize: '2rem', fontWeight: '800', color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>
                 {liveData.summary?.selectionsCompleted || 0}
+              </div>
+            </div>
+
+            <div className="glass-card" style={{ padding: '1.25rem' }}>
+              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Scheduled Selection Start</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#00F2FE', marginTop: '0.4rem' }}>
+                {liveData.summary?.selectionScheduledStart ? new Date(liveData.summary.selectionScheduledStart).toLocaleString() : 'Not Scheduled'}
               </div>
             </div>
           </div>

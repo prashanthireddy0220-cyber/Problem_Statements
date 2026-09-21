@@ -93,9 +93,13 @@ async function triggerAutoSeed() {
 
     const psCount = await ProblemStatement.countDocuments();
     if (psCount === 0) {
-      console.log('🌱 Seeding Problem Statements (PS-001 to PS-043)...');
+      console.log('🌱 Seeding Problem Statements (PS-001 to PS-043 with 2-Team capacity limit)...');
       const problemStatementsData = require('./data/problemStatements');
-      await ProblemStatement.insertMany(problemStatementsData);
+      const preparedData = problemStatementsData.map(p => ({ ...p, maxTeamCapacity: 2 }));
+      await ProblemStatement.insertMany(preparedData);
+    } else {
+      // Ensure all existing problem statements have maxTeamCapacity: 2 as per requirement
+      await ProblemStatement.updateMany({ maxTeamCapacity: { $ne: 2 } }, { $set: { maxTeamCapacity: 2 } });
     }
 
     const teamCount = await Team.countDocuments();
