@@ -17,6 +17,18 @@ const extractErrorMessage = (err, fallback) => {
   return fallback;
 };
 
+const getCleanBaseUrl = (rawUrl) => {
+  if (!rawUrl) return '';
+  let cleaned = rawUrl.trim();
+  while (cleaned.endsWith('/')) {
+    cleaned = cleaned.slice(0, -1);
+  }
+  if (cleaned.endsWith('/api')) {
+    cleaned = cleaned.slice(0, -4);
+  }
+  return cleaned;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('alpha_user');
@@ -29,23 +41,16 @@ export const AuthProvider = ({ children }) => {
 
   // Configure Axios Base URL safely for local and production environments
   useEffect(() => {
-    let baseUrl = import.meta.env.VITE_API_URL || '';
+    let rawUrl = import.meta.env.VITE_API_URL || '';
     
     // Automatically sanitize localhost URL when running in production/remote deployments
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
-        baseUrl = '';
+      if (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')) {
+        rawUrl = '';
       }
     }
     
-    if (baseUrl) {
-      if (baseUrl.endsWith('/api')) {
-        baseUrl = baseUrl.slice(0, -4);
-      }
-      axios.defaults.baseURL = baseUrl;
-    } else {
-      axios.defaults.baseURL = '';
-    }
+    axios.defaults.baseURL = getCleanBaseUrl(rawUrl);
   }, []);
 
   // Set default authorization header on axios
