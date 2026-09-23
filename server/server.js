@@ -139,15 +139,53 @@ async function triggerAutoSeed() {
     const validTeamIds = authorizedTeams.map(t => t.teamId);
     const validRegNums = authorizedTeams.map(t => t.regNum);
 
-    console.log(`🧹 Cleaning up legacy duplicate teams/leads not in 60 authorized list...`);
-    await Team.deleteMany({ name: { $nin: validTeamIds } });
-    await TeamLead.deleteMany({ registrationNumber: { $nin: validRegNums } });
-    await Participant.deleteMany({ registrationNumber: { $nin: validRegNums } });
+    console.log(`🧹 Purging legacy/invalid team records from database...`);
+
+    // 1. Delete Team documents where name is NOT in validTeamIds OR teamLeadRegNum is NOT in validRegNums OR teamLeadRegNum is missing
+    await Team.deleteMany({
+      $or: [
+        { name: { $nin: validTeamIds } },
+        { teamLeadRegNum: { $nin: validRegNums } },
+        { teamLeadRegNum: { $exists: false } },
+        { teamLeadRegNum: null },
+        { teamLeadRegNum: '' }
+      ]
+    });
+
+    // 2. Delete TeamLead documents where registrationNumber is NOT in validRegNums OR missing
+    await TeamLead.deleteMany({
+      $or: [
+        { registrationNumber: { $nin: validRegNums } },
+        { registrationNumber: { $exists: false } },
+        { registrationNumber: null },
+        { registrationNumber: '' }
+      ]
+    });
+
+    // 3. Delete Participant documents where registrationNumber is NOT in validRegNums
+    await Participant.deleteMany({
+      $or: [
+        { registrationNumber: { $nin: validRegNums } },
+        { registrationNumber: { $exists: false } },
+        { registrationNumber: null }
+      ]
+    });
 
     console.log(`🌱 Ensuring all ${authorizedTeams.length} authorized Teams & Team Leads exist (ALPHA-001 to ALPHA-060)...`);
 
     for (const item of authorizedTeams) {
-      let teamDoc = await Team.findOne({ name: item.teamId });
+      // Deduplicate teams with duplicate names if any exist
+      const teamDocs = await Team.find({ name: item.teamId });
+      let teamDoc = null;
+      if (teamDocs.length > 0) {
+        teamDoc = teamDocs.find(t => t.selectionConfirmed) || teamDocs[0];
+        for (const doc of teamDocs) {
+          if (doc._id.toString() !== teamDoc._id.toString()) {
+            await Team.findByIdAndDelete(doc._id);
+          }
+        }
+      }
+
       if (!teamDoc) {
         teamDoc = await Team.create({
           name: item.teamId,
@@ -167,9 +205,20 @@ async function triggerAutoSeed() {
         await teamDoc.save();
       }
 
-      let leadDoc = await TeamLead.findOne({ registrationNumber: item.regNum });
+      // Deduplicate TeamLeads for regNum
+      const leadDocs = await TeamLead.find({ registrationNumber: item.regNum });
+      let leadDoc = null;
+      if (leadDocs.length > 0) {
+        leadDoc = leadDocs[0];
+        for (const doc of leadDocs) {
+          if (doc._id.toString() !== leadDoc._id.toString()) {
+            await TeamLead.findByIdAndDelete(doc._id);
+          }
+        }
+      }
+
       if (!leadDoc) {
-        await TeamLead.create({
+        leadDoc = await TeamLead.create({
           registrationNumber: item.regNum,
           name: `Team Lead (${item.teamId})`,
           teamId: teamDoc._id,
@@ -182,6 +231,7 @@ async function triggerAutoSeed() {
         await leadDoc.save();
       }
 
+      // Ensure Participant doc exists
       let partDoc = await Participant.findOne({ registrationNumber: item.regNum });
       if (!partDoc) {
         await Participant.create({
@@ -193,6 +243,10 @@ async function triggerAutoSeed() {
           isTeamLead: true,
           qrCodeData: item.regNum
         });
+      } else {
+        partDoc.teamName = item.teamId;
+        partDoc.name = `Team Lead (${item.teamId})`;
+        await partDoc.save();
       }
     }
 
