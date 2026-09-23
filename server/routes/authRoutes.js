@@ -8,7 +8,7 @@ const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const AUTHORIZED_TEAMS = require('../data/teamsData');
 
 // 1. TEAM LEAD LOGIN (Strict 2-Field Authentication & Single-Device Access)
-router.post('/team-lead/login', async (req, res) => {
+const handleTeamLeadLogin = async (req, res) => {
   try {
     const { teamId, registrationNumber, deviceId } = req.body;
 
@@ -134,6 +134,16 @@ router.post('/team-lead/login', async (req, res) => {
     console.error('Team lead login error:', err);
     return res.status(500).json({ error: 'Server error during authentication.' });
   }
+};
+
+// Register POST handlers for all path variants
+router.post('/team-lead/login', handleTeamLeadLogin);
+router.post('/team-lead-login', handleTeamLeadLogin);
+router.post('/login', handleTeamLeadLogin);
+
+// Register GET handler for friendly browser access response
+router.get('/team-lead/login', (req, res) => {
+  return res.json({ status: 'ACTIVE', message: 'Team Lead Login endpoint is active. Submit a POST request with teamId and registrationNumber.' });
 });
 
 // 2. ADMIN LOGIN
