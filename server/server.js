@@ -83,8 +83,18 @@ async function triggerAutoSeed() {
     const { Admin, Volunteer, SystemSettings, ProblemStatement, Team, TeamLead, Participant, AttendanceSession } = require('./models/Schema');
     const bcrypt = require('bcryptjs');
 
-    // Clean up legacy index teamId_1 if it exists in MongoDB Atlas
-    await Team.collection.dropIndex('teamId_1').catch(() => {});
+    // Clean up all legacy indexes on teams collection (e.g. payment.utr_1, teamId_1) except _id_ and name_1
+    try {
+      const indexes = await Team.collection.indexes();
+      for (const idx of indexes) {
+        if (idx.name !== '_id_' && idx.name !== 'name_1') {
+          await Team.collection.dropIndex(idx.name).catch(() => {});
+          console.log(`🧹 Dropped legacy index '${idx.name}' from teams collection.`);
+        }
+      }
+    } catch (e) {
+      // Ignore if collection does not exist yet
+    }
 
     const adminExists = await Admin.findOne({ username: 'admin' });
     if (!adminExists) {

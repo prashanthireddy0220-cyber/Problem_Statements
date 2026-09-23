@@ -299,6 +299,15 @@ router.post('/seed', async (req, res) => {
     }
 
     // E. Seed Authorized Teams & Registered Team Leads (ALPHA-001 to ALPHA-060)
+    try {
+      const indexes = await Team.collection.indexes();
+      for (const idx of indexes) {
+        if (idx.name !== '_id_' && idx.name !== 'name_1') {
+          await Team.collection.dropIndex(idx.name).catch(() => {});
+        }
+      }
+    } catch (e) {}
+
     const authorizedTeams = require('../data/teamsData');
     for (const item of authorizedTeams) {
       let teamDoc = await Team.findOne({ name: item.teamId });
