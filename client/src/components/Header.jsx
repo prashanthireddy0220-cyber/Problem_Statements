@@ -64,13 +64,7 @@ export default function Header() {
           ) : (
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <Link to="/team-lead/login" className="btn-alpha-cyan" style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}>
-                Team Lead
-              </Link>
-              <Link to="/volunteer/login" className="btn-alpha-outline" style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem', borderColor: 'rgba(255, 215, 0, 0.4)', color: '#FFD700' }}>
-                Volunteer
-              </Link>
-              <Link to="/admin/login" className="btn-alpha-outline" style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem', borderColor: 'rgba(0, 242, 254, 0.4)', color: '#00F2FE' }}>
-                Admin
+                Team Lead Portal
               </Link>
             </div>
           )}
