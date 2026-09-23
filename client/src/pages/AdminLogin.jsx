@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, LogIn, Lock, AlertCircle, KeyRound } from 'lucide-react';
 
 export default function AdminLogin() {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { loginAdmin } = useAuth();
@@ -61,6 +61,7 @@ export default function AdminLogin() {
             </label>
             <input
               type="text"
+              placeholder="Enter Admin Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               style={{
@@ -81,6 +82,7 @@ export default function AdminLogin() {
             </label>
             <input
               type="password"
+              placeholder="Enter Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{

@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { QrCode, LogIn, Lock, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export default function VolunteerLogin() {
-  const [username, setUsername] = useState('volunteer1');
-  const [password, setPassword] = useState('vol123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { loginVolunteer } = useAuth();
@@ -61,6 +61,7 @@ export default function VolunteerLogin() {
             </label>
             <input
               type="text"
+              placeholder="Enter Volunteer Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               style={{
@@ -81,6 +82,7 @@ export default function VolunteerLogin() {
             </label>
             <input
               type="password"
+              placeholder="Enter Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{

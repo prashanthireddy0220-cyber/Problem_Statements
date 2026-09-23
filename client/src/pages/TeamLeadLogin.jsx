@@ -11,12 +11,10 @@ export default function TeamLeadLogin() {
   const { loginTeamLead } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = async (e, demoTeamId = null, demoRegNum = null) => {
+  const handleLogin = async (e) => {
     if (e) e.preventDefault();
-    const targetTeamId = demoTeamId || teamId;
-    const targetRegNum = demoRegNum || registrationNumber;
 
-    if (!targetTeamId.trim() || !targetRegNum.trim()) {
+    if (!teamId.trim() || !registrationNumber.trim()) {
       setError('Please enter both Team ID and Team Lead Registration Number.');
       return;
     }
@@ -25,7 +23,7 @@ export default function TeamLeadLogin() {
     setLoading(true);
 
     const deviceId = `browser-device-${Math.random().toString(36).substring(2, 9)}`;
-    const result = await loginTeamLead(targetTeamId, targetRegNum, deviceId);
+    const result = await loginTeamLead(teamId, registrationNumber, deviceId);
 
     setLoading(false);
     if (result.success) {
@@ -34,14 +32,6 @@ export default function TeamLeadLogin() {
       setError(result.error || 'Invalid Team ID or Team Lead Registration Number');
     }
   };
-
-  const sampleDemos = [
-    { teamId: 'ALPHA-001', regNum: '9924008110' },
-    { teamId: 'ALPHA-002', regNum: '99230041040' },
-    { teamId: 'ALPHA-003', regNum: '9924005337' },
-    { teamId: 'ALPHA-004', regNum: '99240040829' },
-    { teamId: 'ALPHA-005', regNum: '99230041058' }
-  ];
 
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
@@ -86,7 +76,7 @@ export default function TeamLeadLogin() {
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
-                placeholder="e.g. ALPHA-001"
+                placeholder="Enter Team ID"
                 value={teamId}
                 onChange={(e) => setTeamId(e.target.value.toUpperCase())}
                 style={{
@@ -114,7 +104,7 @@ export default function TeamLeadLogin() {
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
-                placeholder="e.g. 9924008110"
+                placeholder="Enter Registration Number"
                 value={registrationNumber}
                 onChange={(e) => setRegistrationNumber(e.target.value.toUpperCase())}
                 style={{
@@ -147,29 +137,6 @@ export default function TeamLeadLogin() {
             )}
           </button>
         </form>
-
-        {/* DEMO QUICK LOGIN BUTTONS */}
-        <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-          <div style={{ fontSize: '0.8rem', color: '#94A3B8', textAlign: 'center', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-            <Users size={14} color="#00F2FE" /> Quick Demo Team Lead Logins:
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
-            {sampleDemos.map((demo) => (
-              <button
-                key={demo.teamId}
-                onClick={(e) => {
-                  setTeamId(demo.teamId);
-                  setRegistrationNumber(demo.regNum);
-                  handleLogin(e, demo.teamId, demo.regNum);
-                }}
-                className="btn-alpha-outline"
-                style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem', borderRadius: '8px' }}
-              >
-                {demo.teamId} ({demo.regNum})
-              </button>
-            ))}
-          </div>
-        </div>
 
       </div>
     </div>
