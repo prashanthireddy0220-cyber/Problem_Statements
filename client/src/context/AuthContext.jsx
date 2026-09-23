@@ -3,6 +3,20 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
+const extractErrorMessage = (err, fallback) => {
+  if (!err) return fallback;
+  if (typeof err === 'string') return err;
+  const data = err.response?.data;
+  if (typeof data === 'string') return data;
+  if (data && typeof data.error === 'string') return data.error;
+  if (data && typeof data.message === 'string') return data.message;
+  if (data && typeof data.error === 'object' && data.error !== null) {
+    return data.error.message || data.error.error || JSON.stringify(data.error);
+  }
+  if (err.message && typeof err.message === 'string') return err.message;
+  return fallback;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('alpha_user');
@@ -76,7 +90,7 @@ export const AuthProvider = ({ children }) => {
       setRevokedMessage(null);
       return { success: true, user };
     } catch (err) {
-      return { success: false, error: err.response?.data?.error || 'Team lead login failed.' };
+      return { success: false, error: extractErrorMessage(err, 'Team lead login failed.') };
     }
   };
 
@@ -95,7 +109,7 @@ export const AuthProvider = ({ children }) => {
       setRevokedMessage(null);
       return { success: true, user };
     } catch (err) {
-      return { success: false, error: err.response?.data?.error || 'Admin login failed.' };
+      return { success: false, error: extractErrorMessage(err, 'Admin login failed.') };
     }
   };
 
@@ -114,7 +128,7 @@ export const AuthProvider = ({ children }) => {
       setRevokedMessage(null);
       return { success: true, user };
     } catch (err) {
-      return { success: false, error: err.response?.data?.error || 'Volunteer login failed.' };
+      return { success: false, error: extractErrorMessage(err, 'Volunteer login failed.') };
     }
   };
 

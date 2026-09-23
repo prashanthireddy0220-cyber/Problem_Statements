@@ -50,7 +50,7 @@ export default function AdminLogin() {
         {error && (
           <div style={{ background: 'rgba(255, 75, 75, 0.15)', border: '1px solid rgba(255, 75, 75, 0.4)', color: '#FF4B4B', padding: '0.85rem 1rem', borderRadius: '10px', fontSize: '0.88rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <AlertCircle size={18} />
-            <span>{error}</span>
+            <span>{typeof error === 'string' ? error : (error?.message || error?.error || String(error))}</span>
           </div>
         )}
 
