@@ -39,14 +39,16 @@ export const AuthProvider = ({ children }) => {
   const [sessionId, setSessionId] = useState(() => localStorage.getItem('alpha_session_id') || null);
   const [revokedMessage, setRevokedMessage] = useState(null);
 
+  const PRODUCTION_BACKEND_URL = 'https://problem-statements-w7wq.onrender.com';
+
   // Configure Axios Base URL safely for local and production environments
   useEffect(() => {
     let rawUrl = import.meta.env.VITE_API_URL || '';
     
-    // Automatically sanitize localhost URL when running in production/remote deployments
+    // Automatically fallback to Render production backend when running on remote deployments (like Vercel)
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      if (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')) {
-        rawUrl = '';
+      if (!rawUrl || rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')) {
+        rawUrl = PRODUCTION_BACKEND_URL;
       }
     }
     
