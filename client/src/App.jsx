@@ -141,14 +141,16 @@ export default function App() {
                 <AdminDashboard />
               </ProtectedRoute>
             } />
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
+            <Route path="/admin-login" element={<Navigate to="/admin/login" replace />} />
 
             <Route path="/volunteer/dashboard" element={
               <ProtectedRoute allowedRoles={['VOLUNTEER', 'ADMIN']}>
                 <VolunteerScanner />
               </ProtectedRoute>
             } />
-            <Route path="/volunteer" element={<Navigate to="/volunteer/dashboard" replace />} />
+            <Route path="/volunteer" element={<Navigate to="/volunteer/login" replace />} />
+            <Route path="/volunteer-login" element={<Navigate to="/volunteer/login" replace />} />
 
             {/* Catch-all Fallback */}
             <Route path="*" element={<RootRedirect />} />
