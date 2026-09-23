@@ -229,9 +229,13 @@ export default function AdminDashboard() {
   };
 
   // Data for Charts
-  const pieData = [
+  const totalAttScans = (attStats.present || 0) + (attStats.absent || 0);
+  const hasPieData = totalAttScans > 0;
+  const pieData = hasPieData ? [
     { name: 'Present', value: attStats.present || 0, color: '#00E676' },
     { name: 'Absent', value: attStats.absent || 0, color: '#FF4B4B' }
+  ] : [
+    { name: 'No Scans Yet', value: 1, color: '#334155' }
   ];
 
   return (
@@ -799,10 +803,20 @@ export default function AdminDashboard() {
             {/* Pie Chart */}
             <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
               <h3 style={{ fontSize: '1rem', color: '#00F2FE', marginBottom: '1rem' }}>Present vs Absent Overview</h3>
-              <div style={{ width: '100%', height: '260px' }}>
-                <ResponsiveContainer width="100%" height="100%">
+              <div style={{ width: '100%', height: '260px', minHeight: '260px' }}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                    <Pie 
+                      data={pieData} 
+                      dataKey="value" 
+                      nameKey="name" 
+                      cx="50%" 
+                      cy="50%" 
+                      outerRadius={70} 
+                      isAnimationActive={false}
+                      minAngle={3}
+                      label={hasPieData ? ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%` : false}
+                    >
                       {pieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}

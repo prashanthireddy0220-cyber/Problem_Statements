@@ -49,7 +49,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const navigate = useNavigate();
   
   if (!token || !user) {
-    return <Navigate to="/team-lead/login" replace />;
+    const loginRoute = (allowedRoles && allowedRoles.includes('ADMIN')) ? '/admin/login' : 
+                       (allowedRoles && allowedRoles.includes('VOLUNTEER')) ? '/volunteer/login' : '/team-lead/login';
+    return <Navigate to={loginRoute} replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
