@@ -120,47 +120,63 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
   }
 });
 
-// 3. GET LIVE MONITORING & TEAM SELECTION STATUSES
 router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
     const settings = await SystemSettings.findOne() || {};
-    const teams = await Team.find().sort({ name: 1 });
-    const teamLeads = await TeamLead.find();
+    const authorizedTeams = require('../data/teamsData');
+    const validTeamIds = authorizedTeams.map(t => t.teamId);
+    const validRegNums = authorizedTeams.map(t => t.regNum);
+
+    // Auto-purge any legacy/invalid/unknown teams from MongoDB immediately on fetch
+    await Team.deleteMany({
+      $or: [
+        { name: { $nin: validTeamIds } },
+        { teamLeadRegNum: { $nin: validRegNums } },
+        { teamLeadRegNum: { $exists: false } },
+        { teamLeadRegNum: null },
+        { teamLeadRegNum: '' }
+      ]
+    });
+
+    const teams = await Team.find({ name: { $in: validTeamIds } }).sort({ name: 1 });
+    const teamLeads = await TeamLead.find({ registrationNumber: { $in: validRegNums } });
     const activeSessions = await ActiveSession.find({ role: 'TEAM_LEAD' });
     const problemStatements = await ProblemStatement.find();
 
     const activeRegNums = new Set(activeSessions.map(s => s.registrationNumber));
 
-    const activity = teams.map(team => {
-      const lead = teamLeads.find(l => l.registrationNumber === team.teamLeadRegNum);
-      const isOnline = lead && activeRegNums.has(lead.registrationNumber);
+    const activity = teams
+      .filter(team => team.name && team.name.startsWith('ALPHA-') && team.teamLeadRegNum)
+      .map(team => {
+        const lead = teamLeads.find(l => l.registrationNumber === team.teamLeadRegNum);
+        const isOnline = lead && activeRegNums.has(lead.registrationNumber);
 
-      let statusStr = '⚪ Not Started';
-      if (team.selectionConfirmed) {
-        statusStr = '✅ Selection Completed';
-      } else if (isOnline) {
-        statusStr = (settings.currentPhase === 'SELECTION_OPEN' || settings.currentPhase === 'SELECTION') ? '🟠 Selecting' : '🟢 Viewing';
-      }
+        let statusStr = '⚪ Not Started';
+        if (team.selectionConfirmed) {
+          statusStr = '✅ Selection Completed';
+        } else if (isOnline) {
+          statusStr = (settings.currentPhase === 'SELECTION_OPEN' || settings.currentPhase === 'SELECTION') ? '🟠 Selecting' : '🟢 Viewing';
+        }
 
-      return {
-        teamId: team._id,
-        teamName: team.name || team.teamId || 'ALPHA-000',
-        teamLeadRegNum: team.teamLeadRegNum || (lead ? lead.registrationNumber : '—'),
-        teamLeadName: lead ? lead.name : (team.members && team.members[0] ? team.members[0].name : `Team Lead (${team.name || team.teamId})`),
-        college: team.college || 'KARE',
-        isOnline,
-        statusStr,
-        selectedProblemCode: team.selectedProblemCode,
-        selectionConfirmed: team.selectionConfirmed,
-        selectedAt: team.selectedAt
-      };
-    });
+        return {
+          teamId: team._id,
+          teamName: team.name,
+          teamLeadRegNum: team.teamLeadRegNum,
+          teamLeadName: lead ? lead.name : `Team Lead (${team.name})`,
+          college: team.college || 'KARE',
+          isOnline,
+          statusStr,
+          selectedProblemCode: team.selectedProblemCode,
+          selectionConfirmed: team.selectionConfirmed,
+          selectedAt: team.selectedAt
+        };
+      });
 
     const totalProblems = problemStatements.length;
     const fullProblemsCount = problemStatements.filter(p => p.selectedCount >= (p.maxTeamCapacity || 2)).length;
 
     const summary = {
-      totalTeams: teams.length,
+      totalTeams: activity.length,
       teamsLoggedIn: activeSessions.length,
       teamsReading: activity.filter(a => a.statusStr.includes('Viewing')).length,
       teamsSelecting: activity.filter(a => a.statusStr.includes('Selecting')).length,
@@ -175,6 +191,7 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
 
     return res.json({ summary, teams: activity, problemStatements });
   } catch (err) {
+    console.error('Live activity error:', err);
     return res.status(500).json({ error: 'Failed to fetch live activity data.' });
   }
 });

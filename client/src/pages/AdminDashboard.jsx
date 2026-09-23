@@ -398,106 +398,122 @@ export default function AdminDashboard() {
           </div>
 
           {/* METRIC SUMMARY CARDS */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-            <div className="glass-card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Problem Statements</div>
-              <div style={{ fontSize: '2rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>
-                {liveData.summary?.totalProblems || liveData.problemStatements?.length || 0}
-              </div>
-            </div>
+          {(() => {
+            const validTeams = (liveData.teams || []).filter(t => 
+              t.teamName && 
+              t.teamName !== 'Unknown' && 
+              t.teamLeadName !== 'Unknown' && 
+              t.teamLeadRegNum && 
+              t.teamLeadRegNum !== '—' &&
+              t.teamName.startsWith('ALPHA-')
+            );
+            const totalTeamsCount = validTeams.length || liveData.summary?.totalTeams || 0;
 
-            <div className="glass-card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Full Problems (2/2 Teams)</div>
-              <div style={{ fontSize: '2rem', fontWeight: '800', color: liveData.summary?.fullProblemsCount > 0 ? '#FF4B4B' : '#00E676', fontFamily: 'Orbitron, monospace' }}>
-                {liveData.summary?.fullProblemsCount || 0}
-              </div>
-            </div>
+            return (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+                  <div className="glass-card" style={{ padding: '1.25rem' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Problem Statements</div>
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>
+                      {liveData.summary?.totalProblems || liveData.problemStatements?.length || 0}
+                    </div>
+                  </div>
 
-            <div className="glass-card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Registered Teams</div>
-              <div style={{ fontSize: '2rem', fontWeight: '800', color: '#F8FAFC', fontFamily: 'Orbitron, monospace' }}>
-                {liveData.summary?.totalTeams || 0}
-              </div>
-            </div>
+                  <div className="glass-card" style={{ padding: '1.25rem' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Full Problems (2/2 Teams)</div>
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color: liveData.summary?.fullProblemsCount > 0 ? '#FF4B4B' : '#00E676', fontFamily: 'Orbitron, monospace' }}>
+                      {liveData.summary?.fullProblemsCount || 0}
+                    </div>
+                  </div>
 
-            <div className="glass-card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Selections Completed</div>
-              <div style={{ fontSize: '2rem', fontWeight: '800', color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>
-                {liveData.summary?.selectionsCompleted || 0}
-              </div>
-            </div>
+                  <div className="glass-card" style={{ padding: '1.25rem' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Registered Teams</div>
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color: '#F8FAFC', fontFamily: 'Orbitron, monospace' }}>
+                      {totalTeamsCount}
+                    </div>
+                  </div>
 
-            <div className="glass-card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Scheduled Selection Start</div>
-              <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#00F2FE', marginTop: '0.4rem' }}>
-                {liveData.summary?.selectionScheduledStart ? new Date(liveData.summary.selectionScheduledStart).toLocaleString() : 'Not Scheduled'}
-              </div>
-            </div>
-          </div>
+                  <div className="glass-card" style={{ padding: '1.25rem' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Selections Completed</div>
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>
+                      {liveData.summary?.selectionsCompleted || 0}
+                    </div>
+                  </div>
 
-          {/* LIVE TEAM ACTIVITY TABLE */}
-          <div className="glass-panel" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.1rem', color: '#F8FAFC', marginBottom: '1rem' }}>LIVE TEAM ACTIVITY MONITOR</h3>
+                  <div className="glass-card" style={{ padding: '1.25rem' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Scheduled Selection Start</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#00F2FE', marginTop: '0.4rem' }}>
+                      {liveData.summary?.selectionScheduledStart ? new Date(liveData.summary.selectionScheduledStart).toLocaleString() : 'Not Scheduled'}
+                    </div>
+                  </div>
+                </div>
 
-            <div className="alpha-table-container">
-              <table className="alpha-table">
-                <thead>
-                  <tr>
-                    <th>Team Name</th>
-                    <th>Team Lead Reg No</th>
-                    <th>Lead Name</th>
-                    <th>College</th>
-                    <th>Current Activity</th>
-                    <th>Selected Problem</th>
-                    <th>Single-Device Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(liveData.teams || []).map((t) => (
-                    <tr key={t.teamId}>
-                      <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{t.teamName}</td>
-                      <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{t.teamLeadRegNum}</td>
-                      <td>{t.teamLeadName}</td>
-                      <td>{t.college}</td>
-                      <td>
-                        <span style={{
-                          padding: '0.25rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '700',
-                          background: t.selectionConfirmed ? 'rgba(0,230,118,0.2)' : 'rgba(0,242,254,0.15)',
-                          color: t.selectionConfirmed ? '#00E676' : '#00F2FE'
-                        }}>
-                          {t.statusStr}
-                        </span>
-                      </td>
-                      <td style={{ fontFamily: 'Orbitron, monospace', color: '#FFD700' }}>
-                        {t.selectedProblemCode || '—'}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            onClick={() => handleRevokeSession(t.teamLeadRegNum)}
-                            className="btn-alpha-outline"
-                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', color: '#FF4B4B', borderColor: '#FF4B4B' }}
-                            title="Revoke session instantly"
-                          >
-                            Revoke Device Session
-                          </button>
-                          {t.selectionConfirmed && (
-                            <button
-                              onClick={() => handleResetTeamSelection(t.teamId, t.teamName)}
-                              className="btn-alpha-outline"
-                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem' }}
-                            >
-                              Reset Selection
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                {/* LIVE TEAM ACTIVITY TABLE */}
+                <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1.1rem', color: '#F8FAFC', marginBottom: '1rem' }}>LIVE TEAM ACTIVITY MONITOR</h3>
+
+                  <div className="alpha-table-container">
+                    <table className="alpha-table">
+                      <thead>
+                        <tr>
+                          <th>Team Name</th>
+                          <th>Team Lead Reg No</th>
+                          <th>Lead Name</th>
+                          <th>College</th>
+                          <th>Current Activity</th>
+                          <th>Selected Problem</th>
+                          <th>Single-Device Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {validTeams.map((t) => (
+                          <tr key={t.teamId}>
+                            <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{t.teamName}</td>
+                            <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{t.teamLeadRegNum}</td>
+                            <td>{t.teamLeadName}</td>
+                            <td>{t.college}</td>
+                            <td>
+                              <span style={{
+                                padding: '0.25rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '700',
+                                background: t.selectionConfirmed ? 'rgba(0,230,118,0.2)' : 'rgba(0,242,254,0.15)',
+                                color: t.selectionConfirmed ? '#00E676' : '#00F2FE'
+                              }}>
+                                {t.statusStr}
+                              </span>
+                            </td>
+                            <td style={{ fontFamily: 'Orbitron, monospace', color: '#FFD700' }}>
+                              {t.selectedProblemCode || '—'}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                  onClick={() => handleRevokeSession(t.teamLeadRegNum)}
+                                  className="btn-alpha-outline"
+                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', color: '#FF4B4B', borderColor: '#FF4B4B' }}
+                                  title="Revoke session instantly"
+                                >
+                                  Revoke Device Session
+                                </button>
+                                {t.selectionConfirmed && (
+                                  <button
+                                    onClick={() => handleResetTeamSelection(t.teamId, t.teamName)}
+                                    className="btn-alpha-outline"
+                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem' }}
+                                  >
+                                    Reset Selection
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
