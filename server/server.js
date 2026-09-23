@@ -48,14 +48,33 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'College Hackathon ALPHA Server Running', time: new Date() });
 });
 
+const fs = require('fs');
+
 // Serve frontend static build if dist exists
 const clientDistPath = path.join(__dirname, '../client/dist');
-app.use(express.static(clientDistPath));
+const indexPath = path.join(clientDistPath, 'index.html');
+
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+}
+
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api')) {
     return res.status(404).json({ error: 'API route not found' });
   }
-  res.sendFile(path.join(clientDistPath, 'index.html'));
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  return res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+      <head><title>College Hackathon ALPHA Server</title></head>
+      <body style="font-family: sans-serif; text-align: center; padding: 3rem; background: #0f172a; color: #f8fafc;">
+        <h1 style="color: #00f2fe;">🚀 EVENT ALPHA HACKATHON SERVER ACTIVE</h1>
+        <p>Backend API server is running successfully.</p>
+      </body>
+    </html>
+  `);
 });
 
 // Seed helper
@@ -63,6 +82,9 @@ async function triggerAutoSeed() {
   try {
     const { Admin, Volunteer, SystemSettings, ProblemStatement, Team, TeamLead, Participant, AttendanceSession } = require('./models/Schema');
     const bcrypt = require('bcryptjs');
+
+    // Clean up legacy index teamId_1 if it exists in MongoDB Atlas
+    await Team.collection.dropIndex('teamId_1').catch(() => {});
 
     const adminExists = await Admin.findOne({ username: 'admin' });
     if (!adminExists) {
@@ -110,6 +132,7 @@ async function triggerAutoSeed() {
       if (!teamDoc) {
         teamDoc = await Team.create({
           name: item.teamId,
+          teamId: item.teamId,
           teamLeadRegNum: item.regNum,
           college: 'KARE',
           department: 'CSE',

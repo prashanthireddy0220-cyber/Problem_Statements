@@ -305,6 +305,7 @@ router.post('/seed', async (req, res) => {
       if (!teamDoc) {
         teamDoc = await Team.create({
           name: item.teamId,
+          teamId: item.teamId,
           teamLeadRegNum: item.regNum,
           college: 'KARE',
           department: 'CSE',

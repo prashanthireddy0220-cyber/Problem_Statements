@@ -37,6 +37,7 @@ router.post('/team-lead/login', async (req, res) => {
       if (!team) {
         team = await Team.create({
           name: cleanTeamId,
+          teamId: cleanTeamId,
           teamLeadRegNum: cleanRegNum,
           college: 'KARE',
           department: 'CSE',

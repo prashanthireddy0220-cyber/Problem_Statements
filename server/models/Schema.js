@@ -22,6 +22,7 @@ const TeamLeadSchema = new mongoose.Schema({
 // 3. Team Schema
 const TeamSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
+  teamId: { type: String },
   teamLeadRegNum: { type: String, required: true },
   college: { type: String, default: 'KARE' },
   department: { type: String, default: 'CSE' },
