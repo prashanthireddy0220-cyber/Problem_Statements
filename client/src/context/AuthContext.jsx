@@ -13,14 +13,26 @@ export const AuthProvider = ({ children }) => {
   const [sessionId, setSessionId] = useState(() => localStorage.getItem('alpha_session_id') || null);
   const [revokedMessage, setRevokedMessage] = useState(null);
 
-  // Configure Axios Base URL from environment variable VITE_API_URL
-  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-  
+  // Configure Axios Base URL safely for local and production environments
   useEffect(() => {
-    if (API_BASE_URL && !API_BASE_URL.startsWith('/')) {
-      axios.defaults.baseURL = API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
+    let baseUrl = import.meta.env.VITE_API_URL || '';
+    
+    // Automatically sanitize localhost URL when running in production/remote deployments
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+        baseUrl = '';
+      }
     }
-  }, [API_BASE_URL]);
+    
+    if (baseUrl) {
+      if (baseUrl.endsWith('/api')) {
+        baseUrl = baseUrl.slice(0, -4);
+      }
+      axios.defaults.baseURL = baseUrl;
+    } else {
+      axios.defaults.baseURL = '';
+    }
+  }, []);
 
   // Set default authorization header on axios
   useEffect(() => {
