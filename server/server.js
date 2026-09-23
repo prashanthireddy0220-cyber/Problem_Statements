@@ -136,6 +136,14 @@ async function triggerAutoSeed() {
     }
 
     const authorizedTeams = require('./data/teamsData');
+    const validTeamIds = authorizedTeams.map(t => t.teamId);
+    const validRegNums = authorizedTeams.map(t => t.regNum);
+
+    console.log(`🧹 Cleaning up legacy duplicate teams/leads not in 60 authorized list...`);
+    await Team.deleteMany({ name: { $nin: validTeamIds } });
+    await TeamLead.deleteMany({ registrationNumber: { $nin: validRegNums } });
+    await Participant.deleteMany({ registrationNumber: { $nin: validRegNums } });
+
     console.log(`🌱 Ensuring all ${authorizedTeams.length} authorized Teams & Team Leads exist (ALPHA-001 to ALPHA-060)...`);
 
     for (const item of authorizedTeams) {
@@ -152,6 +160,11 @@ async function triggerAutoSeed() {
             { name: `Member 1 (${item.teamId})`, registrationNumber: `${item.regNum}-M1`, role: 'MEMBER', phone: '9876543211' }
           ]
         });
+      } else {
+        teamDoc.teamId = item.teamId;
+        teamDoc.teamLeadRegNum = item.regNum;
+        if (!teamDoc.college) teamDoc.college = 'KARE';
+        await teamDoc.save();
       }
 
       let leadDoc = await TeamLead.findOne({ registrationNumber: item.regNum });
@@ -163,6 +176,10 @@ async function triggerAutoSeed() {
           phone: '9876543210',
           email: `${item.teamId.toLowerCase()}@hackathon.edu`
         });
+      } else {
+        leadDoc.teamId = teamDoc._id;
+        leadDoc.name = `Team Lead (${item.teamId})`;
+        await leadDoc.save();
       }
 
       let partDoc = await Participant.findOne({ registrationNumber: item.regNum });

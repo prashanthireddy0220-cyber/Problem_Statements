@@ -144,10 +144,10 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
 
       return {
         teamId: team._id,
-        teamName: team.name,
-        teamLeadRegNum: team.teamLeadRegNum,
-        teamLeadName: lead ? lead.name : 'Unknown',
-        college: team.college,
+        teamName: team.name || team.teamId || 'ALPHA-000',
+        teamLeadRegNum: team.teamLeadRegNum || (lead ? lead.registrationNumber : '—'),
+        teamLeadName: lead ? lead.name : (team.members && team.members[0] ? team.members[0].name : `Team Lead (${team.name || team.teamId})`),
+        college: team.college || 'KARE',
         isOnline,
         statusStr,
         selectedProblemCode: team.selectedProblemCode,
@@ -309,6 +309,14 @@ router.post('/seed', async (req, res) => {
     } catch (e) {}
 
     const authorizedTeams = require('../data/teamsData');
+    const validTeamIds = authorizedTeams.map(t => t.teamId);
+    const validRegNums = authorizedTeams.map(t => t.regNum);
+
+    // Clean up legacy duplicate teams/leads not in authorized list
+    await Team.deleteMany({ name: { $nin: validTeamIds } });
+    await TeamLead.deleteMany({ registrationNumber: { $nin: validRegNums } });
+    await Participant.deleteMany({ registrationNumber: { $nin: validRegNums } });
+
     for (const item of authorizedTeams) {
       let teamDoc = await Team.findOne({ name: item.teamId });
       if (!teamDoc) {
@@ -323,6 +331,11 @@ router.post('/seed', async (req, res) => {
             { name: `Member 1 (${item.teamId})`, registrationNumber: `${item.regNum}-M1`, role: 'MEMBER', phone: '9876543211' }
           ]
         });
+      } else {
+        teamDoc.teamId = item.teamId;
+        teamDoc.teamLeadRegNum = item.regNum;
+        if (!teamDoc.college) teamDoc.college = 'KARE';
+        await teamDoc.save();
       }
 
       let leadDoc = await TeamLead.findOne({ registrationNumber: item.regNum });
@@ -334,6 +347,10 @@ router.post('/seed', async (req, res) => {
           phone: '9876543210',
           email: `${item.teamId.toLowerCase()}@hackathon.edu`
         });
+      } else {
+        leadDoc.teamId = teamDoc._id;
+        leadDoc.name = `Team Lead (${item.teamId})`;
+        await leadDoc.save();
       }
 
       let partDoc = await Participant.findOne({ registrationNumber: item.regNum });
