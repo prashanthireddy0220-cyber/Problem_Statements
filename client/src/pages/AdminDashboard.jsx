@@ -463,7 +463,6 @@ export default function AdminDashboard() {
                           <th>Team Name</th>
                           <th>Team Lead Reg No</th>
                           <th>Lead Name</th>
-                          <th>College</th>
                           <th>Current Activity</th>
                           <th>Selected Problem</th>
                           <th>Single-Device Action</th>
@@ -475,7 +474,6 @@ export default function AdminDashboard() {
                             <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{t.teamName}</td>
                             <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{t.teamLeadRegNum}</td>
                             <td>{t.teamLeadName}</td>
-                            <td>{t.college}</td>
                             <td>
                               <span style={{
                                 padding: '0.25rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '700',
