@@ -267,52 +267,36 @@ async function seedInstantDb() {
     }
   ]);
 
-  const sampleTeams = [
-    { regNum: 'HACK2026-001', leadName: 'Alex Rivera', teamName: 'ALPHA', college: 'KARE' },
-    { regNum: 'HACK2026-002', leadName: 'Priya Sharma', teamName: 'CYBER_DRAGONS', college: 'KARE' },
-    { regNum: 'HACK2026-003', leadName: 'David Chen', teamName: 'NEURAL_NINJAS', college: 'IIT Madras' },
-    { regNum: 'HACK2026-004', leadName: 'Ananya Reddy', teamName: 'QUANTUM_LEAP', college: 'KARE' },
-    { regNum: 'HACK2026-005', leadName: 'Marcus Vance', teamName: 'BYTE_CODERS', college: 'NIT Trichy' }
-  ];
+  const authorizedTeams = require('../data/teamsData');
 
-  for (const item of sampleTeams) {
+  for (const item of authorizedTeams) {
     const teamDoc = await db.Team.create({
-      name: item.teamName,
+      name: item.teamId,
       teamLeadRegNum: item.regNum,
-      college: item.college,
+      college: 'KARE',
       department: 'CSE',
       members: [
-        { name: item.leadName, registrationNumber: item.regNum, role: 'LEAD', phone: '9876543210' },
-        { name: `Member 1 (${item.teamName})`, registrationNumber: `${item.regNum}-M1`, role: 'MEMBER', phone: '9876543211' }
+        { name: `Team Lead (${item.teamId})`, registrationNumber: item.regNum, role: 'LEAD', phone: '9876543210' },
+        { name: `Member 1 (${item.teamId})`, registrationNumber: `${item.regNum}-M1`, role: 'MEMBER', phone: '9876543211' }
       ]
     });
 
     await db.TeamLead.create({
       registrationNumber: item.regNum,
-      name: item.leadName,
+      name: `Team Lead (${item.teamId})`,
       teamId: teamDoc._id,
       phone: '9876543210',
-      email: `${item.regNum.toLowerCase()}@hackathon.edu`
+      email: `${item.teamId.toLowerCase()}@hackathon.edu`
     });
 
     await db.Participant.create({
       registrationNumber: item.regNum,
-      name: item.leadName,
-      teamName: item.teamName,
-      college: item.college,
+      name: `Team Lead (${item.teamId})`,
+      teamName: item.teamId,
+      college: 'KARE',
       department: 'CSE',
       isTeamLead: true,
       qrCodeData: item.regNum
-    });
-
-    await db.Participant.create({
-      registrationNumber: `${item.regNum}-M1`,
-      name: `Member 1 (${item.teamName})`,
-      teamName: item.teamName,
-      college: item.college,
-      department: 'CSE',
-      isTeamLead: false,
-      qrCodeData: `${item.regNum}-M1`
     });
   }
 

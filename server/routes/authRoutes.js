@@ -5,24 +5,61 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { TeamLead, Admin, Volunteer, ActiveSession, Team, AuditLog } = require('../models/Schema');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
+const AUTHORIZED_TEAMS = require('../data/teamsData');
 
-// 1. TEAM LEAD LOGIN (Strict Single-Device Access)
+// 1. TEAM LEAD LOGIN (Strict 2-Field Authentication & Single-Device Access)
 router.post('/team-lead/login', async (req, res) => {
   try {
-    const { registrationNumber, deviceId } = req.body;
+    const { teamId, registrationNumber, deviceId } = req.body;
 
-    if (!registrationNumber || typeof registrationNumber !== 'string') {
-      return res.status(400).json({ error: 'Registration Number is required.' });
+    if (!teamId || typeof teamId !== 'string' || !registrationNumber || typeof registrationNumber !== 'string') {
+      return res.status(400).json({ error: 'Invalid Team ID or Team Lead Registration Number' });
     }
 
+    const cleanTeamId = teamId.trim().toUpperCase();
     const cleanRegNum = registrationNumber.trim().toUpperCase();
 
-    // Verify registration number belongs to a registered team lead in DB
-    const teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
-    if (!teamLead) {
+    // 1. Check if Team ID + Registration Number combination exists in authorized list
+    const isAuthorized = AUTHORIZED_TEAMS.some(t => t.teamId === cleanTeamId && t.regNum === cleanRegNum);
+    if (!isAuthorized) {
       return res.status(401).json({
-        error: 'Invalid Registration Number. Access is restricted to registered Team Leads only.',
-        code: 'UNREGISTERED_LEAD'
+        error: 'Invalid Team ID or Team Lead Registration Number',
+        code: 'INVALID_CREDENTIALS'
+      });
+    }
+
+    // 2. Lookup Team Lead & Team in Database
+    let teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
+
+    // Auto-heal / Seed on the fly if DB record is missing for this authorized pair
+    if (!teamLead) {
+      let team = await Team.findOne({ name: cleanTeamId });
+      if (!team) {
+        team = await Team.create({
+          name: cleanTeamId,
+          teamLeadRegNum: cleanRegNum,
+          college: 'KARE',
+          department: 'CSE',
+          members: [
+            { name: `Team Lead (${cleanTeamId})`, registrationNumber: cleanRegNum, role: 'LEAD', phone: '9876543210' }
+          ]
+        });
+      }
+      teamLead = await TeamLead.create({
+        registrationNumber: cleanRegNum,
+        name: `Team Lead (${cleanTeamId})`,
+        teamId: team._id,
+        phone: '9876543210',
+        email: `${cleanTeamId.toLowerCase()}@hackathon.edu`
+      });
+      teamLead.teamId = team;
+    }
+
+    // 3. Ensure Team Lead's associated Team ID matches the submitted Team ID exactly
+    if (!teamLead.teamId || teamLead.teamId.name !== cleanTeamId) {
+      return res.status(401).json({
+        error: 'Invalid Team ID or Team Lead Registration Number',
+        code: 'INVALID_CREDENTIALS'
       });
     }
 
@@ -71,7 +108,7 @@ router.post('/team-lead/login', async (req, res) => {
       role: 'TEAM_LEAD',
       action: 'LOGIN',
       target: teamLead.name,
-      metadata: { deviceId: currentDeviceId, sessionId: newSessionId }
+      metadata: { deviceId: currentDeviceId, sessionId: newSessionId, teamId: cleanTeamId }
     });
 
     return res.json({

@@ -49,9 +49,9 @@ export const AuthProvider = ({ children }) => {
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
-  const loginTeamLead = async (registrationNumber, deviceId) => {
+  const loginTeamLead = async (teamId, registrationNumber, deviceId) => {
     try {
-      const res = await axios.post('/api/auth/team-lead/login', { registrationNumber, deviceId });
+      const res = await axios.post('/api/auth/team-lead/login', { teamId, registrationNumber, deviceId });
       const { token, user, sessionId } = res.data;
       
       localStorage.setItem('alpha_token', token);

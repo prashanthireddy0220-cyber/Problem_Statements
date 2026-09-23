@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, LogIn, KeyRound, AlertCircle, Laptop, Users } from 'lucide-react';
+import { ShieldCheck, LogIn, KeyRound, AlertCircle, Laptop, Users, Building2 } from 'lucide-react';
 
 export default function TeamLeadLogin() {
+  const [teamId, setTeamId] = useState('');
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { loginTeamLead } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = async (e, demoRegNum = null) => {
+  const handleLogin = async (e, demoTeamId = null, demoRegNum = null) => {
     if (e) e.preventDefault();
-    const regToUse = demoRegNum || registrationNumber;
+    const targetTeamId = demoTeamId || teamId;
+    const targetRegNum = demoRegNum || registrationNumber;
 
-    if (!regToUse.trim()) {
-      setError('Please enter your registered Team Lead Registration Number.');
+    if (!targetTeamId.trim() || !targetRegNum.trim()) {
+      setError('Please enter both Team ID and Team Lead Registration Number.');
       return;
     }
 
@@ -23,15 +25,23 @@ export default function TeamLeadLogin() {
     setLoading(true);
 
     const deviceId = `browser-device-${Math.random().toString(36).substring(2, 9)}`;
-    const result = await loginTeamLead(regToUse, deviceId);
+    const result = await loginTeamLead(targetTeamId, targetRegNum, deviceId);
 
     setLoading(false);
     if (result.success) {
       navigate('/team-lead/dashboard');
     } else {
-      setError(result.error);
+      setError(result.error || 'Invalid Team ID or Team Lead Registration Number');
     }
   };
+
+  const sampleDemos = [
+    { teamId: 'ALPHA-001', regNum: '9924008110' },
+    { teamId: 'ALPHA-002', regNum: '99230041040' },
+    { teamId: 'ALPHA-003', regNum: '9924005337' },
+    { teamId: 'ALPHA-004', regNum: '99240040829' },
+    { teamId: 'ALPHA-005', regNum: '99230041058' }
+  ];
 
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
@@ -68,14 +78,43 @@ export default function TeamLeadLogin() {
 
         {/* Login Form */}
         <form onSubmit={handleLogin}>
-          <div style={{ marginBottom: '1.5rem' }}>
+          {/* Field 1: Team ID */}
+          <div style={{ marginBottom: '1.25rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Registration Number
+              Team ID
             </label>
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
-                placeholder="e.g. HACK2026-001"
+                placeholder="e.g. ALPHA-001"
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value.toUpperCase())}
+                style={{
+                  width: '100%',
+                  padding: '0.85rem 1rem 0.85rem 2.75rem',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  border: '1px solid var(--border-cyan)',
+                  borderRadius: '10px',
+                  color: '#FFFFFF',
+                  fontFamily: 'Orbitron, monospace',
+                  fontSize: '1rem',
+                  letterSpacing: '1px',
+                  outline: 'none'
+                }}
+              />
+              <Building2 size={18} color="#00F2FE" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
+          </div>
+
+          {/* Field 2: Registration Number */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Team Lead Registration Number
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="e.g. 9924008110"
                 value={registrationNumber}
                 onChange={(e) => setRegistrationNumber(e.target.value.toUpperCase())}
                 style={{
@@ -101,7 +140,7 @@ export default function TeamLeadLogin() {
             className="btn-alpha-cyan"
             style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontSize: '1rem' }}
           >
-            {loading ? 'Verifying Registration...' : (
+            {loading ? 'Verifying Credentials...' : (
               <>
                 <LogIn size={18} /> Login to Selection Portal
               </>
@@ -115,23 +154,22 @@ export default function TeamLeadLogin() {
             <Users size={14} color="#00F2FE" /> Quick Demo Team Lead Logins:
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
-            {['HACK2026-001', 'HACK2026-002', 'HACK2026-003', 'HACK2026-004', 'HACK2026-005'].map((reg) => (
+            {sampleDemos.map((demo) => (
               <button
-                key={reg}
+                key={demo.teamId}
                 onClick={(e) => {
-                  setRegistrationNumber(reg);
-                  handleLogin(e, reg);
+                  setTeamId(demo.teamId);
+                  setRegistrationNumber(demo.regNum);
+                  handleLogin(e, demo.teamId, demo.regNum);
                 }}
                 className="btn-alpha-outline"
                 style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem', borderRadius: '8px' }}
               >
-                {reg}
+                {demo.teamId} ({demo.regNum})
               </button>
             ))}
           </div>
         </div>
-
-
 
       </div>
     </div>
