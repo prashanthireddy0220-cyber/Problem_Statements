@@ -89,20 +89,36 @@ export default function VolunteerScanner() {
     setLookupError('');
   };
 
+  const extractCleanId = (rawInput) => {
+    if (!rawInput || typeof rawInput !== 'string') return '';
+    let str = rawInput.trim();
+    if (str.includes('/') || str.toLowerCase().startsWith('http')) {
+      try {
+        const parts = str.split('/').filter(p => p.trim().length > 0);
+        if (parts.length > 0) {
+          str = parts[parts.length - 1];
+        }
+      } catch (e) {}
+    }
+    return str.split('?')[0].split('#')[0].trim().toUpperCase();
+  };
+
   // Participant lookup function
   const handleLookup = async (queryStr) => {
     if (!queryStr || !queryStr.trim()) return;
+    const cleanQuery = extractCleanId(queryStr);
+    setInputRegNum(cleanQuery);
     setLookupError('');
     setScanResult(null);
 
     try {
       const res = await axios.get('/api/attendance/participant/lookup', {
-        params: { query: queryStr.trim() }
+        params: { query: cleanQuery }
       });
       setScannedParticipant(res.data.participant);
     } catch (err) {
       setScannedParticipant(null);
-      setLookupError(err.response?.data?.error || 'Participant not found.');
+      setLookupError(err.response?.data?.error || `Participant '${cleanQuery}' not found.`);
     }
   };
 
