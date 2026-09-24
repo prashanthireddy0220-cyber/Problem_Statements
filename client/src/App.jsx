@@ -10,6 +10,7 @@ import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import VolunteerLogin from './pages/VolunteerLogin';
 import VolunteerScanner from './pages/VolunteerScanner';
+import PublicTeamPage from './pages/PublicTeamPage';
 import { LogOut, ArrowLeft, ShieldAlert } from 'lucide-react';
 
 // Helper to determine dashboard route based on user role
@@ -107,6 +108,7 @@ export default function App() {
             <Route path="/" element={<RootRedirect />} />
             <Route path="/login" element={<Navigate to="/team-lead/login" replace />} />
             <Route path="/team-lead" element={<Navigate to="/team-lead/login" replace />} />
+            <Route path="/team/:tokenOrId" element={<PublicTeamPage />} />
             
             <Route path="/team-lead/login" element={
               <PublicLoginRoute targetRole="TEAM_LEAD">

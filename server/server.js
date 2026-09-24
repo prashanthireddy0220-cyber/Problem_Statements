@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const problemRoutes = require('./routes/problemRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const teamRoutes = require('./routes/teamRoutes');
 
 const app = express();
 const PORT = config.PORT;
@@ -40,6 +41,7 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 // Mount API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', authRoutes);
+app.use('/api/teams', teamRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/admin', adminRoutes);
@@ -186,6 +188,16 @@ async function triggerAutoSeed() {
         }
       }
 
+      const defaultMembers = [
+        { name: `Team Lead (${item.teamId})`, registrationNumber: item.regNum, role: 'LEAD', phone: '+91 9876543210', email: `${item.teamId.toLowerCase()}.lead@hackathon.edu` },
+        { name: `Dev Member 1 (${item.teamId})`, registrationNumber: `REG-${item.teamId.replace('ALPHA-', '')}02`, role: 'MEMBER', phone: '+91 9876543211', email: `${item.teamId.toLowerCase()}.m1@hackathon.edu` },
+        { name: `UI Member 2 (${item.teamId})`, registrationNumber: `REG-${item.teamId.replace('ALPHA-', '')}03`, role: 'MEMBER', phone: '+91 9876543212', email: `${item.teamId.toLowerCase()}.m2@hackathon.edu` },
+        { name: `AI Member 3 (${item.teamId})`, registrationNumber: `REG-${item.teamId.replace('ALPHA-', '')}04`, role: 'MEMBER', phone: '+91 9876543213', email: `${item.teamId.toLowerCase()}.m3@hackathon.edu` }
+      ];
+
+      const qrToken = `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
+      const passToken = `EP-${item.teamId}-${item.regNum.slice(-4)}`;
+
       if (!teamDoc) {
         teamDoc = await Team.create({
           name: item.teamId,
@@ -193,15 +205,21 @@ async function triggerAutoSeed() {
           teamLeadRegNum: item.regNum,
           college: 'KARE',
           department: 'CSE',
-          members: [
-            { name: `Team Lead (${item.teamId})`, registrationNumber: item.regNum, role: 'LEAD', phone: '9876543210' },
-            { name: `Member 1 (${item.teamId})`, registrationNumber: `${item.regNum}-M1`, role: 'MEMBER', phone: '9876543211' }
-          ]
+          members: defaultMembers,
+          teamQrToken: qrToken,
+          eventPassQrToken: passToken,
+          registrationStatus: 'CONFIRMED',
+          eventPassStatus: 'ISSUED'
         });
       } else {
         teamDoc.teamId = item.teamId;
         teamDoc.teamLeadRegNum = item.regNum;
         if (!teamDoc.college) teamDoc.college = 'KARE';
+        if (!teamDoc.members || teamDoc.members.length < 2) {
+          teamDoc.members = defaultMembers;
+        }
+        if (!teamDoc.teamQrToken) teamDoc.teamQrToken = qrToken;
+        if (!teamDoc.eventPassQrToken) teamDoc.eventPassQrToken = passToken;
         await teamDoc.save();
       }
 

@@ -3,19 +3,28 @@ import { useAuth } from '../context/AuthContext';
 import { 
   ShieldCheck, Clock, Users, BookOpen, ToggleLeft, ToggleRight, 
   Download, Plus, Edit, Trash2, RefreshCw, AlertTriangle, CheckCircle2, 
-  PieChart as PieIcon, BarChart3, Activity, Lock, Unlock, Zap, Database
+  PieChart as PieIcon, BarChart3, Activity, Lock, Unlock, Zap, Database,
+  QrCode, Eye, Search, Printer, FileText, UserCheck, CheckCircle, Ticket
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import axios from 'axios';
+import QRCode from 'qrcode';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   
-  const [activeTab, setActiveTab] = useState('live'); // live, problems, timers, attendance, analytics, audit
+  const [activeTab, setActiveTab] = useState('live'); // live, teams, problems, timers, attendance, analytics, audit
   
   // State for Live Activity
   const [liveData, setLiveData] = useState({ summary: {}, teams: [] });
   
+  // State for Teams Management (All 60 Teams)
+  const [allTeams, setAllTeams] = useState([]);
+  const [teamSearchTerm, setTeamSearchTerm] = useState('');
+  const [selectedTeamDetail, setSelectedTeamDetail] = useState(null);
+  const [qrModalTeam, setQrModalTeam] = useState(null);
+  const [adminQrDataUrl, setAdminQrDataUrl] = useState('');
+
   // State for Problems
   const [problems, setProblems] = useState([]);
   const [showAddProblemModal, setShowAddProblemModal] = useState(false);
@@ -50,7 +59,6 @@ export default function AdminDashboard() {
 
   // State for Audit Logs
   const [auditLogs, setAuditLogs] = useState([]);
-  
   const [actionMsg, setActionMsg] = useState('');
 
   // Auto-refresh interval
@@ -60,7 +68,6 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, [activeTab]);
 
-  // Load timer settings when switching to timers tab or initially
   useEffect(() => {
     fetchSettings();
   }, [activeTab]);
@@ -74,9 +81,7 @@ export default function AdminDashboard() {
           ...res.data.settings
         }));
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   };
 
   const fetchAllData = async () => {
@@ -84,6 +89,10 @@ export default function AdminDashboard() {
       if (activeTab === 'live') {
         const res = await axios.get('/api/admin/live-activity');
         setLiveData(res.data);
+      }
+      if (activeTab === 'teams') {
+        const res = await axios.get('/api/teams/admin/all');
+        setAllTeams(res.data.teams || []);
       }
       if (activeTab === 'problems' || activeTab === 'live') {
         const res = await axios.get('/api/problems?domain=ALL&difficulty=ALL');
@@ -100,17 +109,14 @@ export default function AdminDashboard() {
         const lRes = await axios.get('/api/admin/audit-logs');
         setAuditLogs(lRes.data.logs || []);
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   };
 
   const [scheduledTimeInput, setScheduledTimeInput] = useState('');
 
-  // Phase transition handler
   const handlePhaseAction = async (actionStr, extraData = {}) => {
     try {
-      const res = await axios.post('/api/admin/session-control', { action: actionStr, ...extraData });
+      await axios.post('/api/admin/session-control', { action: actionStr, ...extraData });
       setActionMsg(`Session action '${actionStr}' applied successfully!`);
       setTimeout(() => setActionMsg(''), 3000);
       fetchAllData();
@@ -129,11 +135,10 @@ export default function AdminDashboard() {
     await handlePhaseAction('SCHEDULE_SELECTION', { scheduledTime: scheduledTimeInput });
   };
 
-  // Seed Initial Demo Data
   const handleSeed = async () => {
     try {
       await axios.post('/api/admin/seed');
-      setActionMsg('Seed dataset populated successfully!');
+      setActionMsg('All 60 teams and demo data populated successfully!');
       setTimeout(() => setActionMsg(''), 3000);
       fetchAllData();
       fetchSettings();
@@ -142,7 +147,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Save Timer & Access Settings
   const handleSaveSettings = async () => {
     try {
       const res = await axios.post('/api/admin/settings', settings);
@@ -157,7 +161,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Add Problem Statement
   const handleCreateProblem = async (e) => {
     e.preventDefault();
     try {
@@ -171,7 +174,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Create Attendance Session
   const handleCreateSess = async (e) => {
     e.preventDefault();
     try {
@@ -185,7 +187,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Toggle Attendance Session Status (Start / Close)
   const handleToggleSessStatus = async (id, newStatus) => {
     try {
       await axios.put(`/api/attendance/sessions/${id}/status`, { status: newStatus });
@@ -197,7 +198,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Revoke Team Lead Device Session
   const handleRevokeSession = async (regNum) => {
     if (!window.confirm(`Are you sure you want to revoke single-device access for ${regNum}?`)) return;
     try {
@@ -210,7 +210,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Reset Team Selection
   const handleResetTeamSelection = async (teamId, teamName) => {
     if (!window.confirm(`Reset problem selection for Team '${teamName}'?`)) return;
     try {
@@ -223,12 +222,53 @@ export default function AdminDashboard() {
     }
   };
 
-  // Export Attendance CSV
+  // Regenerate Unique Team QR Token
+  const handleRegenerateTeamQr = async (teamId, teamName) => {
+    if (!window.confirm(`Regenerate unique Team QR Code for '${teamName}'? The existing QR URL will change.`)) return;
+    try {
+      const res = await axios.post(`/api/teams/admin/${teamId}/regenerate-qr`);
+      setActionMsg(`Regenerated new Team QR Code for ${teamName}!`);
+      setTimeout(() => setActionMsg(''), 3000);
+      if (qrModalTeam && qrModalTeam._id === teamId) {
+        setQrModalTeam({
+          ...qrModalTeam,
+          teamQrToken: res.data.teamQrToken,
+          publicQrUrl: res.data.publicQrUrl
+        });
+      }
+      fetchAllData();
+    } catch (e) {
+      alert('Failed to regenerate Team QR.');
+    }
+  };
+
+  // Generate QR Data URL for Admin Modal Preview
+  useEffect(() => {
+    if (qrModalTeam?.teamQrToken) {
+      const targetUrl = qrModalTeam.publicQrUrl || `${window.location.origin}/team/${qrModalTeam.teamQrToken}`;
+      QRCode.toDataURL(targetUrl, { width: 300, margin: 2, color: { dark: '#00F2FE', light: '#0F172A' } })
+        .then(setAdminQrDataUrl)
+        .catch(() => {});
+    }
+  }, [qrModalTeam]);
+
   const handleExportCSV = () => {
     window.open('/api/attendance/admin/export', '_blank');
   };
 
-  // Data for Charts
+  // Filtered Teams List
+  const filteredTeams = allTeams.filter(t => {
+    if (!teamSearchTerm) return true;
+    const term = teamSearchTerm.toLowerCase();
+    return (
+      (t.teamId && t.teamId.toLowerCase().includes(term)) ||
+      (t.teamName && t.teamName.toLowerCase().includes(term)) ||
+      (t.teamLeadName && t.teamLeadName.toLowerCase().includes(term)) ||
+      (t.teamLeadRegNum && t.teamLeadRegNum.toLowerCase().includes(term)) ||
+      (t.selectedProblemCode && t.selectedProblemCode.toLowerCase().includes(term))
+    );
+  });
+
   const totalAttScans = (attStats.present || 0) + (attStats.absent || 0);
   const hasPieData = totalAttScans > 0;
   const pieData = hasPieData ? [
@@ -248,13 +288,13 @@ export default function AdminDashboard() {
             <ShieldCheck color="#00F2FE" size={28} /> MASTER ADMIN CONTROL DASHBOARD
           </h1>
           <p style={{ color: '#94A3B8', fontSize: '0.88rem' }}>
-            Event ALPHA • Real-time selection timer control, live team activity, attendance analytics & single-device security.
+            Event ALPHA • Manage all 60 Teams, Team QR codes, problem selections, live monitoring & attendance.
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button onClick={handleSeed} className="btn-alpha-outline" style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}>
-            <Database size={15} /> Populate Demo Seed Data
+            <Database size={15} /> Populate All 60 Teams Data
           </button>
           <button onClick={handleExportCSV} className="btn-alpha-cyan" style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}>
             <Download size={15} /> Export Attendance CSV
@@ -272,10 +312,11 @@ export default function AdminDashboard() {
       {/* ADMIN NAVIGATION TABS */}
       <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', pb: '0.5rem' }}>
         {[
-          { id: 'live', label: 'Live Monitoring & Session Control', icon: Activity },
+          { id: 'live', label: 'Live Session Control', icon: Activity },
+          { id: 'teams', label: 'Teams Management (60 Teams)', icon: Users },
           { id: 'problems', label: 'Problem Statements', icon: BookOpen },
           { id: 'timers', label: 'Timer & Access Controls', icon: Clock },
-          { id: 'attendance', label: 'Attendance Manager', icon: Users },
+          { id: 'attendance', label: 'Attendance Manager', icon: Ticket },
           { id: 'analytics', label: 'Reports & Analytics', icon: BarChart3 },
           { id: 'audit', label: 'Audit Logs & Sessions', icon: Lock }
         ].map((tab) => {
@@ -305,14 +346,12 @@ export default function AdminDashboard() {
       {/* TAB 1: LIVE MONITORING & SESSION CONTROL */}
       {activeTab === 'live' && (
         <div>
-          {/* SESSION PHASE CONTROLLER CARDS */}
           <div className="glass-panel" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.15rem', color: '#FFD700', fontFamily: 'var(--font-heading)' }}>
                 ⚡ PROBLEM STATEMENT SELECTION CONTROLLER
               </h3>
               
-              {/* CURRENT SELECTION STATUS BADGE */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Problem Statement Status:</span>
                 <span style={{
@@ -337,9 +376,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* ADMIN CONTROL BUTTONS & SCHEDULER */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
-              {/* Release Toggle */}
               <div className="glass-card" style={{ padding: '1rem' }}>
                 <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>1. PUBLISH CONTROL</div>
                 {liveData.summary?.problemStatementsReleased ? (
@@ -353,7 +390,6 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              {/* Schedule Timer Input */}
               <div className="glass-card" style={{ padding: '1rem' }}>
                 <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>2. SCHEDULE SELECTION TIMER</div>
                 <form onSubmit={handleScheduleSelection} style={{ display: 'flex', gap: '0.5rem' }}>
@@ -377,7 +413,6 @@ export default function AdminDashboard() {
                 </form>
               </div>
 
-              {/* Open Now Button */}
               <div className="glass-card" style={{ padding: '1rem' }}>
                 <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>3. IMMEDIATE OPEN</div>
                 <button onClick={() => handlePhaseAction('OPEN_NOW')} className="btn-alpha-gold" style={{ width: '100%', justifyContent: 'center' }}>
@@ -385,7 +420,6 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              {/* Close Button */}
               <div className="glass-card" style={{ padding: '1rem' }}>
                 <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>4. CLOSE / LOCK</div>
                 <button onClick={() => handlePhaseAction('CLOSE')} className="btn-alpha-outline" style={{ width: '100%', borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center' }}>
@@ -400,126 +434,215 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
-
-          {/* METRIC SUMMARY CARDS */}
-          {(() => {
-            const validTeams = (liveData.teams || []).filter(t => 
-              t.teamName && 
-              t.teamName !== 'Unknown' && 
-              t.teamLeadName !== 'Unknown' && 
-              t.teamLeadRegNum && 
-              t.teamLeadRegNum !== '—' &&
-              t.teamName.startsWith('ALPHA-')
-            );
-            const totalTeamsCount = validTeams.length || liveData.summary?.totalTeams || 0;
-
-            return (
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-                  <div className="glass-card" style={{ padding: '1.25rem' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Problem Statements</div>
-                    <div style={{ fontSize: '2rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>
-                      {liveData.summary?.totalProblems || liveData.problemStatements?.length || 0}
-                    </div>
-                  </div>
-
-                  <div className="glass-card" style={{ padding: '1.25rem' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Full Problems (2/2 Teams)</div>
-                    <div style={{ fontSize: '2rem', fontWeight: '800', color: liveData.summary?.fullProblemsCount > 0 ? '#FF4B4B' : '#00E676', fontFamily: 'Orbitron, monospace' }}>
-                      {liveData.summary?.fullProblemsCount || 0}
-                    </div>
-                  </div>
-
-                  <div className="glass-card" style={{ padding: '1.25rem' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Registered Teams</div>
-                    <div style={{ fontSize: '2rem', fontWeight: '800', color: '#F8FAFC', fontFamily: 'Orbitron, monospace' }}>
-                      {totalTeamsCount}
-                    </div>
-                  </div>
-
-                  <div className="glass-card" style={{ padding: '1.25rem' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Selections Completed</div>
-                    <div style={{ fontSize: '2rem', fontWeight: '800', color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>
-                      {liveData.summary?.selectionsCompleted || 0}
-                    </div>
-                  </div>
-
-                  <div className="glass-card" style={{ padding: '1.25rem' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Scheduled Selection Start</div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#00F2FE', marginTop: '0.4rem' }}>
-                      {liveData.summary?.selectionScheduledStart ? new Date(liveData.summary.selectionScheduledStart).toLocaleString() : 'Not Scheduled'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* LIVE TEAM ACTIVITY TABLE */}
-                <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1.1rem', color: '#F8FAFC', marginBottom: '1rem' }}>LIVE TEAM ACTIVITY MONITOR</h3>
-
-                  <div className="alpha-table-container">
-                    <table className="alpha-table">
-                      <thead>
-                        <tr>
-                          <th>Team Name</th>
-                          <th>Team Lead Reg No</th>
-                          <th>Lead Name</th>
-                          <th>Current Activity</th>
-                          <th>Selected Problem</th>
-                          <th>Single-Device Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {validTeams.map((t) => (
-                          <tr key={t.teamId}>
-                            <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{t.teamName}</td>
-                            <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{t.teamLeadRegNum}</td>
-                            <td>{t.teamLeadName}</td>
-                            <td>
-                              <span style={{
-                                padding: '0.25rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '700',
-                                background: t.selectionConfirmed ? 'rgba(0,230,118,0.2)' : 'rgba(0,242,254,0.15)',
-                                color: t.selectionConfirmed ? '#00E676' : '#00F2FE'
-                              }}>
-                                {t.statusStr}
-                              </span>
-                            </td>
-                            <td style={{ fontFamily: 'Orbitron, monospace', color: '#FFD700' }}>
-                              {t.selectedProblemCode || '—'}
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <button
-                                  onClick={() => handleRevokeSession(t.teamLeadRegNum)}
-                                  className="btn-alpha-outline"
-                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', color: '#FF4B4B', borderColor: '#FF4B4B' }}
-                                  title="Revoke session instantly"
-                                >
-                                  Revoke Device Session
-                                </button>
-                                {t.selectionConfirmed && (
-                                  <button
-                                    onClick={() => handleResetTeamSelection(t.teamId, t.teamName)}
-                                    className="btn-alpha-outline"
-                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem' }}
-                                  >
-                                    Reset Selection
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </>
-            );
-          })()}
         </div>
       )}
 
-      {/* TAB 2: PROBLEM STATEMENTS MANAGER */}
+      {/* ==================================================== */}
+      {/* TAB 2: ADMIN TEAMS MANAGEMENT (ALL 60 TEAMS) */}
+      {/* ==================================================== */}
+      {activeTab === 'teams' && (
+        <div className="glass-panel" style={{ padding: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Users size={24} color="#00F2FE" /> ALL REGISTERED TEAMS MANAGEMENT (Target: 60 Teams)
+              </h2>
+              <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                View, manage, inspect member details, and generate unique Team QR codes for Team 1 to Team 60.
+              </p>
+            </div>
+
+            <div style={{ position: 'relative', minWidth: '300px' }}>
+              <input
+                type="text"
+                placeholder="Search Team ID, Name, Lead, Reg No..."
+                value={teamSearchTerm}
+                onChange={(e) => setTeamSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 1rem 0.65rem 2.4rem',
+                  background: '#0F172A',
+                  border: '1px solid var(--border-cyan)',
+                  borderRadius: '8px',
+                  color: '#FFF',
+                  fontSize: '0.85rem'
+                }}
+              />
+              <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
+          </div>
+
+          <div style={{ fontSize: '0.85rem', color: '#00F2FE', marginBottom: '1rem', fontWeight: '700' }}>
+            Showing {filteredTeams.length} of {allTeams.length} Registered Teams
+          </div>
+
+          <div className="alpha-table-container">
+            <table className="alpha-table">
+              <thead>
+                <tr>
+                  <th>Team ID</th>
+                  <th>Team Name</th>
+                  <th>Team Lead</th>
+                  <th>Members</th>
+                  <th>Problem Statement</th>
+                  <th>Team QR</th>
+                  <th>Event Pass</th>
+                  <th>Attendance</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTeams.map((t) => (
+                  <tr key={t._id}>
+                    <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800' }}>{t.teamId}</td>
+                    <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{t.teamName}</td>
+                    <td>
+                      <div>{t.teamLeadName}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontFamily: 'Orbitron, monospace' }}>{t.teamLeadRegNum}</div>
+                    </td>
+                    <td style={{ fontWeight: '700', color: '#00E676' }}>{t.membersCount} Members</td>
+                    <td style={{ fontFamily: 'Orbitron, monospace', color: t.selectionConfirmed ? '#FFD700' : '#94A3B8' }}>
+                      {t.selectedProblemCode}
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => setQrModalTeam(t)}
+                        className="btn-alpha-outline"
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                      >
+                        <QrCode size={14} color="#00F2FE" /> View Team QR
+                      </button>
+                    </td>
+                    <td>
+                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(0,230,118,0.15)', color: '#00E676' }}>
+                        {t.eventPassStatus}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: '700', color: '#00F2FE' }}>
+                      {t.attendanceCount} Check-ins
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button
+                          onClick={() => setSelectedTeamDetail(t)}
+                          className="btn-alpha-cyan"
+                          style={{ padding: '0.3rem 0.61rem', fontSize: '0.72rem' }}
+                          title="View complete team members list"
+                        >
+                          <Eye size={13} /> View Team
+                        </button>
+
+                        <button
+                          onClick={() => handleRegenerateTeamQr(t._id, t.teamName)}
+                          className="btn-alpha-outline"
+                          style={{ padding: '0.3rem 0.61rem', fontSize: '0.72rem' }}
+                          title="Regenerate Team QR Code Token"
+                        >
+                          <RefreshCw size={13} /> QR
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ADMIN TEAM DETAIL MODAL */}
+          {selectedTeamDetail && (
+            <div className="modal-overlay">
+              <div className="modal-content" style={{ maxWidth: '700px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <div>
+                    <span style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800' }}>{selectedTeamDetail.teamId}</span>
+                    <h2 style={{ color: '#F8FAFC', fontSize: '1.4rem', margin: '0.25rem 0' }}>{selectedTeamDetail.teamName}</h2>
+                  </div>
+                  <button onClick={() => setSelectedTeamDetail(null)} className="btn-alpha-outline" style={{ padding: '0.35rem 0.75rem' }}>✕</button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>College</div>
+                    <div style={{ fontWeight: '700', color: '#F8FAFC' }}>{selectedTeamDetail.college}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Department</div>
+                    <div style={{ fontWeight: '700', color: '#F8FAFC' }}>{selectedTeamDetail.department}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Problem Selection</div>
+                    <div style={{ fontWeight: '800', color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>{selectedTeamDetail.selectedProblemCode}</div>
+                  </div>
+                </div>
+
+                <h3 style={{ fontSize: '1.1rem', color: '#00E676', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Users size={18} /> COMPLETE TEAM MEMBERS LIST ({selectedTeamDetail.members?.length || 0})
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '350px', overflowY: 'auto' }}>
+                  {selectedTeamDetail.members?.map((m, idx) => (
+                    <div key={idx} style={{ padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', borderLeft: m.role === 'LEAD' ? '3px solid #00E676' : '3px solid #00F2FE', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#F8FAFC' }}>{m.name}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>Role: <strong style={{ color: m.role === 'LEAD' ? '#00E676' : '#00F2FE' }}>{m.role}</strong> {m.phone ? `• ${m.phone}` : ''} {m.email ? `• ${m.email}` : ''}</div>
+                      </div>
+                      <div style={{ fontFamily: 'Orbitron, monospace', fontWeight: '800', color: '#00F2FE', fontSize: '0.95rem' }}>
+                        {m.registrationNumber}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  <button onClick={() => setSelectedTeamDetail(null)} className="btn-alpha-cyan">Close</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ADMIN TEAM QR CODE MODAL */}
+          {qrModalTeam && (
+            <div className="modal-overlay">
+              <div className="modal-content" style={{ maxWidth: '500px', textAlign: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ fontFamily: 'var(--font-heading)', color: '#00F2FE', fontSize: '1.2rem' }}>UNIQUE TEAM QR CODE</h3>
+                  <button onClick={() => setQrModalTeam(null)} className="btn-alpha-outline" style={{ padding: '0.25rem 0.6rem' }}>✕</button>
+                </div>
+
+                <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#F8FAFC', marginBottom: '0.25rem' }}>
+                  {qrModalTeam.teamName}
+                </div>
+                <div style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800', marginBottom: '1.25rem' }}>
+                  Team ID: {qrModalTeam.teamId}
+                </div>
+
+                <div style={{ background: '#0F172A', padding: '1.25rem', borderRadius: '16px', border: '2px dashed #00F2FE', display: 'inline-block', marginBottom: '1.25rem' }}>
+                  {adminQrDataUrl ? (
+                    <img src={adminQrDataUrl} alt="Team QR" style={{ width: '200px', height: '200px', display: 'block' }} />
+                  ) : (
+                    <div style={{ width: '200px', height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>Loading QR...</div>
+                  )}
+                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.5rem', wordBreak: 'break-all' }}>
+                    Token: {qrModalTeam.teamQrToken}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                  <button onClick={() => handleRegenerateTeamQr(qrModalTeam._id, qrModalTeam.teamName)} className="btn-alpha-gold" style={{ fontSize: '0.8rem' }}>
+                    <RefreshCw size={14} /> Regenerate QR Code
+                  </button>
+                  <button onClick={() => window.open(qrModalTeam.publicQrUrl || `/team/${qrModalTeam.teamQrToken}`, '_blank')} className="btn-alpha-cyan" style={{ fontSize: '0.8rem' }}>
+                    <Eye size={14} /> Open Public Page
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* TAB 3: PROBLEM STATEMENTS MANAGER */}
       {activeTab === 'problems' && (
         <div className="glass-panel" style={{ padding: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -564,7 +687,6 @@ export default function AdminDashboard() {
             </table>
           </div>
 
-          {/* ADD PROBLEM MODAL */}
           {showAddProblemModal && (
             <div className="modal-overlay">
               <div className="modal-content" style={{ maxWidth: '650px' }}>
@@ -628,7 +750,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 3: TIMERS & ACCESS CONTROLS */}
+      {/* TAB 4: TIMERS & ACCESS CONTROLS */}
       {activeTab === 'timers' && (
         <div className="glass-panel" style={{ padding: '2rem', maxWidth: '800px' }}>
           <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC', marginBottom: '1.5rem' }}>TIMER & MODULE ACCESS CONTROLS</h2>
@@ -684,7 +806,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 4: CENTRALIZED ATTENDANCE MANAGER */}
+      {/* TAB 5: CENTRALIZED ATTENDANCE MANAGER */}
       {activeTab === 'attendance' && (
         <div className="glass-panel" style={{ padding: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -694,7 +816,6 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          {/* SESSIONS GRID */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
             {attSessions.map((s) => (
               <div key={s._id} className="glass-card" style={{ padding: '1.25rem' }}>
@@ -731,8 +852,7 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          {/* ATTENDANCE RECORDS TABLE */}
-          <h3 style={{ fontSize: '1.1rem', color: '#00F2FE', marginBottom: '1rem' }}>CENTRAL ATTENDANCE LOG Matrix</h3>
+          <h3 style={{ fontSize: '1.1rem', color: '#00F2FE', marginBottom: '1rem' }}>CENTRAL ATTENDANCE LOG MATRIX</h3>
           <div className="alpha-table-container">
             <table className="alpha-table">
               <thead>
@@ -762,7 +882,6 @@ export default function AdminDashboard() {
             </table>
           </div>
 
-          {/* CREATE SESSION MODAL */}
           {showCreateSessModal && (
             <div className="modal-overlay">
               <div className="modal-content" style={{ maxWidth: '500px' }}>
@@ -791,14 +910,12 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 5: ANALYTICS & REPORTS */}
+      {/* TAB 6: ANALYTICS & REPORTS */}
       {activeTab === 'analytics' && (
         <div className="glass-panel" style={{ padding: '2rem' }}>
           <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC', marginBottom: '1.5rem' }}>VISUAL ANALYTICS & ATTENDANCE CHARTS</h2>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-            
-            {/* Pie Chart */}
             <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
               <h3 style={{ fontSize: '1rem', color: '#00F2FE', marginBottom: '1rem' }}>Present vs Absent Overview</h3>
               <div style={{ width: '100%', height: '260px', minHeight: '260px' }}>
@@ -829,7 +946,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Metrics Breakdown Card */}
             <div className="glass-card" style={{ padding: '1.5rem' }}>
               <h3 style={{ fontSize: '1rem', color: '#FFD700', marginBottom: '1.5rem' }}>Attendance Metrics Breakdown</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
@@ -853,7 +969,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 6: AUDIT LOGS & DEVICE SESSIONS */}
+      {/* TAB 7: AUDIT LOGS & DEVICE SESSIONS */}
       {activeTab === 'audit' && (
         <div className="glass-panel" style={{ padding: '2rem' }}>
           <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC', marginBottom: '1.5rem' }}>SYSTEM AUDIT LOG TRAIL</h2>

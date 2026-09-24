@@ -30,12 +30,17 @@ const TeamSchema = new mongoose.Schema({
     name: String,
     registrationNumber: String,
     role: String,
-    phone: String
+    phone: String,
+    email: String
   }],
   selectedProblemId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProblemStatement', default: null },
   selectedProblemCode: { type: String, default: null },
   selectionConfirmed: { type: Boolean, default: false },
-  selectedAt: { type: Date, default: null }
+  selectedAt: { type: Date, default: null },
+  teamQrToken: { type: String, unique: true, sparse: true },
+  registrationStatus: { type: String, default: 'CONFIRMED' },
+  eventPassStatus: { type: String, default: 'ISSUED' },
+  eventPassQrToken: { type: String, sparse: true }
 }, { timestamps: true });
 
 // 4. Participant Schema
