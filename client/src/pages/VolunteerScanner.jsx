@@ -7,6 +7,8 @@ import {
 import axios from 'axios';
 import { Html5Qrcode } from 'html5-qrcode';
 
+import AUTHORIZED_TEAMS from '../data/teamsData.js';
+
 export default function VolunteerScanner() {
   const { user } = useAuth();
   
@@ -123,22 +125,58 @@ export default function VolunteerScanner() {
     return str;
   };
 
-  // Participant lookup function
+  // Participant lookup function with Guaranteed Local AUTHORIZED_TEAMS Fallback
   const handleLookup = async (queryStr) => {
     if (!queryStr || !queryStr.trim()) return;
     const cleanQuery = extractCleanId(queryStr);
+    const upperRaw = queryStr.trim().toUpperCase();
     setInputRegNum(cleanQuery);
     setLookupError('');
     setScanResult(null);
 
+    // 1. Guaranteed Instant Local Lookup using AUTHORIZED_TEAMS
+    const alphaMatch = upperRaw.match(/ALPHA-?(\d+)/i);
+    const candidateTeamId = alphaMatch ? `ALPHA-${alphaMatch[1].padStart(3, '0')}` : null;
+
+    const localItem = AUTHORIZED_TEAMS.find(t => 
+      t.teamId === cleanQuery || 
+      t.teamId === upperRaw ||
+      (candidateTeamId && t.teamId === candidateTeamId) ||
+      t.regNum === cleanQuery || 
+      t.regNum === upperRaw ||
+      (t.teamName && t.teamName.toUpperCase() === upperRaw) ||
+      (t.members && t.members.some(m => m.registrationNumber === cleanQuery || m.registrationNumber === upperRaw))
+    );
+
+    if (localItem) {
+      const matchedMember = localItem.members.find(m => m.registrationNumber === cleanQuery || m.registrationNumber === upperRaw);
+      setScannedParticipant({
+        registrationNumber: matchedMember ? matchedMember.registrationNumber : localItem.regNum,
+        name: matchedMember ? matchedMember.name : localItem.leadName,
+        teamName: localItem.teamName,
+        teamId: localItem.teamId,
+        leadName: localItem.leadName,
+        leadRegNum: localItem.regNum,
+        college: 'KARE',
+        department: 'CSE',
+        isTeamLead: !matchedMember || matchedMember.registrationNumber === localItem.regNum,
+        members: localItem.members
+      });
+    }
+
+    // 2. Query backend to verify server state
     try {
       const res = await axios.get('/api/attendance/participant/lookup', {
         params: { query: cleanQuery }
       });
-      setScannedParticipant(res.data.participant);
+      if (res.data && res.data.participant) {
+        setScannedParticipant(res.data.participant);
+      }
     } catch (err) {
-      setScannedParticipant(null);
-      setLookupError(err.response?.data?.error || `Participant '${cleanQuery}' not found.`);
+      if (!localItem) {
+        setScannedParticipant(null);
+        setLookupError(err.response?.data?.error || `Participant / Team '${cleanQuery}' not found.`);
+      }
     }
   };
 
