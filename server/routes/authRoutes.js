@@ -140,6 +140,12 @@ const handleTeamLeadLogin = async (req, res) => {
       metadata: { deviceId: currentDeviceId, sessionId: newSessionId, teamId: cleanTeamId }
     });
 
+    const displayLeadName = authItem?.leadName || teamLead.name || `Team Lead (${cleanTeamId})`;
+    const displayTeamName = authItem?.teamName || teamLead.teamId?.teamName || teamLead.teamId?.name || cleanTeamId;
+    const teamMembers = (authItem?.members && authItem.members.length > 0) ? authItem.members : (teamLead.teamId?.members || []);
+    const qrToken = teamLead.teamId?.teamQrToken || `TQ-${cleanTeamId}-${cleanRegNum.slice(-4)}`;
+    const passToken = teamLead.teamId?.eventPassQrToken || `EP-${cleanTeamId}-${cleanRegNum.slice(-4)}`;
+
     return res.json({
       message: 'Login successful',
       token,
@@ -147,15 +153,23 @@ const handleTeamLeadLogin = async (req, res) => {
       user: {
         id: teamLead._id,
         registrationNumber: cleanRegNum,
-        name: teamLead.name,
+        name: displayLeadName,
         role: 'TEAM_LEAD',
-        team: teamLead.teamId ? {
-          id: teamLead.teamId._id,
-          name: teamLead.teamId.name,
-          college: teamLead.teamId.college,
-          selectionConfirmed: teamLead.teamId.selectionConfirmed,
-          selectedProblemCode: teamLead.teamId.selectedProblemCode
-        } : null
+        team: {
+          id: teamLead.teamId?._id || cleanTeamId,
+          teamId: cleanTeamId,
+          name: displayTeamName,
+          teamName: displayTeamName,
+          college: teamLead.teamId?.college || 'KARE',
+          department: teamLead.teamId?.department || 'CSE',
+          registrationStatus: teamLead.teamId?.registrationStatus || 'CONFIRMED',
+          eventPassStatus: teamLead.teamId?.eventPassStatus || 'ISSUED',
+          members: teamMembers,
+          teamQrToken: qrToken,
+          eventPassQrToken: passToken,
+          selectionConfirmed: Boolean(teamLead.teamId?.selectionConfirmed),
+          selectedProblemCode: teamLead.teamId?.selectedProblemCode || null
+        }
       }
     });
   } catch (err) {

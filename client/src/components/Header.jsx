@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, UserCheck, AlertTriangle, LayoutDashboard } from 'lucide-react';
 import { getDashboardRoute } from '../App';
+import AUTHORIZED_TEAMS from '../data/teamsData';
 
 export default function Header() {
   const { user, logout, revokedMessage, setRevokedMessage } = useAuth();
@@ -14,6 +15,24 @@ export default function Header() {
   };
 
   const userDashboard = user ? getDashboardRoute(user.role) : '/team-lead/login';
+
+  const formatTeamKey = (raw) => {
+    if (!raw) return '';
+    const str = String(raw).trim().toUpperCase();
+    const m = str.match(/ALPHA-?(\d+)/i);
+    if (m) return `ALPHA-${m[1].padStart(3, '0')}`;
+    return str;
+  };
+
+  const teamKey = user ? formatTeamKey(user.team?.teamId || user.team?.name || user.teamId || user.registrationNumber) : '';
+  const authItem = user ? AUTHORIZED_TEAMS.find(t => 
+    (t.teamId && formatTeamKey(t.teamId) === teamKey) ||
+    (t.regNum && t.regNum === user.registrationNumber) ||
+    (t.members && t.members.some(m => m.registrationNumber === user.registrationNumber))
+  ) : null;
+
+  const headerLeadName = authItem?.leadName || (user?.name && !user.name.includes('Team Lead') ? user.name : null) || user?.registrationNumber || user?.name || 'User';
+  const headerTeamDisplay = authItem ? `${authItem.teamId} (${authItem.teamName})` : (user?.team?.name || user?.teamId || '');
 
   return (
     <>
@@ -50,10 +69,10 @@ export default function Header() {
                 <UserCheck size={16} color="#00F2FE" />
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#F8FAFC' }}>
-                    {user.name || user.registrationNumber || user.username}
+                    {headerLeadName}
                   </div>
                   <div style={{ fontSize: '0.68rem', color: '#00F2FE', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    {user.role} {user.team ? `• ${user.team.name}` : ''}
+                    {user.role} {headerTeamDisplay ? `• ${headerTeamDisplay}` : ''}
                   </div>
                 </div>
                 <button onClick={handleLogout} className="btn-alpha-outline" style={{ padding: '0.35rem 0.65rem', borderRadius: '20px', fontSize: '0.75rem' }} title="Logout">

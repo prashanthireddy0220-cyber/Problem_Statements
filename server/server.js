@@ -40,8 +40,10 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
 // Mount API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api', authRoutes);
 app.use('/api/teams', teamRoutes);
+app.use('/api/team', teamRoutes);
+app.use('/api', teamRoutes);
+app.use('/api', authRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/admin', adminRoutes);
