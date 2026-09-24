@@ -149,23 +149,32 @@ function extractCleanId(rawInput) {
   return str;
 }
 
-// Helper to resolve participant by regNum, teamName, qrCodeData, or Team document lookup
+// Helper to resolve participant by regNum, teamId, teamName, qrCodeData, or Team document lookup
 async function resolveParticipant(rawInput) {
+  if (!rawInput || typeof rawInput !== 'string') return null;
+  const str = rawInput.trim();
   const cleanId = extractCleanId(rawInput);
-  if (!cleanId) return null;
+  const upperStr = str.toUpperCase();
 
-  // Search in official AUTHORIZED_TEAMS first
+  // Extract candidate team ID format (e.g. ALPHA-008, ALPHA-8)
+  const alphaMatch = str.match(/ALPHA-?(\d+)/i);
+  const candidateTeamId = alphaMatch ? `ALPHA-${alphaMatch[1].padStart(3, '0')}` : null;
+
+  // Search in official AUTHORIZED_TEAMS first by ALL criteria
   const authItem = AUTHORIZED_TEAMS.find(t => 
     t.regNum === cleanId || 
+    t.regNum === upperStr ||
     t.teamId === cleanId || 
-    t.teamName.toUpperCase() === cleanId ||
-    t.members.some(m => m.registrationNumber === cleanId)
+    t.teamId === upperStr ||
+    (candidateTeamId && t.teamId === candidateTeamId) ||
+    (t.teamName && t.teamName.toUpperCase() === upperStr) ||
+    (t.members && t.members.some(m => m.registrationNumber === cleanId || m.registrationNumber === upperStr))
   );
 
   if (authItem) {
-    const matchedMember = authItem.members.find(m => m.registrationNumber === cleanId);
+    const matchedMember = authItem.members.find(m => m.registrationNumber === cleanId || m.registrationNumber === upperStr);
     return {
-      registrationNumber: cleanId,
+      registrationNumber: matchedMember ? matchedMember.registrationNumber : authItem.regNum,
       name: matchedMember ? matchedMember.name : authItem.leadName,
       teamName: authItem.teamName,
       teamId: authItem.teamId,
@@ -173,17 +182,47 @@ async function resolveParticipant(rawInput) {
       leadRegNum: authItem.regNum,
       college: 'KARE',
       department: 'CSE',
-      isTeamLead: cleanId === authItem.regNum,
+      isTeamLead: !matchedMember || matchedMember.registrationNumber === authItem.regNum,
       members: authItem.members
     };
   }
 
-  // Fallback to database Participant model
+  // Fallback 1: Database Team model
+  const dbTeam = await Team.findOne({
+    $or: [
+      { teamId: cleanId },
+      { teamId: upperStr },
+      ...(candidateTeamId ? [{ teamId: candidateTeamId }, { name: candidateTeamId }] : []),
+      { name: upperStr },
+      { teamName: upperStr },
+      { teamLeadRegNum: cleanId },
+      { teamLeadRegNum: upperStr }
+    ]
+  });
+
+  if (dbTeam) {
+    return {
+      registrationNumber: dbTeam.teamLeadRegNum || 'LEAD',
+      name: dbTeam.teamName || dbTeam.name,
+      teamName: dbTeam.teamName || dbTeam.name,
+      teamId: dbTeam.teamId || dbTeam.name,
+      leadName: dbTeam.teamName || dbTeam.name,
+      leadRegNum: dbTeam.teamLeadRegNum || 'LEAD',
+      college: 'KARE',
+      department: 'CSE',
+      isTeamLead: true,
+      members: dbTeam.members || []
+    };
+  }
+
+  // Fallback 2: Database Participant model
   let participant = await Participant.findOne({
     $or: [
       { registrationNumber: cleanId },
+      { registrationNumber: upperStr },
       { qrCodeData: cleanId },
-      { teamName: cleanId }
+      { qrCodeData: upperStr },
+      { teamName: upperStr }
     ]
   });
 

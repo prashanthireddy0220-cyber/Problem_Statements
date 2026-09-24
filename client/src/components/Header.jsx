@@ -35,7 +35,7 @@ export default function Header() {
   const headerLeadName = isVolunteer 
     ? (user?.name && !user.name.includes('Sarah') ? user.name : 'Event Volunteer')
     : (authItem?.leadName || (user?.name && !user.name.includes('Team Lead') ? user.name : null) || user?.registrationNumber || user?.name || 'User');
-  const headerTeamDisplay = isVolunteer ? 'ALPHA Volunteer' : (authItem ? `${authItem.teamId} (${authItem.teamName})` : (user?.team?.name || user?.teamId || ''));
+  const headerTeamDisplay = isVolunteer ? '' : (authItem ? `${authItem.teamId} (${authItem.teamName})` : (user?.team?.name || user?.teamId || ''));
 
   return (
     <>

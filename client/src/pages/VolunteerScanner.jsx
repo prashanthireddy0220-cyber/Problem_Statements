@@ -327,7 +327,7 @@ export default function VolunteerScanner() {
 
         /* ACTIVE SCANNING PANEL (WHEN SESSION IS ACTIVE) */
         <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', pb: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <span style={{ fontSize: '0.78rem', color: '#00E676', textTransform: 'uppercase', fontWeight: '700' }}>🟢 SCANNER ACTIVE</span>
               <h2 style={{ fontSize: '1.25rem', color: '#F8FAFC', fontWeight: '800' }}>{activeSession?.sessionName}</h2>
@@ -357,10 +357,10 @@ export default function VolunteerScanner() {
             <label style={{ display: 'block', fontSize: '0.82rem', color: '#94A3B8', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
               Participant Registration Number / QR Payload
             </label>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <input
                 type="text"
-                placeholder="e.g. HACK2026-001 or HACK2026-001-M1"
+                placeholder="Enter Team ID (e.g. ALPHA-008) or Registration No."
                 value={inputRegNum}
                 onChange={(e) => {
                   setInputRegNum(e.target.value.toUpperCase());
@@ -368,8 +368,12 @@ export default function VolunteerScanner() {
                     handleLookup(e.target.value);
                   }
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleLookup(inputRegNum);
+                }}
                 style={{
-                  flex: 1,
+                  flex: '1 1 200px',
+                  minWidth: '0',
                   padding: '0.85rem 1rem',
                   background: 'rgba(15, 23, 42, 0.8)',
                   border: '1px solid var(--border-cyan)',
@@ -383,7 +387,7 @@ export default function VolunteerScanner() {
               <button
                 onClick={() => handleLookup(inputRegNum)}
                 className="btn-alpha-cyan"
-                style={{ padding: '0.85rem 1.25rem' }}
+                style={{ padding: '0.85rem 1.25rem', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 <Search size={18} /> Search
               </button>
