@@ -810,36 +810,66 @@ export default function TeamLeadDashboard() {
             })}
           </div>
 
-          {/* ATTENDANCE SESSION QR CODE DISPLAY */}
+          {/* ATTENDANCE SESSION QR CODE OR MARKED PRESENT BANNER */}
           {selectedAttSession ? (
-            <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', maxWidth: '560px', margin: '0 auto', borderColor: '#FFD700', boxShadow: '0 0 30px rgba(255, 215, 0, 0.15)' }}>
-              <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#FFD700', fontWeight: '800', letterSpacing: '1px' }}>
-                SESSION ATTENDANCE QR CODE
-              </div>
+            myAttendanceRecords[selectedAttSession.sessionId] ? (
+              <div className="glass-panel" style={{ padding: '2.5rem 2rem', textAlign: 'center', maxWidth: '560px', margin: '0 auto', borderColor: '#00E676', background: 'rgba(0, 230, 118, 0.06)', boxShadow: '0 0 35px rgba(0, 230, 118, 0.2)' }}>
+                <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: 'rgba(0, 230, 118, 0.15)', border: '2px solid #00E676', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', boxShadow: '0 0 25px rgba(0, 230, 118, 0.4)' }}>
+                  <CheckCircle2 size={40} color="#00E676" />
+                </div>
 
-              <h3 style={{ fontSize: '1.4rem', color: '#F8FAFC', margin: '0.35rem 0' }}>
-                {selectedAttSession.sessionName}
-              </h3>
+                <h3 style={{ fontFamily: 'var(--font-heading)', color: '#00E676', fontSize: '1.5rem', fontWeight: '800', marginBottom: '0.5rem', letterSpacing: '1px' }}>
+                  ATTENDANCE CHECKED IN ✅
+                </h3>
 
-              <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-                Present this QR code to authorized volunteers at the hall entry scanner for attendance check-in.
-              </p>
+                <div style={{ fontSize: '1.1rem', color: '#F8FAFC', fontWeight: '700', marginBottom: '0.5rem' }}>
+                  {selectedAttSession.sessionName}
+                </div>
 
-              <div style={{ background: '#0F172A', padding: '1.25rem', borderRadius: '16px', border: '2px dashed #FFD700', display: 'inline-block', marginBottom: '1rem' }}>
-                {attQrDataUrl ? (
-                  <img src={attQrDataUrl} alt="Session Attendance QR" style={{ width: '200px', height: '200px', display: 'block' }} />
-                ) : (
-                  <div style={{ width: '200px', height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>Generating Session QR...</div>
-                )}
-                <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '0.85rem', color: '#FFD700', marginTop: '0.65rem' }}>
-                  Participant: {user?.registrationNumber} ({user?.name || 'Lead'})
+                <p style={{ color: '#CBD5E1', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+                  Attendance status for Team <strong>{displayTeamName}</strong> ({displayTeamId}) is recorded as <strong>PRESENT</strong>.
+                </p>
+
+                <div style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(0, 230, 118, 0.3)', display: 'inline-block', width: '100%', maxWidth: '420px' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Check-in Confirmation</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#00E676', marginTop: '0.25rem' }}>
+                    Checked in at {new Date(myAttendanceRecords[selectedAttSession.sessionId].markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#CBD5E1', marginTop: '0.35rem' }}>
+                    Verified by: <strong style={{ color: '#00F2FE' }}>{myAttendanceRecords[selectedAttSession.sessionId].markedByVolunteer || 'Event Volunteer'}</strong>
+                  </div>
                 </div>
               </div>
+            ) : (
+              <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', maxWidth: '560px', margin: '0 auto', borderColor: '#FFD700', boxShadow: '0 0 30px rgba(255, 215, 0, 0.15)' }}>
+                <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#FFD700', fontWeight: '800', letterSpacing: '1px' }}>
+                  SESSION ATTENDANCE QR CODE
+                </div>
 
-              <div style={{ fontSize: '0.78rem', color: '#94A3B8', background: 'rgba(255,255,255,0.03)', padding: '0.65rem', borderRadius: '8px' }}>
-                ℹ️ Note: This Attendance QR code is generated dynamically for <strong>{selectedAttSession.sessionName}</strong>. It is separate from your permanent Team QR code.
+                <h3 style={{ fontSize: '1.4rem', color: '#F8FAFC', margin: '0.35rem 0' }}>
+                  {selectedAttSession.sessionName}
+                </h3>
+
+                <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+                  Present this QR code to authorized volunteers at the hall entry scanner for attendance check-in.
+                </p>
+
+                <div style={{ background: '#0F172A', padding: '1.25rem', borderRadius: '16px', border: '2px dashed #FFD700', display: 'inline-block', marginBottom: '1rem' }}>
+                  {attQrDataUrl ? (
+                    <img src={attQrDataUrl} alt="Session Attendance QR" style={{ width: '200px', height: '200px', display: 'block' }} />
+                  ) : (
+                    <div style={{ width: '200px', height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>Generating Session QR...</div>
+                  )}
+                  <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '0.85rem', color: '#FFD700', marginTop: '0.65rem' }}>
+                    Team ID: {displayTeamId} ({displayTeamName})
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.78rem', color: '#94A3B8', background: 'rgba(255,255,255,0.03)', padding: '0.65rem', borderRadius: '8px' }}>
+                  ℹ️ Note: This Attendance QR code is generated dynamically for <strong>{selectedAttSession.sessionName}</strong>. It is separate from your permanent Team QR code.
+                </div>
               </div>
-            </div>
+            )
           ) : (
             <div style={{ textAlign: 'center', color: '#94A3B8', padding: '2rem' }}>
               No attendance sessions available.

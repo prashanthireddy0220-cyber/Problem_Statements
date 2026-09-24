@@ -271,7 +271,39 @@ router.get('/participant/lookup', authenticateToken, async (req, res) => {
 router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async (req, res) => {
   try {
     const cleanRegNum = (req.user.registrationNumber || '').trim().toUpperCase();
-    const records = await Attendance.find({ participantRegNum: cleanRegNum });
+    const teamIdFromUser = req.user.team?.teamId || req.user.team?.name || req.user.teamId;
+
+    const formatKey = (raw) => {
+      if (!raw) return '';
+      const str = String(raw).trim().toUpperCase();
+      const m = str.match(/ALPHA-?(\d+)/i);
+      if (m) return `ALPHA-${m[1].padStart(3, '0')}`;
+      return str;
+    };
+
+    const teamKey = formatKey(teamIdFromUser || cleanRegNum);
+    const authItem = AUTHORIZED_TEAMS.find(t => 
+      (t.teamId && formatKey(t.teamId) === teamKey) ||
+      (t.regNum && t.regNum === cleanRegNum) ||
+      (t.members && t.members.some(m => m.registrationNumber === cleanRegNum))
+    );
+
+    const searchCriteria = [{ participantRegNum: cleanRegNum }];
+    if (authItem) {
+      if (authItem.regNum) searchCriteria.push({ participantRegNum: authItem.regNum });
+      if (authItem.teamId) searchCriteria.push({ participantRegNum: authItem.teamId });
+      if (authItem.teamName) searchCriteria.push({ teamName: authItem.teamName });
+      if (authItem.members) {
+        authItem.members.forEach(m => {
+          if (m.registrationNumber) searchCriteria.push({ participantRegNum: m.registrationNumber });
+        });
+      }
+    }
+    if (teamIdFromUser) {
+      searchCriteria.push({ participantRegNum: teamIdFromUser });
+    }
+
+    const records = await Attendance.find({ $or: searchCriteria });
     const markedSessions = {};
     records.forEach(r => {
       markedSessions[r.sessionId] = {
@@ -282,6 +314,7 @@ router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async 
     });
     return res.json({ markedSessions });
   } catch (err) {
+    console.error('Fetch my-attendance error:', err);
     return res.status(500).json({ error: 'Failed to fetch my attendance.' });
   }
 });
