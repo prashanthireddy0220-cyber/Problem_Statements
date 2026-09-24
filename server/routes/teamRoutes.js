@@ -96,7 +96,7 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
         name: authItem?.leadName || req.user.name || `Team Lead (${team?.name || 'ALPHA'})`,
         teamId: team?._id,
         phone: '9876543210',
-        email: `${(authItem?.teamId || team?.name || 'alpha').toLowerCase()}@hackathon.edu`
+        email: `${cleanRegNum}@klu.ac.in`
       });
     } else if (team && (!teamLead.teamId || teamLead.teamId._id?.toString() !== team._id.toString())) {
       teamLead.teamId = team._id;
@@ -150,8 +150,7 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
       teamLead: {
         name: teamLead?.name || authItem?.leadName || req.user.name || 'Team Lead',
         registrationNumber: cleanRegNum,
-        email: teamLead?.email || `${teamCode.toLowerCase()}@hackathon.edu`,
-        phone: teamLead?.phone || '9876543210'
+        email: `${cleanRegNum}@klu.ac.in`
       },
       members
     });

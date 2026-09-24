@@ -69,7 +69,7 @@ const handleTeamLeadLogin = async (req, res) => {
           name: authItem?.leadName || `Team Lead (${cleanTeamId})`,
           teamId: team._id,
           phone: '9876543210',
-          email: `${cleanTeamId.toLowerCase()}@hackathon.edu`
+          email: `${cleanRegNum}@klu.ac.in`
         });
       } else if (teamLead && team) {
         teamLead.teamId = team._id;

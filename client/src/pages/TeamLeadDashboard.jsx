@@ -352,13 +352,6 @@ export default function TeamLeadDashboard() {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
-                  <span style={{ color: '#94A3B8', fontSize: '0.85rem' }}>College / Institution</span>
-                  <span style={{ fontWeight: '600', color: '#F8FAFC', fontSize: '0.92rem' }}>
-                    {displayCollege}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
                   <span style={{ color: '#94A3B8', fontSize: '0.85rem' }}>Department</span>
                   <span style={{ fontWeight: '600', color: '#F8FAFC', fontSize: '0.92rem' }}>
                     {displayDepartment}
@@ -398,14 +391,7 @@ export default function TeamLeadDashboard() {
                 <div style={{ padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
                   <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Email Address</div>
                   <div style={{ fontSize: '0.92rem', color: '#CBD5E1', marginTop: '0.2rem' }}>
-                    {myTeamData?.teamLead?.email || `${displayTeamId.toLowerCase()}@hackathon.edu`}
-                  </div>
-                </div>
-
-                <div style={{ padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Phone Contact</div>
-                  <div style={{ fontSize: '0.92rem', color: '#CBD5E1', marginTop: '0.2rem' }}>
-                    {myTeamData?.teamLead?.phone || '+91 9876543210'}
+                    {displayLeadRegNum && displayLeadRegNum !== 'N/A' ? `${displayLeadRegNum}@klu.ac.in` : (myTeamData?.teamLead?.email || 'N/A')}
                   </div>
                 </div>
               </div>
@@ -529,39 +515,6 @@ export default function TeamLeadDashboard() {
                     No Problem Statement selected yet. Click the button above or visit the <strong>Problem Statements</strong> tab to select one during the selection phase.
                   </div>
                 )}
-              </div>
-
-              {/* CARD 6: EVENT PASS (SEPARATE FROM TEAM QR & ATTENDANCE) */}
-              <div className="glass-panel" style={{ gridColumn: '1 / -1', padding: '1.75rem', borderLeft: '4px solid #00E676' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div>
-                    <h3 style={{ fontFamily: 'var(--font-heading)', color: '#00E676', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Ticket size={22} color="#00E676" /> SEPARATE HACKATHON EVENT PASS
-                    </h3>
-                    <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                      Official hackathon entry pass for all team members (Separate from Team QR & Attendance QR)
-                    </p>
-                  </div>
-                  <span style={{ padding: '0.35rem 0.85rem', borderRadius: '20px', background: 'rgba(0,230,118,0.2)', color: '#00E676', fontSize: '0.85rem', fontWeight: '800' }}>
-                    PASS STATUS: {myTeamData?.team?.eventPassStatus || 'ISSUED'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', marginTop: '1.25rem', flexWrap: 'wrap' }}>
-                  <div style={{ background: '#0F172A', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(0,230,118,0.3)' }}>
-                    {eventPassQrDataUrl ? (
-                      <img src={eventPassQrDataUrl} alt="Event Pass QR" style={{ width: '130px', height: '130px', display: 'block' }} />
-                    ) : (
-                      <div style={{ width: '130px', height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>Loading Pass QR...</div>
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: '240px' }}>
-                    <h4 style={{ color: '#F8FAFC', fontSize: '1.05rem', marginBottom: '0.35rem' }}>OFFICIAL EVENT ENTRY DELEGATE PASS</h4>
-                    <p style={{ color: '#94A3B8', fontSize: '0.85rem', lineHeight: '1.5' }}>
-                      This pass confirms registration for Team <strong>{displayTeamName}</strong> and all registered team members for College Hackathon ALPHA 2026.
-                    </p>
-                  </div>
-                </div>
               </div>
 
             </div>
