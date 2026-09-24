@@ -331,3 +331,55 @@ body.alpha-body::before {
 .alpha-table tbody tr:hover {
   background: rgba(0, 242, 254, 0.04);
 }
+
+/* Mobile Responsive Media Queries */
+@media (max-width: 768px) {
+  .alpha-header {
+    height: auto;
+    padding: 0.75rem 1rem;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .brand-section {
+    gap: 0.75rem;
+  }
+
+  .club-logo-container {
+    width: 40px;
+    height: 40px;
+  }
+
+  .event-title-badge {
+    font-size: 1.15rem;
+    letter-spacing: 1px;
+  }
+
+  .event-subtitle {
+    font-size: 0.65rem;
+  }
+
+  .main-layout {
+    padding: 1rem 0.75rem;
+  }
+
+  .glass-panel {
+    padding: 1.25rem 1rem !important;
+    border-radius: 12px;
+  }
+
+  .glass-card {
+    padding: 1rem !important;
+  }
+
+  .alpha-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .alpha-table th, .alpha-table td {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+}

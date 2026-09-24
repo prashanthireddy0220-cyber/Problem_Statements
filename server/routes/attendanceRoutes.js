@@ -114,11 +114,11 @@ function extractCleanId(rawInput) {
   if (str.startsWith('ATTENDANCE:')) {
     const parts = str.split(':');
     if (parts.length >= 3 && parts[2]) {
-      return parts[2].trim().toUpperCase();
+      str = parts[2].trim();
     }
   }
 
-  // 2. Handle URL payload
+  // 2. Handle URL payload (e.g. https://domain.app/team/TQ-ALPHA-008-0811)
   if (str.includes('/') || str.toLowerCase().startsWith('http')) {
     try {
       const parts = str.split('/').filter(p => p.trim().length > 0);
@@ -128,17 +128,25 @@ function extractCleanId(rawInput) {
     } catch (e) {}
   }
 
-  // 3. Handle TQ-ALPHA-001-8110 or EP-ALPHA-001-8110 tokens
-  if (str.startsWith('TQ-') || str.startsWith('EP-')) {
-    const parts = str.split('-');
-    if (parts.length >= 2) {
-      const candidateCode = parts[1].toUpperCase(); // e.g. ALPHA-001
-      const authByCode = AUTHORIZED_TEAMS.find(t => t.teamId === candidateCode);
-      if (authByCode) return authByCode.regNum;
-    }
+  str = str.split('?')[0].split('#')[0].trim().toUpperCase();
+
+  // 3. Match Registration Number directly (numeric string e.g. 99240040811)
+  if (/^\d{8,12}$/.test(str)) {
+    return str;
   }
 
-  return str.split('?')[0].split('#')[0].trim().toUpperCase();
+  // 4. Extract ALPHA team code if present (e.g. TQ-ALPHA-008-0811, EP-ALPHA-008-0811, ALPHA-008, ALPHA-8)
+  const alphaMatch = str.match(/ALPHA-?(\d+)/i);
+  if (alphaMatch) {
+    const formattedTeamId = `ALPHA-${alphaMatch[1].padStart(3, '0')}`;
+    const authByCode = AUTHORIZED_TEAMS.find(t => t.teamId === formattedTeamId);
+    if (authByCode) {
+      return authByCode.regNum; // Return lead registration number for team resolution
+    }
+    return formattedTeamId;
+  }
+
+  return str;
 }
 
 // Helper to resolve participant by regNum, teamName, qrCodeData, or Team document lookup

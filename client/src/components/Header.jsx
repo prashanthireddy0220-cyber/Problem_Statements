@@ -31,8 +31,11 @@ export default function Header() {
     (t.members && t.members.some(m => m.registrationNumber === user.registrationNumber))
   ) : null;
 
-  const headerLeadName = authItem?.leadName || (user?.name && !user.name.includes('Team Lead') ? user.name : null) || user?.registrationNumber || user?.name || 'User';
-  const headerTeamDisplay = authItem ? `${authItem.teamId} (${authItem.teamName})` : (user?.team?.name || user?.teamId || '');
+  const isVolunteer = user?.role === 'VOLUNTEER';
+  const headerLeadName = isVolunteer 
+    ? (user?.name && !user.name.includes('Sarah') ? user.name : 'Event Volunteer')
+    : (authItem?.leadName || (user?.name && !user.name.includes('Team Lead') ? user.name : null) || user?.registrationNumber || user?.name || 'User');
+  const headerTeamDisplay = isVolunteer ? 'ALPHA Volunteer' : (authItem ? `${authItem.teamId} (${authItem.teamName})` : (user?.team?.name || user?.teamId || ''));
 
   return (
     <>

@@ -278,7 +278,7 @@ router.post('/seed', async (req, res) => {
       await Volunteer.create({
         username: 'volunteer1',
         passwordHash: volPassHash,
-        name: 'Sarah Connor (Volunteer)',
+        name: 'Event Volunteer',
         phone: '+91 9876543210'
       });
     }

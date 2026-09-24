@@ -177,7 +177,7 @@ async function seedInstantDb() {
   await db.Admin.create({ username: 'admin', passwordHash: passHash, name: 'Head Organizer (Admin)', role: 'ADMIN' });
 
   const volPassHash = await bcrypt.hash('vol123', 10);
-  await db.Volunteer.create({ username: 'volunteer1', passwordHash: volPassHash, name: 'Sarah Connor (Volunteer)', phone: '+91 9876543210' });
+  await db.Volunteer.create({ username: 'volunteer1', passwordHash: volPassHash, name: 'Event Volunteer', phone: '+91 9876543210' });
 
   await db.SystemSettings.create({
     readingDurationMinutes: 30,

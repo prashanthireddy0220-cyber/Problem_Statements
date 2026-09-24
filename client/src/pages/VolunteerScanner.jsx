@@ -92,6 +92,14 @@ export default function VolunteerScanner() {
   const extractCleanId = (rawInput) => {
     if (!rawInput || typeof rawInput !== 'string') return '';
     let str = rawInput.trim();
+
+    if (str.startsWith('ATTENDANCE:')) {
+      const parts = str.split(':');
+      if (parts.length >= 3 && parts[2]) {
+        str = parts[2].trim();
+      }
+    }
+
     if (str.includes('/') || str.toLowerCase().startsWith('http')) {
       try {
         const parts = str.split('/').filter(p => p.trim().length > 0);
@@ -100,7 +108,19 @@ export default function VolunteerScanner() {
         }
       } catch (e) {}
     }
-    return str.split('?')[0].split('#')[0].trim().toUpperCase();
+
+    str = str.split('?')[0].split('#')[0].trim().toUpperCase();
+
+    if (/^\d{8,12}$/.test(str)) {
+      return str;
+    }
+
+    const alphaMatch = str.match(/ALPHA-?(\d+)/i);
+    if (alphaMatch) {
+      return `ALPHA-${alphaMatch[1].padStart(3, '0')}`;
+    }
+
+    return str;
   };
 
   // Participant lookup function
@@ -215,7 +235,7 @@ export default function VolunteerScanner() {
 
       {/* 2. SELECT ATTENDANCE SESSION DROPDOWN & TOTAL PRESENT STAT CARD */}
       <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '1.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', alignItems: 'center' }}>
           
           {/* Dropdown Selector */}
           <div>

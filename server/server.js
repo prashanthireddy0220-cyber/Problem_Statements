@@ -112,7 +112,9 @@ async function triggerAutoSeed() {
     if (!volExists) {
       console.log('🌱 Seeding default Volunteer (volunteer1 / vol123)...');
       const volPassHash = await bcrypt.hash('vol123', 10);
-      await Volunteer.create({ username: 'volunteer1', passwordHash: volPassHash, name: 'Sarah Connor (Volunteer)', phone: '+91 9876543210' });
+      await Volunteer.create({ username: 'volunteer1', passwordHash: volPassHash, name: 'Event Volunteer', phone: '+91 9876543210' });
+    } else {
+      await Volunteer.updateMany({ $or: [{ name: /Sarah/i }, { name: 'Sarah Connor (Volunteer)' }] }, { $set: { name: 'Event Volunteer' } });
     }
 
     let settings = await SystemSettings.findOne();
