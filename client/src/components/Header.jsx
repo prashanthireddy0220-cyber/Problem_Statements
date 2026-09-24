@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, UserCheck, AlertTriangle, LayoutDashboard } from 'lucide-react';
 import { getDashboardRoute } from '../App';
-import AUTHORIZED_TEAMS from '../data/teamsData';
+import AUTHORIZED_TEAMS from '../data/teamsData.js';
 
 export default function Header() {
   const { user, logout, revokedMessage, setRevokedMessage } = useAuth();

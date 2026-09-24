@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import QRCode from 'qrcode';
-import AUTHORIZED_TEAMS from '../data/teamsData';
+import AUTHORIZED_TEAMS from '../data/teamsData.js';
 
 export default function TeamLeadDashboard() {
   const { user, refreshUserSession } = useAuth();
