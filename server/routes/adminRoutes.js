@@ -124,53 +124,42 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
   try {
     const settings = await SystemSettings.findOne() || {};
     const authorizedTeams = require('../data/teamsData');
-    const validTeamIds = authorizedTeams.map(t => t.teamId);
-    const validRegNums = authorizedTeams.map(t => t.regNum);
-
-    // Auto-purge any legacy/invalid/unknown teams from MongoDB immediately on fetch
-    await Team.deleteMany({
-      $or: [
-        { name: { $nin: validTeamIds } },
-        { teamLeadRegNum: { $nin: validRegNums } },
-        { teamLeadRegNum: { $exists: false } },
-        { teamLeadRegNum: null },
-        { teamLeadRegNum: '' }
-      ]
-    });
-
-    const teams = await Team.find({ name: { $in: validTeamIds } }).sort({ name: 1 });
-    const teamLeads = await TeamLead.find({ registrationNumber: { $in: validRegNums } });
+    
+    const teams = await Team.find();
+    const teamLeads = await TeamLead.find();
     const activeSessions = await ActiveSession.find({ role: 'TEAM_LEAD' });
     const problemStatements = await ProblemStatement.find();
 
     const activeRegNums = new Set(activeSessions.map(s => s.registrationNumber));
 
-    const activity = teams
-      .filter(team => team.name && team.name.startsWith('ALPHA-') && team.teamLeadRegNum)
-      .map(team => {
-        const lead = teamLeads.find(l => l.registrationNumber === team.teamLeadRegNum);
-        const isOnline = lead && activeRegNums.has(lead.registrationNumber);
+    // Map ALL 60 teams from authorized dataset so no team is ever missing in Admin Portal
+    const activity = authorizedTeams.map(item => {
+      const dbTeam = teams.find(t => t.name === item.teamId || t.teamId === item.teamId || t.teamLeadRegNum === item.regNum);
+      const dbLead = teamLeads.find(l => l.registrationNumber === item.regNum);
+      const isOnline = activeRegNums.has(item.regNum);
 
-        let statusStr = '⚪ Not Started';
-        if (team.selectionConfirmed) {
-          statusStr = '✅ Selection Completed';
-        } else if (isOnline) {
-          statusStr = (settings.currentPhase === 'SELECTION_OPEN' || settings.currentPhase === 'SELECTION') ? '🟠 Selecting' : '🟢 Viewing';
-        }
+      let statusStr = '⚪ Not Started';
+      if (dbTeam?.selectionConfirmed) {
+        statusStr = '✅ Selection Completed';
+      } else if (isOnline) {
+        statusStr = (settings.currentPhase === 'SELECTION_OPEN' || settings.currentPhase === 'SELECTION') ? '🟠 Selecting' : '🟢 Viewing';
+      }
 
-        return {
-          teamId: team._id,
-          teamName: team.name,
-          teamLeadRegNum: team.teamLeadRegNum,
-          teamLeadName: lead ? lead.name : `Team Lead (${team.name})`,
-          college: team.college || 'KARE',
-          isOnline,
-          statusStr,
-          selectedProblemCode: team.selectedProblemCode,
-          selectionConfirmed: team.selectionConfirmed,
-          selectedAt: team.selectedAt
-        };
-      });
+      return {
+        teamId: dbTeam?._id || item.teamId,
+        teamCode: item.teamId,
+        teamName: item.teamName || item.teamId, // Official Team Name (e.g. INNOVATES)
+        teamLeadRegNum: item.regNum,
+        teamLeadName: dbLead?.name || item.leadName || `Team Lead (${item.teamId})`, // Official Lead Name (e.g. POLANKI VYSHNAVI)
+        college: dbTeam?.college || 'KARE',
+        department: dbTeam?.department || 'CSE',
+        isOnline,
+        statusStr,
+        selectedProblemCode: dbTeam?.selectedProblemCode || null,
+        selectionConfirmed: Boolean(dbTeam?.selectionConfirmed),
+        selectedAt: dbTeam?.selectedAt || null
+      };
+    });
 
     const totalProblems = problemStatements.length;
     const fullProblemsCount = problemStatements.filter(p => p.selectedCount >= (p.maxTeamCapacity || 2)).length;

@@ -103,10 +103,22 @@ router.delete('/sessions/:id', authenticateToken, requireRole('ADMIN'), async (r
   }
 });
 
+const AUTHORIZED_TEAMS = require('../data/teamsData');
+
 // Helper to extract registration number or Team ID from raw QR payloads / URLs
 function extractCleanId(rawInput) {
   if (!rawInput || typeof rawInput !== 'string') return '';
   let str = rawInput.trim();
+
+  // 1. Handle ATTENDANCE:sessionId:regNum:teamId payload
+  if (str.startsWith('ATTENDANCE:')) {
+    const parts = str.split(':');
+    if (parts.length >= 3 && parts[2]) {
+      return parts[2].trim().toUpperCase();
+    }
+  }
+
+  // 2. Handle URL payload
   if (str.includes('/') || str.toLowerCase().startsWith('http')) {
     try {
       const parts = str.split('/').filter(p => p.trim().length > 0);
@@ -115,6 +127,17 @@ function extractCleanId(rawInput) {
       }
     } catch (e) {}
   }
+
+  // 3. Handle TQ-ALPHA-001-8110 or EP-ALPHA-001-8110 tokens
+  if (str.startsWith('TQ-') || str.startsWith('EP-')) {
+    const parts = str.split('-');
+    if (parts.length >= 2) {
+      const candidateCode = parts[1].toUpperCase(); // e.g. ALPHA-001
+      const authByCode = AUTHORIZED_TEAMS.find(t => t.teamId === candidateCode);
+      if (authByCode) return authByCode.regNum;
+    }
+  }
+
   return str.split('?')[0].split('#')[0].trim().toUpperCase();
 }
 
@@ -123,7 +146,31 @@ async function resolveParticipant(rawInput) {
   const cleanId = extractCleanId(rawInput);
   if (!cleanId) return null;
 
-  // 1. Direct search by registrationNumber, qrCodeData, or teamName
+  // Search in official AUTHORIZED_TEAMS first
+  const authItem = AUTHORIZED_TEAMS.find(t => 
+    t.regNum === cleanId || 
+    t.teamId === cleanId || 
+    t.teamName.toUpperCase() === cleanId ||
+    t.members.some(m => m.registrationNumber === cleanId)
+  );
+
+  if (authItem) {
+    const matchedMember = authItem.members.find(m => m.registrationNumber === cleanId);
+    return {
+      registrationNumber: cleanId,
+      name: matchedMember ? matchedMember.name : authItem.leadName,
+      teamName: authItem.teamName,
+      teamId: authItem.teamId,
+      leadName: authItem.leadName,
+      leadRegNum: authItem.regNum,
+      college: 'KARE',
+      department: 'CSE',
+      isTeamLead: cleanId === authItem.regNum,
+      members: authItem.members
+    };
+  }
+
+  // Fallback to database Participant model
   let participant = await Participant.findOne({
     $or: [
       { registrationNumber: cleanId },
@@ -132,41 +179,23 @@ async function resolveParticipant(rawInput) {
     ]
   });
 
-  if (participant) return participant;
-
-  // 2. Lookup by Team document (if cleanId is teamId/name like ALPHA-060)
-  const teamDoc = await Team.findOne({
-    $or: [
-      { name: cleanId },
-      { teamId: cleanId }
-    ]
-  });
-
-  if (teamDoc && teamDoc.teamLeadRegNum) {
-    participant = await Participant.findOne({ registrationNumber: teamDoc.teamLeadRegNum });
-    if (!participant) {
-      participant = await Participant.create({
-        registrationNumber: teamDoc.teamLeadRegNum,
-        name: `Team Lead (${teamDoc.name})`,
-        teamName: teamDoc.name,
-        college: teamDoc.college || 'KARE',
-        department: teamDoc.department || 'CSE',
-        isTeamLead: true,
-        qrCodeData: teamDoc.teamLeadRegNum
-      });
-    }
-    return participant;
+  if (participant) {
+    const teamDoc = await Team.findOne({ name: participant.teamName });
+    return {
+      registrationNumber: participant.registrationNumber,
+      name: participant.name,
+      teamName: teamDoc?.teamName || participant.teamName,
+      teamId: teamDoc?.teamId || 'ALPHA',
+      leadName: participant.name,
+      leadRegNum: participant.registrationNumber,
+      college: participant.college || 'KARE',
+      department: participant.department || 'CSE',
+      isTeamLead: participant.isTeamLead,
+      members: teamDoc?.members || []
+    };
   }
 
-  // 3. Fallback: regex search on registrationNumber or teamName
-  participant = await Participant.findOne({
-    $or: [
-      { registrationNumber: { $regex: cleanId, $options: 'i' } },
-      { teamName: { $regex: cleanId, $options: 'i' } }
-    ]
-  });
-
-  return participant;
+  return null;
 }
 
 // 5. VOLUNTEER / ADMIN: LOOKUP PARTICIPANT BY REGISTRATION NUMBER OR QR DATA
@@ -181,12 +210,32 @@ router.get('/participant/lookup', authenticateToken, async (req, res) => {
 
     if (!participant) {
       const cleanId = extractCleanId(query);
-      return res.status(404).json({ error: `Participant with registration ID '${cleanId}' not found in database.` });
+      return res.status(404).json({ error: `Participant / Team with registration ID '${cleanId}' not found in database.` });
     }
 
     return res.json({ participant });
   } catch (err) {
+    console.error('Participant lookup error:', err);
     return res.status(500).json({ error: 'Participant lookup error.' });
+  }
+});
+
+// 5B. GET LOGGED-IN TEAM LEAD'S ATTENDANCE STATUS FOR ALL SESSIONS
+router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async (req, res) => {
+  try {
+    const cleanRegNum = (req.user.registrationNumber || '').trim().toUpperCase();
+    const records = await Attendance.find({ participantRegNum: cleanRegNum });
+    const markedSessions = {};
+    records.forEach(r => {
+      markedSessions[r.sessionId] = {
+        markedAt: r.markedAt,
+        markedByVolunteer: r.markedByVolunteer,
+        sessionName: r.sessionName
+      };
+    });
+    return res.json({ markedSessions });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch my attendance.' });
   }
 });
 

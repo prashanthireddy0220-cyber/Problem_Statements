@@ -229,7 +229,7 @@ router.get('/public/:tokenOrId', async (req, res) => {
 // 3. GET ALL TEAMS FOR ADMIN MANAGEMENT (Admin Only)
 router.get('/admin/all', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const teams = await Team.find().sort({ name: 1 });
+    const teams = await Team.find();
     const teamLeads = await TeamLead.find();
     const attendanceRecords = await Attendance.find();
     const appBaseUrl = config.FRONTEND_URL || 'http://localhost:5173';
@@ -242,30 +242,34 @@ router.get('/admin/all', authenticateToken, requireRole('ADMIN'), async (req, re
       }
     });
 
-    const detailedTeams = await Promise.all(teams.map(async (t) => {
-      await ensureTeamTokens(t);
-      const members = sanitizeTeamMembers(t);
-      const lead = teamLeads.find(l => l.registrationNumber === t.teamLeadRegNum);
+    const detailedTeams = AUTHORIZED_TEAMS.map((item) => {
+      const dbTeam = teams.find(t => t.name === item.teamId || t.teamId === item.teamId || t.teamLeadRegNum === item.regNum);
+      const dbLead = teamLeads.find(l => l.registrationNumber === item.regNum);
+      const members = (dbTeam?.members && dbTeam.members.length > 0) ? dbTeam.members : item.members;
+      
+      const teamQrToken = dbTeam?.teamQrToken || `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
+      const eventPassQrToken = dbTeam?.eventPassQrToken || `EP-${item.teamId}-${item.regNum.slice(-4)}`;
 
       return {
-        _id: t._id,
-        teamId: t.name || t.teamId,
-        teamName: t.name,
-        teamLeadRegNum: t.teamLeadRegNum,
-        teamLeadName: lead ? lead.name : (members[0] ? members[0].name : `Team Lead (${t.name})`),
+        _id: dbTeam?._id || item.teamId,
+        teamId: item.teamId,
+        teamName: item.teamName, // Official Team Name (e.g. INNOVATES)
+        teamLeadRegNum: item.regNum,
+        teamLeadName: dbLead?.name || item.leadName || `Team Lead (${item.teamId})`,
         membersCount: members.length,
         members: members,
-        college: t.college || 'KARE',
-        department: t.department || 'CSE',
-        selectedProblemCode: t.selectedProblemCode || 'Not Selected',
-        selectionConfirmed: t.selectionConfirmed,
-        teamQrToken: t.teamQrToken,
-        publicQrUrl: `${appBaseUrl}/team/${t.teamQrToken}`,
-        eventPassStatus: t.eventPassStatus || 'ISSUED',
-        registrationStatus: t.registrationStatus || 'CONFIRMED',
-        attendanceCount: attendanceByTeam[t.name] || 0
+        college: dbTeam?.college || 'KARE',
+        department: dbTeam?.department || 'CSE',
+        selectedProblemCode: dbTeam?.selectedProblemCode || 'Not Selected',
+        selectionConfirmed: Boolean(dbTeam?.selectionConfirmed),
+        teamQrToken: teamQrToken,
+        publicQrUrl: `${appBaseUrl}/team/${teamQrToken}`,
+        eventPassQrToken: eventPassQrToken,
+        eventPassStatus: dbTeam?.eventPassStatus || 'ISSUED',
+        registrationStatus: dbTeam?.registrationStatus || 'CONFIRMED',
+        attendanceCount: attendanceByTeam[item.teamId] || attendanceByTeam[item.teamName] || 0
       };
-    }));
+    });
 
     return res.json({ teams: detailedTeams });
   } catch (err) {

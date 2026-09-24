@@ -399,42 +399,69 @@ export default function VolunteerScanner() {
             </div>
           )}
 
-          {/* VERIFIED PARTICIPANT DETAILS CARD */}
+          {/* VERIFIED TEAM & PARTICIPANT DETAILS CARD */}
           {scannedParticipant && (
-            <div className="glass-card" style={{ padding: '1.75rem', borderLeft: '4px solid #00F2FE', marginBottom: '1rem' }}>
-              <div style={{ fontSize: '0.78rem', color: '#00F2FE', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.5rem', fontWeight: '700' }}>
-                PARTICIPANT FOUND ✅
+            <div className="glass-card" style={{ padding: '1.75rem', borderLeft: '4px solid #00F2FE', marginBottom: '1.5rem', background: 'rgba(15, 23, 42, 0.95)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', pb: '0.75rem' }}>
+                <div style={{ fontSize: '0.78rem', color: '#00E676', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '800' }}>
+                  TEAM VERIFIED FOR ATTENDANCE ✅
+                </div>
+                <span style={{ fontFamily: 'Orbitron, monospace', fontSize: '0.9rem', fontWeight: '800', color: '#00F2FE', background: 'rgba(0,242,254,0.1)', padding: '0.25rem 0.65rem', borderRadius: '12px', border: '1px solid rgba(0,242,254,0.3)' }}>
+                  {scannedParticipant.teamId || 'TEAM'}
+                </span>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Registration Number</div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>
-                    {scannedParticipant.registrationNumber}
+                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Team Name</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#FFD700' }}>
+                    {scannedParticipant.teamName}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Full Name</div>
+                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Scanned Lead / Student</div>
                   <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#F8FAFC' }}>
                     {scannedParticipant.name}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Team Name</div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#FFD700' }}>
-                    {scannedParticipant.teamName}
+                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Registration Number</div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>
+                    {scannedParticipant.registrationNumber}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>College / Dept</div>
+                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>College / Dept</div>
                   <div style={{ fontSize: '1rem', fontWeight: '600', color: '#CBD5E1' }}>
-                    {scannedParticipant.college} ({scannedParticipant.department})
+                    {scannedParticipant.college || 'KARE'} ({scannedParticipant.department || 'CSE'})
                   </div>
                 </div>
               </div>
+
+              {/* ALL 4 TEAM MEMBERS LIST */}
+              {scannedParticipant.members && scannedParticipant.members.length > 0 && (
+                <div style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Users size={16} color="#00F2FE" /> FULL TEAM MEMBERS ROSTER ({scannedParticipant.members.length}):
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                    {scannedParticipant.members.map((m, idx) => (
+                      <div key={idx} style={{ padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.8)', borderRadius: '8px', borderLeft: m.role === 'LEAD' ? '3px solid #00E676' : '3px solid #00F2FE' }}>
+                        <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F8FAFC' }}>
+                          {idx + 1}. {m.name}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#00F2FE', fontFamily: 'Orbitron, monospace', marginTop: '0.15rem' }}>
+                          {m.registrationNumber} • <span style={{ color: m.role === 'LEAD' ? '#00E676' : '#94A3B8' }}>{m.role || (idx === 0 ? 'LEAD' : 'MEMBER')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button onClick={() => setScannedParticipant(null)} className="btn-alpha-outline">Cancel</button>
@@ -442,9 +469,9 @@ export default function VolunteerScanner() {
                   onClick={handleMarkAttendance}
                   disabled={markingLoading}
                   className="btn-alpha-cyan"
-                  style={{ background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)', padding: '0.75rem 1.5rem' }}
+                  style={{ background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)', padding: '0.75rem 1.5rem', fontWeight: '800' }}
                 >
-                  {markingLoading ? 'Recording...' : 'MARK ATTENDANCE ✅'}
+                  {markingLoading ? 'Recording...' : 'MARK ATTENDANCE FOR TEAM ✅'}
                 </button>
               </div>
             </div>

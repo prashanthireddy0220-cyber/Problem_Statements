@@ -39,6 +39,7 @@ export default function TeamLeadDashboard() {
   const [attSessions, setAttSessions] = useState([]);
   const [selectedAttSession, setSelectedAttSession] = useState(null);
   const [attQrDataUrl, setAttQrDataUrl] = useState('');
+  const [myAttendanceRecords, setMyAttendanceRecords] = useState({});
 
   // 1. Fetch My Team Details
   const fetchMyTeam = async () => {
@@ -113,7 +114,7 @@ export default function TeamLeadDashboard() {
     };
   }, [selectedDomain, selectedDifficulty, searchTerm]);
 
-  // 3. Poll Attendance Sessions
+  // 3. Poll Attendance Sessions & My Attendance Status
   useEffect(() => {
     const fetchAttendanceSessions = async () => {
       try {
@@ -125,10 +126,17 @@ export default function TeamLeadDashboard() {
             setSelectedAttSession(active);
           }
         }
+
+        const myAttRes = await axios.get('/api/attendance/my-attendance');
+        if (myAttRes.data?.markedSessions) {
+          setMyAttendanceRecords(myAttRes.data.markedSessions);
+        }
       } catch (e) {}
     };
 
     fetchAttendanceSessions();
+    const interval = setInterval(fetchAttendanceSessions, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   // Generate Attendance Session QR Data URL
@@ -766,6 +774,9 @@ export default function TeamLeadDashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
             {attSessions.map((sess) => {
               const isSelected = selectedAttSession?._id === sess._id;
+              const isMarked = Boolean(myAttendanceRecords[sess.sessionId]);
+              const record = myAttendanceRecords[sess.sessionId];
+
               return (
                 <div
                   key={sess._id}
@@ -774,28 +785,41 @@ export default function TeamLeadDashboard() {
                   style={{
                     padding: '1.5rem',
                     cursor: 'pointer',
-                    borderLeft: isSelected ? '4px solid #FFD700' : '4px solid rgba(255,255,255,0.1)',
-                    background: isSelected ? 'rgba(255,215,0,0.06)' : 'rgba(255,255,255,0.02)',
+                    borderLeft: isMarked ? '4px solid #00E676' : (isSelected ? '4px solid #FFD700' : '4px solid rgba(255,255,255,0.1)'),
+                    background: isMarked ? 'rgba(0,230,118,0.05)' : (isSelected ? 'rgba(255,215,0,0.06)' : 'rgba(255,255,255,0.02)'),
                     boxShadow: isSelected ? '0 0 20px rgba(255, 215, 0, 0.15)' : 'none'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.78rem', fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{sess.sessionId}</span>
+                    
                     <span style={{
                       fontSize: '0.75rem',
                       fontWeight: '800',
                       padding: '0.2rem 0.6rem',
                       borderRadius: '12px',
-                      background: sess.status === 'ACTIVE' ? 'rgba(0,230,118,0.2)' : 'rgba(255,215,0,0.15)',
-                      color: sess.status === 'ACTIVE' ? '#00E676' : '#FFD700'
+                      background: isMarked ? 'rgba(0,230,118,0.2)' : (sess.status === 'ACTIVE' ? 'rgba(0,242,254,0.15)' : 'rgba(255,215,0,0.15)'),
+                      color: isMarked ? '#00E676' : (sess.status === 'ACTIVE' ? '#00F2FE' : '#FFD700')
                     }}>
-                      {sess.status}
+                      {isMarked ? '✅ PRESENT' : sess.status}
                     </span>
                   </div>
 
                   <h3 style={{ fontSize: '1.1rem', color: '#F8FAFC', marginBottom: '0.35rem' }}>{sess.sessionName}</h3>
                   <div style={{ fontSize: '0.82rem', color: '#94A3B8' }}>
                     📅 {sess.date} • ⏰ {sess.startTime} - {sess.endTime}
+                  </div>
+
+                  <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.8rem' }}>
+                    {isMarked ? (
+                      <span style={{ color: '#00E676', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <CheckCircle2 size={14} /> Checked in at {new Date(record.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#94A3B8' }}>
+                        ⏳ Click to generate Attendance QR for volunteer scan
+                      </span>
+                    )}
                   </div>
                 </div>
               );
