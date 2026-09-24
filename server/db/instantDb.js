@@ -270,20 +270,25 @@ async function seedInstantDb() {
   const authorizedTeams = require('../data/teamsData');
 
   for (const item of authorizedTeams) {
+    const qrToken = `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
+    const passToken = `EP-${item.teamId}-${item.regNum.slice(-4)}`;
+
     const teamDoc = await db.Team.create({
-      name: item.teamId,
+      name: item.teamName || item.teamId,
+      teamId: item.teamId,
       teamLeadRegNum: item.regNum,
       college: 'KARE',
       department: 'CSE',
-      members: [
-        { name: `Team Lead (${item.teamId})`, registrationNumber: item.regNum, role: 'LEAD', phone: '9876543210' },
-        { name: `Member 1 (${item.teamId})`, registrationNumber: `${item.regNum}-M1`, role: 'MEMBER', phone: '9876543211' }
-      ]
+      members: item.members || [],
+      teamQrToken: qrToken,
+      eventPassQrToken: passToken,
+      registrationStatus: 'CONFIRMED',
+      eventPassStatus: 'ISSUED'
     });
 
     await db.TeamLead.create({
       registrationNumber: item.regNum,
-      name: `Team Lead (${item.teamId})`,
+      name: item.leadName || `Team Lead (${item.teamId})`,
       teamId: teamDoc._id,
       phone: '9876543210',
       email: `${item.teamId.toLowerCase()}@hackathon.edu`
@@ -291,8 +296,8 @@ async function seedInstantDb() {
 
     await db.Participant.create({
       registrationNumber: item.regNum,
-      name: `Team Lead (${item.teamId})`,
-      teamName: item.teamId,
+      name: item.leadName || `Team Lead (${item.teamId})`,
+      teamName: item.teamName || item.teamId,
       college: 'KARE',
       department: 'CSE',
       isTeamLead: true,

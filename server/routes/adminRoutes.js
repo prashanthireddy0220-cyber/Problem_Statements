@@ -360,54 +360,37 @@ router.post('/seed', async (req, res) => {
     });
 
     for (const item of authorizedTeams) {
-      // Deduplicate teams with duplicate names if any exist
-      const teamDocs = await Team.find({ name: item.teamId });
-      let teamDoc = null;
-      if (teamDocs.length > 0) {
-        teamDoc = teamDocs.find(t => t.selectionConfirmed) || teamDocs[0];
-        for (const doc of teamDocs) {
-          if (doc._id.toString() !== teamDoc._id.toString()) {
-            await Team.findByIdAndDelete(doc._id);
-          }
-        }
-      }
-
-      const defaultMembers = [
-        { name: `Team Lead (${item.teamId})`, registrationNumber: item.regNum, role: 'LEAD', phone: '+91 9876543210', email: `${item.teamId.toLowerCase()}.lead@hackathon.edu` },
-        { name: `Dev Member 1 (${item.teamId})`, registrationNumber: `REG-${item.teamId.replace('ALPHA-', '')}02`, role: 'MEMBER', phone: '+91 9876543211', email: `${item.teamId.toLowerCase()}.m1@hackathon.edu` },
-        { name: `UI Member 2 (${item.teamId})`, registrationNumber: `REG-${item.teamId.replace('ALPHA-', '')}03`, role: 'MEMBER', phone: '+91 9876543212', email: `${item.teamId.toLowerCase()}.m2@hackathon.edu` },
-        { name: `AI Member 3 (${item.teamId})`, registrationNumber: `REG-${item.teamId.replace('ALPHA-', '')}04`, role: 'MEMBER', phone: '+91 9876543213', email: `${item.teamId.toLowerCase()}.m3@hackathon.edu` }
-      ];
+      // Find team doc by name / teamId
+      let teamDoc = await Team.findOne({ $or: [{ name: item.teamId }, { name: item.teamName }, { teamId: item.teamId }] });
 
       const qrToken = `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
       const passToken = `EP-${item.teamId}-${item.regNum.slice(-4)}`;
 
       if (!teamDoc) {
         teamDoc = await Team.create({
-          name: item.teamId,
+          name: item.teamName || item.teamId,
           teamId: item.teamId,
           teamLeadRegNum: item.regNum,
           college: 'KARE',
           department: 'CSE',
-          members: defaultMembers,
+          members: item.members || [],
           teamQrToken: qrToken,
           eventPassQrToken: passToken,
           registrationStatus: 'CONFIRMED',
           eventPassStatus: 'ISSUED'
         });
       } else {
+        teamDoc.name = item.teamName || item.teamId;
         teamDoc.teamId = item.teamId;
         teamDoc.teamLeadRegNum = item.regNum;
+        teamDoc.members = item.members || teamDoc.members;
         if (!teamDoc.college) teamDoc.college = 'KARE';
-        if (!teamDoc.members || teamDoc.members.length < 2) {
-          teamDoc.members = defaultMembers;
-        }
         if (!teamDoc.teamQrToken) teamDoc.teamQrToken = qrToken;
         if (!teamDoc.eventPassQrToken) teamDoc.eventPassQrToken = passToken;
         await teamDoc.save();
       }
 
-      // Deduplicate TeamLeads for regNum
+      // Ensure TeamLead doc exists with exact lead name
       const leadDocs = await TeamLead.find({ registrationNumber: item.regNum });
       let leadDoc = null;
       if (leadDocs.length > 0) {
@@ -422,14 +405,14 @@ router.post('/seed', async (req, res) => {
       if (!leadDoc) {
         leadDoc = await TeamLead.create({
           registrationNumber: item.regNum,
-          name: `Team Lead (${item.teamId})`,
+          name: item.leadName || `Team Lead (${item.teamId})`,
           teamId: teamDoc._id,
           phone: '9876543210',
           email: `${item.teamId.toLowerCase()}@hackathon.edu`
         });
       } else {
         leadDoc.teamId = teamDoc._id;
-        leadDoc.name = `Team Lead (${item.teamId})`;
+        leadDoc.name = item.leadName || leadDoc.name;
         await leadDoc.save();
       }
 
@@ -438,16 +421,16 @@ router.post('/seed', async (req, res) => {
       if (!partDoc) {
         await Participant.create({
           registrationNumber: item.regNum,
-          name: `Team Lead (${item.teamId})`,
-          teamName: item.teamId,
+          name: item.leadName || `Team Lead (${item.teamId})`,
+          teamName: item.teamName || item.teamId,
           college: 'KARE',
           department: 'CSE',
           isTeamLead: true,
           qrCodeData: item.regNum
         });
       } else {
-        partDoc.teamName = item.teamId;
-        partDoc.name = `Team Lead (${item.teamId})`;
+        partDoc.teamName = item.teamName || item.teamId;
+        partDoc.name = item.leadName || partDoc.name;
         await partDoc.save();
       }
     }
