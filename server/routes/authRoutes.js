@@ -31,33 +31,61 @@ const handleTeamLeadLogin = async (req, res) => {
     // 2. Lookup Team Lead & Team in Database
     let teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
 
+    // Find auth dataset entry
+    const authItem = AUTHORIZED_TEAMS.find(t => t.teamId === cleanTeamId && t.regNum === cleanRegNum);
+
     // Auto-heal / Seed on the fly if DB record is missing for this authorized pair
-    if (!teamLead) {
-      let team = await Team.findOne({ name: cleanTeamId });
-      if (!team) {
+    if (!teamLead || !teamLead.teamId) {
+      let team = await Team.findOne({
+        $or: [
+          { name: cleanTeamId },
+          { teamId: cleanTeamId },
+          { teamLeadRegNum: cleanRegNum }
+        ]
+      });
+
+      if (!team && authItem) {
+        const qrToken = `TQ-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
+        const passToken = `EP-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
+
         team = await Team.create({
-          name: cleanTeamId,
-          teamId: cleanTeamId,
+          name: authItem.teamId,
+          teamId: authItem.teamId,
+          teamName: authItem.teamName || authItem.teamId,
           teamLeadRegNum: cleanRegNum,
           college: 'KARE',
           department: 'CSE',
-          members: [
-            { name: `Team Lead (${cleanTeamId})`, registrationNumber: cleanRegNum, role: 'LEAD', phone: '9876543210' }
-          ]
+          members: authItem.members || [],
+          teamQrToken: qrToken,
+          eventPassQrToken: passToken,
+          registrationStatus: 'CONFIRMED',
+          eventPassStatus: 'ISSUED'
         });
       }
-      teamLead = await TeamLead.create({
-        registrationNumber: cleanRegNum,
-        name: `Team Lead (${cleanTeamId})`,
-        teamId: team._id,
-        phone: '9876543210',
-        email: `${cleanTeamId.toLowerCase()}@hackathon.edu`
-      });
-      teamLead.teamId = team;
+
+      if (!teamLead && team) {
+        teamLead = await TeamLead.create({
+          registrationNumber: cleanRegNum,
+          name: authItem?.leadName || `Team Lead (${cleanTeamId})`,
+          teamId: team._id,
+          phone: '9876543210',
+          email: `${cleanTeamId.toLowerCase()}@hackathon.edu`
+        });
+      } else if (teamLead && team) {
+        teamLead.teamId = team._id;
+        await teamLead.save();
+      }
+      if (teamLead) teamLead.teamId = team;
     }
 
-    // 3. Ensure Team Lead's associated Team ID matches the submitted Team ID exactly
-    if (!teamLead.teamId || teamLead.teamId.name !== cleanTeamId) {
+    // 3. Ensure Team Lead's associated Team ID matches the submitted Team ID
+    const isTeamMatch = teamLead && teamLead.teamId && (
+      teamLead.teamId.name === cleanTeamId ||
+      teamLead.teamId.teamId === cleanTeamId ||
+      teamLead.teamId.teamName === cleanTeamId
+    );
+
+    if (!isTeamMatch) {
       return res.status(401).json({
         error: 'Invalid Team ID or Team Lead Registration Number',
         code: 'INVALID_CREDENTIALS'

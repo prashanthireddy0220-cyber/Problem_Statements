@@ -61,27 +61,29 @@ export default function TeamLeadDashboard() {
 
   // Generate Team QR Data URL
   useEffect(() => {
-    if (myTeamData?.team?.teamQrToken) {
-      const publicUrl = `${window.location.origin}/team/${myTeamData.team.teamQrToken}`;
+    const token = myTeamData?.team?.teamQrToken || myTeamData?.team?.teamId || user?.team?.teamId;
+    if (token) {
+      const publicUrl = `${window.location.origin}/team/${token}`;
       QRCode.toDataURL(publicUrl, {
         width: 320,
         margin: 2,
         color: { dark: '#00F2FE', light: '#0F172A' }
       }).then(setTeamQrDataUrl).catch(console.error);
     }
-  }, [myTeamData?.team?.teamQrToken]);
+  }, [myTeamData?.team?.teamQrToken, myTeamData?.team?.teamId, user?.team?.teamId]);
 
   // Generate Event Pass QR Data URL
   useEffect(() => {
-    if (myTeamData?.team?.eventPassQrToken) {
-      const passUrl = `EVENT-PASS-${myTeamData.team.eventPassQrToken}`;
+    const passToken = myTeamData?.team?.eventPassQrToken || myTeamData?.team?.teamId || user?.team?.teamId;
+    if (passToken) {
+      const passUrl = `EVENT-PASS-${passToken}`;
       QRCode.toDataURL(passUrl, {
         width: 320,
         margin: 2,
         color: { dark: '#00E676', light: '#0F172A' }
       }).then(setEventPassQrDataUrl).catch(console.error);
     }
-  }, [myTeamData?.team?.eventPassQrToken]);
+  }, [myTeamData?.team?.eventPassQrToken, myTeamData?.team?.teamId, user?.team?.teamId]);
 
   // 2. Poll Problem Statements & Timer State
   useEffect(() => {

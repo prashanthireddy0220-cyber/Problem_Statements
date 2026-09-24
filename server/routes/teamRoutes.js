@@ -6,98 +6,152 @@ const { Team, TeamLead, Participant, ProblemStatement, Attendance } = require('.
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const config = require('../config/env');
 
+const AUTHORIZED_TEAMS = require('../data/teamsData');
+
 // Helper to ensure team has valid teamQrToken and eventPassQrToken
 async function ensureTeamTokens(team) {
+  if (!team) return null;
   let updated = false;
+  const teamCode = team.teamId || team.name || 'ALPHA';
+  const leadReg = team.teamLeadRegNum || 'LEAD';
+
   if (!team.teamQrToken) {
-    team.teamQrToken = `TQ-${team.name || team.teamId || 'ALPHA'}-${uuidv4().substring(0, 8).toUpperCase()}`;
+    team.teamQrToken = `TQ-${teamCode}-${leadReg.slice(-4)}`;
     updated = true;
   }
   if (!team.eventPassQrToken) {
-    team.eventPassQrToken = `EP-${team.name || team.teamId || 'ALPHA'}-${uuidv4().substring(0, 8).toUpperCase()}`;
+    team.eventPassQrToken = `EP-${teamCode}-${leadReg.slice(-4)}`;
     updated = true;
   }
   if (updated) {
-    await team.save();
+    await team.save().catch(err => console.error('Save tokens error:', err));
   }
   return team;
 }
 
 // Helper to populate default full team members if missing/incomplete
-function sanitizeTeamMembers(team) {
-  if (!team.members || team.members.length === 0) {
-    const leadReg = team.teamLeadRegNum || 'REG-LEAD';
-    return [
-      { name: `Team Lead (${team.name})`, registrationNumber: leadReg, role: 'LEAD', phone: '9876543210', email: `${team.name.toLowerCase()}@hackathon.edu` },
-      { name: `Member 1 (${team.name})`, registrationNumber: `${leadReg}-M1`, role: 'MEMBER', phone: '9876543211', email: `m1.${team.name.toLowerCase()}@hackathon.edu` },
-      { name: `Member 2 (${team.name})`, registrationNumber: `${leadReg}-M2`, role: 'MEMBER', phone: '9876543212', email: `m2.${team.name.toLowerCase()}@hackathon.edu` },
-      { name: `Member 3 (${team.name})`, registrationNumber: `${leadReg}-M3`, role: 'MEMBER', phone: '9876543213', email: `m3.${team.name.toLowerCase()}@hackathon.edu` }
-    ];
+function sanitizeTeamMembers(team, authItem) {
+  if (authItem && authItem.members && authItem.members.length > 0) {
+    return authItem.members;
   }
-  return team.members;
+  if (team && team.members && team.members.length > 0) {
+    return team.members;
+  }
+  const leadReg = team?.teamLeadRegNum || authItem?.regNum || 'REG-LEAD';
+  const teamCode = team?.teamId || team?.name || authItem?.teamId || 'ALPHA';
+  return [
+    { name: authItem?.leadName || `Team Lead (${teamCode})`, registrationNumber: leadReg, role: 'LEAD', phone: '9876543210', email: `${teamCode.toLowerCase()}@hackathon.edu` },
+    { name: `Member 1 (${teamCode})`, registrationNumber: `${leadReg}-M1`, role: 'MEMBER', phone: '9876543211', email: `m1.${teamCode.toLowerCase()}@hackathon.edu` },
+    { name: `Member 2 (${teamCode})`, registrationNumber: `${leadReg}-M2`, role: 'MEMBER', phone: '9876543212', email: `m2.${teamCode.toLowerCase()}@hackathon.edu` },
+    { name: `Member 3 (${teamCode})`, registrationNumber: `${leadReg}-M3`, role: 'MEMBER', phone: '9876543213', email: `m3.${teamCode.toLowerCase()}@hackathon.edu` }
+  ];
 }
 
 // 1. GET MY TEAM DASHBOARD DATA (Team Lead Only)
 router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, res) => {
   try {
-    const cleanRegNum = req.user.registrationNumber;
-    let teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
+    const cleanRegNum = (req.user.registrationNumber || '').trim().toUpperCase();
     
-    if (!teamLead || !teamLead.teamId) {
-      // Lookup team directly by teamLeadRegNum
-      const teamDoc = await Team.findOne({ teamLeadRegNum: cleanRegNum });
-      if (!teamDoc) {
-        return res.status(404).json({ error: 'Team details not found for this account.' });
+    // Find matching authorized team from data list
+    const authItem = AUTHORIZED_TEAMS.find(t => t.regNum === cleanRegNum || t.teamId === req.user.teamId || t.teamId === req.user.team?.teamId);
+
+    // 1. Lookup Team Lead & Team
+    let teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
+    let team = teamLead?.teamId;
+
+    if (!team) {
+      // Lookup team directly by teamLeadRegNum or teamId/name
+      const searchConditions = [{ teamLeadRegNum: cleanRegNum }];
+      if (authItem) {
+        searchConditions.push({ name: authItem.teamId });
+        searchConditions.push({ teamId: authItem.teamId });
       }
-      if (!teamLead) {
-        teamLead = await TeamLead.create({
-          registrationNumber: cleanRegNum,
-          name: req.user.name || `Team Lead (${teamDoc.name})`,
-          teamId: teamDoc._id,
-          phone: '9876543210',
-          email: `${teamDoc.name.toLowerCase()}@hackathon.edu`
-        });
-      } else {
-        teamLead.teamId = teamDoc._id;
-        await teamLead.save();
-      }
-      teamLead.teamId = teamDoc;
+      team = await Team.findOne({ $or: searchConditions });
     }
 
-    const team = await ensureTeamTokens(teamLead.teamId);
-    const members = sanitizeTeamMembers(team);
+    // Auto-heal / Seed team if missing from DB
+    if (!team && authItem) {
+      const qrToken = `TQ-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
+      const passToken = `EP-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
+
+      team = await Team.create({
+        name: authItem.teamId,
+        teamId: authItem.teamId,
+        teamName: authItem.teamName || authItem.teamId,
+        teamLeadRegNum: cleanRegNum,
+        college: 'KARE',
+        department: 'CSE',
+        members: authItem.members || [],
+        teamQrToken: qrToken,
+        eventPassQrToken: passToken,
+        registrationStatus: 'CONFIRMED',
+        eventPassStatus: 'ISSUED'
+      });
+    }
+
+    // Ensure teamLead doc exists and links to team
+    if (!teamLead) {
+      teamLead = await TeamLead.create({
+        registrationNumber: cleanRegNum,
+        name: authItem?.leadName || req.user.name || `Team Lead (${team?.name || 'ALPHA'})`,
+        teamId: team?._id,
+        phone: '9876543210',
+        email: `${(authItem?.teamId || team?.name || 'alpha').toLowerCase()}@hackathon.edu`
+      });
+    } else if (team && (!teamLead.teamId || teamLead.teamId._id?.toString() !== team._id.toString())) {
+      teamLead.teamId = team._id;
+      await teamLead.save();
+    }
+
+    // Update team members from authItem if team members are empty or missing
+    if (team && authItem && (!team.members || team.members.length === 0)) {
+      team.members = authItem.members || [];
+      if (!team.teamName) team.teamName = authItem.teamName;
+      await team.save();
+    }
+
+    if (team) {
+      await ensureTeamTokens(team);
+    }
+
+    const members = sanitizeTeamMembers(team, authItem);
 
     // Fetch problem details if selected
     let selectedProblem = null;
-    if (team.selectedProblemCode) {
+    if (team?.selectedProblemCode) {
       selectedProblem = await ProblemStatement.findOne({ problemId: team.selectedProblemCode });
     }
 
+    const teamCode = team?.teamId || team?.name || authItem?.teamId || 'ALPHA-000';
+    const displayTeamName = team?.teamName || authItem?.teamName || team?.name || teamCode;
+    const qrToken = team?.teamQrToken || `TQ-${teamCode}-${cleanRegNum.slice(-4)}`;
+    const passToken = team?.eventPassQrToken || `EP-${teamCode}-${cleanRegNum.slice(-4)}`;
+
     const appBaseUrl = config.FRONTEND_URL || 'http://localhost:5173';
-    const publicQrUrl = `${appBaseUrl}/team/${team.teamQrToken}`;
+    const publicQrUrl = `${appBaseUrl}/team/${qrToken}`;
 
     return res.json({
       team: {
-        id: team._id,
-        teamId: team.name || team.teamId,
-        name: team.name,
-        college: team.college || 'KARE',
-        department: team.department || 'CSE',
-        registrationStatus: team.registrationStatus || 'CONFIRMED',
-        eventPassStatus: team.eventPassStatus || 'ISSUED',
-        teamQrToken: team.teamQrToken,
+        id: team?._id || null,
+        teamId: teamCode,
+        name: displayTeamName,
+        college: team?.college || 'KARE',
+        department: team?.department || 'CSE',
+        registrationStatus: team?.registrationStatus || 'CONFIRMED',
+        eventPassStatus: team?.eventPassStatus || 'ISSUED',
+        teamQrToken: qrToken,
         publicQrUrl,
-        eventPassQrToken: team.eventPassQrToken,
-        selectedProblemCode: team.selectedProblemCode,
-        selectionConfirmed: team.selectionConfirmed,
-        selectedAt: team.selectedAt,
+        eventPassQrToken: passToken,
+        selectedProblemCode: team?.selectedProblemCode || null,
+        selectionConfirmed: Boolean(team?.selectionConfirmed),
+        selectedAt: team?.selectedAt || null,
         selectedProblem
       },
       teamLead: {
-        name: teamLead.name,
-        registrationNumber: teamLead.registrationNumber,
-        email: teamLead.email || `${team.name.toLowerCase()}@hackathon.edu`,
-        phone: teamLead.phone || '9876543210'
+        name: teamLead?.name || authItem?.leadName || req.user.name || 'Team Lead',
+        registrationNumber: cleanRegNum,
+        email: teamLead?.email || `${teamCode.toLowerCase()}@hackathon.edu`,
+        phone: teamLead?.phone || '9876543210'
       },
       members
     });

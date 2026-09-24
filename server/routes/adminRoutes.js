@@ -368,8 +368,9 @@ router.post('/seed', async (req, res) => {
 
       if (!teamDoc) {
         teamDoc = await Team.create({
-          name: item.teamName || item.teamId,
+          name: item.teamId,
           teamId: item.teamId,
+          teamName: item.teamName || item.teamId,
           teamLeadRegNum: item.regNum,
           college: 'KARE',
           department: 'CSE',
@@ -380,8 +381,9 @@ router.post('/seed', async (req, res) => {
           eventPassStatus: 'ISSUED'
         });
       } else {
-        teamDoc.name = item.teamName || item.teamId;
+        teamDoc.name = item.teamId;
         teamDoc.teamId = item.teamId;
+        teamDoc.teamName = item.teamName || item.teamId;
         teamDoc.teamLeadRegNum = item.regNum;
         teamDoc.members = item.members || teamDoc.members;
         if (!teamDoc.college) teamDoc.college = 'KARE';
