@@ -29,6 +29,7 @@ yarn-debug.log*
 yarn-error.log*
 data/
 !server/data/
+!client/src/data/
 
 # IDE & OS Files
 .DS_Store
