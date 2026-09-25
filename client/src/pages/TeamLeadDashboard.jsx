@@ -526,42 +526,150 @@ export default function TeamLeadDashboard() {
       {/* ==================================================== */}
       {activeTab === 'problems' && (
         <div>
-          {confirmedData || (user?.team?.selectionConfirmed) ? (
-            <div className="glass-panel" style={{ maxWidth: '800px', margin: '2rem auto', padding: '3rem 2rem', textAlign: 'center', borderColor: '#00E676', boxShadow: '0 0 40px rgba(0, 230, 118, 0.2)' }}>
-              <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(0, 230, 118, 0.15)', border: '2px solid #00E676', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', boxShadow: '0 0 25px rgba(0,230,118,0.4)' }}>
-                <Award size={44} color="#00E676" />
-              </div>
-              
-              <h1 style={{ fontFamily: 'var(--font-heading)', color: '#F8FAFC', fontSize: '2rem', marginBottom: '0.5rem' }}>
-                🎉 PROBLEM STATEMENT CONFIRMED
-              </h1>
-              <p style={{ color: '#00E676', fontSize: '1.1rem', fontWeight: '700', marginBottom: '2rem', letterSpacing: '1px' }}>
-                Your selection is locked in the database. ✅
-              </p>
+          {confirmedData || (user?.team?.selectionConfirmed) || (myTeamData?.team?.selectionConfirmed) ? (
+            (() => {
+              const activeSelectedCode = confirmedData?.problemId || confirmedData?.problemCode || myTeamData?.team?.selectedProblemCode || user?.team?.selectedProblemCode;
+              const selectedProblemObj = myTeamData?.team?.selectedProblem || problems.find(p => p.problemId === activeSelectedCode) || {};
+              const activeProblemTitle = confirmedData?.problemTitle || selectedProblemObj?.title || 'Selected Problem Statement';
+              const activeProblemDomain = confirmedData?.domain || selectedProblemObj?.domain || 'IoT & Smart Energy';
+              const activeProblemDesc = selectedProblemObj?.description || 'Your selected problem statement has been confirmed and locked in the database.';
+              const activeProblemRequirements = selectedProblemObj?.requirements || [];
+              const activeProblemExpectedSolution = selectedProblemObj?.expectedSolution || '';
+              const activeProblemTech = selectedProblemObj?.technologies || [];
 
-              <div className="glass-card" style={{ padding: '2rem', textAlign: 'left', marginBottom: '2rem', borderLeft: '4px solid #00E676' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-                  <div>
-                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Team Name</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#F8FAFC' }}>{user?.team?.name || confirmedData?.teamName}</div>
+              return (
+                <div className="glass-panel" style={{ maxWidth: '950px', margin: '2rem auto', padding: '2.5rem 2rem', textAlign: 'center', borderColor: '#00E676', boxShadow: '0 0 40px rgba(0, 230, 118, 0.2)' }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(0, 230, 118, 0.15)', border: '2px solid #00E676', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', boxShadow: '0 0 25px rgba(0,230,118,0.4)' }}>
+                    <Award size={44} color="#00E676" />
                   </div>
-                  <div>
-                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Team Lead ID</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>{user?.registrationNumber}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Selected Problem</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>
-                      {confirmedData?.problemId || confirmedData?.problemCode || user?.team?.selectedProblemCode}
+                  
+                  <h1 style={{ fontFamily: 'var(--font-heading)', color: '#F8FAFC', fontSize: '2rem', marginBottom: '0.4rem' }}>
+                    🎉 PROBLEM STATEMENT CONFIRMED
+                  </h1>
+                  <p style={{ color: '#00E676', fontSize: '1.1rem', fontWeight: '700', marginBottom: '2rem', letterSpacing: '1px' }}>
+                    Your selection is locked in the database. ✅
+                  </p>
+
+                  {/* SUMMARY CARDS GRID */}
+                  <div className="glass-card" style={{ padding: '1.5rem 2rem', textAlign: 'left', marginBottom: '1.5rem', borderLeft: '4px solid #00E676' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Team ID & Name</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#F8FAFC' }}>
+                          <span style={{ color: '#00F2FE', fontFamily: 'Orbitron, monospace', marginRight: '0.5rem' }}>{displayTeamId}</span>
+                          <span>{displayTeamName}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Team Lead</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#F8FAFC' }}>{displayLeadName}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>{displayLeadRegNum}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Selected Problem Code</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: '900', color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>
+                          {activeSelectedCode}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              <button className="btn-alpha-cyan" onClick={() => window.print()}>
-                <FileText size={18} /> Print Confirmation
-              </button>
-            </div>
+                  {/* FULL SELECTED PROBLEM STATEMENT DETAILS DISPLAY */}
+                  <div className="glass-card" style={{ padding: '2rem', textAlign: 'left', marginBottom: '2rem', border: '1px solid rgba(0, 242, 254, 0.3)', background: 'rgba(15, 23, 42, 0.9)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+                      <div>
+                        <span style={{ background: 'rgba(0,242,254,0.15)', border: '1px solid #00F2FE', color: '#00F2FE', fontSize: '0.8rem', fontWeight: '800', padding: '0.25rem 0.75rem', borderRadius: '20px', fontFamily: 'Orbitron, monospace' }}>
+                          {activeSelectedCode}
+                        </span>
+                        <span style={{ marginLeft: '0.75rem', background: 'rgba(255,215,0,0.15)', border: '1px solid #FFD700', color: '#FFD700', fontSize: '0.8rem', fontWeight: '700', padding: '0.25rem 0.75rem', borderRadius: '20px' }}>
+                          {activeProblemDomain}
+                        </span>
+                      </div>
+                      <span style={{ color: '#00E676', fontSize: '0.82rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <ShieldCheck size={16} /> VERIFIED SELECTION
+                      </span>
+                    </div>
+
+                    <h2 style={{ fontFamily: 'var(--font-heading)', color: '#F8FAFC', fontSize: '1.4rem', marginBottom: '1rem', lineHeight: '1.4' }}>
+                      {activeProblemTitle}
+                    </h2>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <h4 style={{ fontSize: '0.85rem', color: '#00F2FE', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '700', letterSpacing: '0.5px' }}>
+                        Problem Description
+                      </h4>
+                      <p style={{ color: '#CBD5E1', fontSize: '0.95rem', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
+                        {activeProblemDesc}
+                      </p>
+                    </div>
+
+                    {activeProblemExpectedSolution && (
+                      <div style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem 1.25rem', borderRadius: '10px', borderLeft: '3px solid #00F2FE' }}>
+                        <h4 style={{ fontSize: '0.85rem', color: '#00F2FE', textTransform: 'uppercase', marginBottom: '0.35rem', fontWeight: '700' }}>
+                          Expected Solution / Deliverables
+                        </h4>
+                        <p style={{ color: '#E2E8F0', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                          {activeProblemExpectedSolution}
+                        </p>
+                      </div>
+                    )}
+
+                    {activeProblemRequirements && activeProblemRequirements.length > 0 && (
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <h4 style={{ fontSize: '0.85rem', color: '#FFD700', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '700' }}>
+                          Key Requirements
+                        </h4>
+                        <ul style={{ paddingLeft: '1.25rem', color: '#CBD5E1', fontSize: '0.9rem', lineHeight: '1.6' }}>
+                          {activeProblemRequirements.map((reqStr, idx) => (
+                            <li key={idx} style={{ marginBottom: '0.25rem' }}>{reqStr}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activeProblemTech && activeProblemTech.length > 0 && (
+                      <div>
+                        <h4 style={{ fontSize: '0.85rem', color: '#94A3B8', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '700' }}>
+                          Target Technologies
+                        </h4>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          {activeProblemTech.map((tech, idx) => (
+                            <span key={idx} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#F8FAFC', fontSize: '0.78rem', padding: '0.2rem 0.65rem', borderRadius: '6px' }}>
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* TEAM MEMBERS LIST */}
+                  <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'left', marginBottom: '2rem' }}>
+                    <h4 style={{ fontSize: '0.9rem', color: '#00F2FE', textTransform: 'uppercase', marginBottom: '1rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Users size={18} /> REGISTERED TEAM MEMBERS ({displayMembers.length})
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      {displayMembers.map((m, idx) => (
+                        <div key={idx} style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ fontWeight: '700', color: '#F8FAFC', fontSize: '0.9rem' }}>{m.name}</div>
+                          <div style={{ fontSize: '0.78rem', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>{m.registrationNumber}</div>
+                          <div style={{ fontSize: '0.72rem', color: m.role === 'LEAD' ? '#FFD700' : '#94A3B8', fontWeight: '700', marginTop: '0.25rem' }}>
+                            {m.role === 'LEAD' ? '👑 TEAM LEAD' : 'MEMBER'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* PRINT & ACTION BUTTONS */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                    <button className="btn-alpha-cyan" onClick={() => window.print()} style={{ padding: '0.85rem 2rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <Printer size={20} /> Print Official Selection Certificate
+                    </button>
+                  </div>
+                </div>
+              );
+            })()
           ) : (
             <>
               {/* PROMINENT LIVE SESSION TIMER BANNER */}

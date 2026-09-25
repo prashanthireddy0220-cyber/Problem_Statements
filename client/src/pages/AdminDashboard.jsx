@@ -268,21 +268,31 @@ export default function AdminDashboard() {
   const teamsToDisplay = React.useMemo(() => {
     const rawList = (allTeams && allTeams.length > 0) ? allTeams : (liveData?.teams || []);
     
-    // Build map of DB/live state for each team by clean teamId
+    // Build map of DB/live state for each team by clean teamId, regNum, or teamName
     const dbMap = new Map();
     rawList.forEach(t => {
-      const code = (t.teamId || t.teamCode || '').trim().toUpperCase();
-      if (code.startsWith('ALPHA-') && !dbMap.has(code)) {
-        dbMap.set(code, t);
-      }
+      if (!t) return;
+      const keys = [t.teamId, t.teamCode, t.name, t.teamLeadRegNum];
+      keys.forEach(k => {
+        if (k) {
+          const cleanK = String(k).trim().toUpperCase();
+          if (!dbMap.has(cleanK)) {
+            dbMap.set(cleanK, t);
+          }
+        }
+      });
     });
 
     // Map over AUTHORIZED_TEAMS (always exactly 60 teams)
     return AUTHORIZED_TEAMS.map(authItem => {
-      const existing = dbMap.get(authItem.teamId);
+      const existing = dbMap.get(authItem.teamId) || dbMap.get(authItem.regNum);
       const members = (existing?.members && existing.members.length > 0) ? existing.members : authItem.members;
       const teamQrToken = existing?.teamQrToken || `TQ-${authItem.teamId}-${authItem.regNum.slice(-4)}`;
       const eventPassQrToken = existing?.eventPassQrToken || `EP-${authItem.teamId}-${authItem.regNum.slice(-4)}`;
+
+      const probCode = existing?.selectedProblemCode && existing.selectedProblemCode !== 'null' ? existing.selectedProblemCode : 'Not Selected';
+      const matchedProblem = problems.find(p => p.problemId === probCode) || existing?.selectedProblem;
+      const probTitle = matchedProblem?.title || existing?.selectedProblemTitle || '';
 
       return {
         _id: existing?._id || authItem.teamId,
@@ -294,8 +304,9 @@ export default function AdminDashboard() {
         members: members,
         college: existing?.college || 'KARE',
         department: existing?.department || 'CSE',
-        selectedProblemCode: existing?.selectedProblemCode || 'Not Selected',
-        selectionConfirmed: Boolean(existing?.selectionConfirmed),
+        selectedProblemCode: probCode,
+        selectedProblemTitle: probTitle,
+        selectionConfirmed: Boolean(existing?.selectionConfirmed) || (probCode !== 'Not Selected'),
         teamQrToken: teamQrToken,
         publicQrUrl: existing?.publicQrUrl || `/team/${teamQrToken}`,
         eventPassQrToken: eventPassQrToken,
@@ -304,7 +315,7 @@ export default function AdminDashboard() {
         attendanceCount: existing?.attendanceCount || 0
       };
     });
-  }, [allTeams, liveData]);
+  }, [allTeams, liveData, problems]);
 
   const filteredTeams = teamsToDisplay.filter(t => {
     if (!teamSearchTerm) return true;
@@ -546,8 +557,19 @@ export default function AdminDashboard() {
                       <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontFamily: 'Orbitron, monospace' }}>{t.teamLeadRegNum}</div>
                     </td>
                     <td style={{ fontWeight: '700', color: '#00E676' }}>{t.membersCount} Members</td>
-                    <td style={{ fontFamily: 'Orbitron, monospace', color: t.selectionConfirmed ? '#FFD700' : '#94A3B8' }}>
-                      {t.selectedProblemCode}
+                    <td style={{ fontFamily: 'Orbitron, monospace', color: (t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected') ? '#FFD700' : '#94A3B8', fontWeight: (t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected') ? '700' : '400' }}>
+                      {t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected' ? (
+                        <div>
+                          <div style={{ fontSize: '0.95rem', fontWeight: '800' }}>{t.selectedProblemCode}</div>
+                          {t.selectedProblemTitle && (
+                            <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontFamily: 'Inter, sans-serif', fontWeight: 'normal', maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t.selectedProblemTitle}>
+                              {t.selectedProblemTitle}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.85rem', color: '#64748B' }}>Not Selected</span>
+                      )}
                     </td>
                   </tr>
                 ))}

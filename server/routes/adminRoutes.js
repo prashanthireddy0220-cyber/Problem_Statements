@@ -145,17 +145,20 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
 
     // Map ALL 60 teams from authorized dataset so no team is ever missing in Admin Portal
     const activity = authorizedTeams.map(item => {
-      const dbTeam = teams.find(t => t.name === item.teamId || t.teamId === item.teamId || t.teamLeadRegNum === item.regNum);
+      const dbTeam = teams.find(t => t.name === item.teamId || t.teamId === item.teamId || t.teamLeadRegNum === item.regNum || t.name === item.teamName);
       const dbLead = teamLeads.find(l => l.registrationNumber === item.regNum);
       const isOnline = activeRegNums.has(item.regNum);
       const members = (dbTeam?.members && dbTeam.members.length > 0) ? dbTeam.members : (item.members || []);
 
       let statusStr = '⚪ Not Started';
-      if (dbTeam?.selectionConfirmed) {
+      if (dbTeam?.selectionConfirmed || dbTeam?.selectedProblemCode) {
         statusStr = '✅ Selection Completed';
       } else if (isOnline) {
         statusStr = (settings.currentPhase === 'SELECTION_OPEN' || settings.currentPhase === 'SELECTION') ? '🟠 Selecting' : '🟢 Viewing';
       }
+
+      const probCode = dbTeam?.selectedProblemCode && dbTeam.selectedProblemCode !== 'null' ? dbTeam.selectedProblemCode : 'Not Selected';
+      const matchedProblem = probCode !== 'Not Selected' ? problemStatements.find(p => p.problemId === probCode) : null;
 
       const teamQrToken = dbTeam?.teamQrToken || `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
       const eventPassQrToken = dbTeam?.eventPassQrToken || `EP-${item.teamId}-${item.regNum.slice(-4)}`;
@@ -171,8 +174,10 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
         department: dbTeam?.department || 'CSE',
         isOnline,
         statusStr,
-        selectedProblemCode: dbTeam?.selectedProblemCode || 'Not Selected',
-        selectionConfirmed: Boolean(dbTeam?.selectionConfirmed),
+        selectedProblemCode: probCode,
+        selectedProblemTitle: matchedProblem?.title || '',
+        selectedProblem: matchedProblem || null,
+        selectionConfirmed: Boolean(dbTeam?.selectionConfirmed) || (probCode !== 'Not Selected'),
         selectedAt: dbTeam?.selectedAt || null,
         membersCount: members.length,
         members: members,
