@@ -41,23 +41,14 @@ export const AuthProvider = ({ children }) => {
 
   const PRODUCTION_BACKEND_URL = 'https://problem-statements-w7wq.onrender.com';
 
-  // Configure Axios Base URL safely for local and production environments
+  // Configure Axios Base URL - default to production backend URL to ensure seamless connectivity locally and on Vercel
   useEffect(() => {
-    let rawUrl = import.meta.env.VITE_API_URL || '';
-    
-    // If no explicit VITE_API_URL is configured:
-    // On production/remote hostnames (e.g. Vercel), use production Render backend: https://problem-statements-w7wq.onrender.com
-    // On local dev (localhost/127.0.0.1), use relative URL so Vite proxy forwards to local server
-    if (!rawUrl) {
-      if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        rawUrl = PRODUCTION_BACKEND_URL;
-      } else {
-        rawUrl = '';
-      }
-    }
-    
+    const rawUrl = import.meta.env.VITE_API_URL || PRODUCTION_BACKEND_URL;
     axios.defaults.baseURL = getCleanBaseUrl(rawUrl);
   }, []);
+  
+  // Set initial synchronous baseURL
+  axios.defaults.baseURL = getCleanBaseUrl(import.meta.env.VITE_API_URL || PRODUCTION_BACKEND_URL);
 
   // Set default authorization header on axios
   useEffect(() => {
