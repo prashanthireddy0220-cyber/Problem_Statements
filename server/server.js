@@ -145,36 +145,10 @@ async function triggerAutoSeed() {
     const validTeamIds = authorizedTeams.map(t => t.teamId);
     const validRegNums = authorizedTeams.map(t => t.regNum);
 
-    console.log(`🧹 Purging legacy/invalid team records from database...`);
-
-    // Delete Team documents where name/teamId is NOT in validTeamIds OR teamLeadRegNum is NOT in validRegNums
-    await Team.deleteMany({
-      $or: [
-        { name: { $nin: validTeamIds } },
-        { teamId: { $nin: validTeamIds } },
-        { teamLeadRegNum: { $nin: validRegNums } },
-        { teamLeadRegNum: { $exists: false } },
-        { teamLeadRegNum: null },
-        { teamLeadRegNum: '' }
-      ]
-    });
-
-    await TeamLead.deleteMany({
-      $or: [
-        { registrationNumber: { $nin: validRegNums } },
-        { registrationNumber: { $exists: false } },
-        { registrationNumber: null },
-        { registrationNumber: '' }
-      ]
-    });
-
-    await Participant.deleteMany({
-      $or: [
-        { registrationNumber: { $nin: validRegNums } },
-        { registrationNumber: { $exists: false } },
-        { registrationNumber: null }
-      ]
-    });
+    console.log(`🧹 Purging all existing team records to eliminate duplicates...`);
+    await Team.deleteMany({});
+    await TeamLead.deleteMany({});
+    await Participant.deleteMany({});
 
     console.log(`🌱 Ensuring all ${authorizedTeams.length} authorized Teams & Team Leads exist (ALPHA-001 to ALPHA-060)...`);
 

@@ -401,34 +401,9 @@ router.post('/seed', async (req, res) => {
     const validTeamIds = authorizedTeams.map(t => t.teamId);
     const validRegNums = authorizedTeams.map(t => t.regNum);
 
-    // Delete Team documents where name/teamId is NOT in validTeamIds OR teamLeadRegNum is NOT in validRegNums
-    await Team.deleteMany({
-      $or: [
-        { name: { $nin: validTeamIds } },
-        { teamId: { $nin: validTeamIds } },
-        { teamLeadRegNum: { $nin: validRegNums } },
-        { teamLeadRegNum: { $exists: false } },
-        { teamLeadRegNum: null },
-        { teamLeadRegNum: '' }
-      ]
-    });
-
-    await TeamLead.deleteMany({
-      $or: [
-        { registrationNumber: { $nin: validRegNums } },
-        { registrationNumber: { $exists: false } },
-        { registrationNumber: null },
-        { registrationNumber: '' }
-      ]
-    });
-
-    await Participant.deleteMany({
-      $or: [
-        { registrationNumber: { $nin: validRegNums } },
-        { registrationNumber: { $exists: false } },
-        { registrationNumber: null }
-      ]
-    });
+    await Team.deleteMany({});
+    await TeamLead.deleteMany({});
+    await Participant.deleteMany({});
 
     for (const item of authorizedTeams) {
       let teamDoc = await Team.findOne({ $or: [{ name: item.teamId }, { teamId: item.teamId }, { teamLeadRegNum: item.regNum }] });
