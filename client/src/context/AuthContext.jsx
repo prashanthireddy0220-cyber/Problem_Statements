@@ -45,11 +45,15 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let rawUrl = import.meta.env.VITE_API_URL || '';
     
-    // Always use relative base URL when VITE_API_URL is omitted.
-    // - In Vite dev server: Vite proxy forwards /api -> http://localhost:5000
-    // - On Vercel deployment: vercel.json rewrite forwards /api -> https://problem-statements-w7wq.onrender.com
+    // If no explicit VITE_API_URL is configured:
+    // On production/remote hostnames (e.g. Vercel), use production Render backend: https://problem-statements-w7wq.onrender.com
+    // On local dev (localhost/127.0.0.1), use relative URL so Vite proxy forwards to local server
     if (!rawUrl) {
-      rawUrl = '';
+      if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        rawUrl = PRODUCTION_BACKEND_URL;
+      } else {
+        rawUrl = '';
+      }
     }
     
     axios.defaults.baseURL = getCleanBaseUrl(rawUrl);
