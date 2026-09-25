@@ -9,6 +9,7 @@ import {
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import axios from 'axios';
 import QRCode from 'qrcode';
+import AUTHORIZED_TEAMS from '../data/teamsData';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -301,28 +302,47 @@ export default function AdminDashboard() {
     window.open('/api/attendance/admin/export', '_blank');
   };
 
-  // Filtered Teams List (Falls back to liveData.teams if allTeams is empty)
-  const teamsToDisplay = (allTeams && allTeams.length > 0)
-    ? allTeams
-    : ((liveData && liveData.teams && liveData.teams.length > 0) ? liveData.teams.map(t => ({
-        _id: t._id || t.teamId || t.teamCode,
-        teamId: t.teamCode || t.teamId,
-        teamName: t.teamName || t.teamCode || t.teamId,
-        teamLeadRegNum: t.teamLeadRegNum,
-        teamLeadName: t.teamLeadName,
-        membersCount: t.membersCount || (t.members ? t.members.length : 4),
-        members: t.members || [],
-        college: t.college || 'KARE',
-        department: t.department || 'CSE',
-        selectedProblemCode: t.selectedProblemCode || 'Not Selected',
-        selectionConfirmed: Boolean(t.selectionConfirmed),
-        teamQrToken: t.teamQrToken || `TQ-${t.teamCode || t.teamId}-${(t.teamLeadRegNum || '0000').slice(-4)}`,
-        publicQrUrl: t.publicQrUrl || `/team/TQ-${t.teamCode || t.teamId}-${(t.teamLeadRegNum || '0000').slice(-4)}`,
-        eventPassQrToken: t.eventPassQrToken || `EP-${t.teamCode || t.teamId}-${(t.teamLeadRegNum || '0000').slice(-4)}`,
-        eventPassStatus: t.eventPassStatus || 'ISSUED',
-        registrationStatus: t.registrationStatus || 'CONFIRMED',
-        attendanceCount: t.attendanceCount || 0
-      })) : []);
+  // Exact 60 Authorized Teams List (Sanitized & Deduplicated against official table)
+  const teamsToDisplay = React.useMemo(() => {
+    const rawList = (allTeams && allTeams.length > 0) ? allTeams : (liveData?.teams || []);
+    
+    // Build map of DB/live state for each team by clean teamId
+    const dbMap = new Map();
+    rawList.forEach(t => {
+      const code = (t.teamId || t.teamCode || '').trim().toUpperCase();
+      if (code.startsWith('ALPHA-') && !dbMap.has(code)) {
+        dbMap.set(code, t);
+      }
+    });
+
+    // Map over AUTHORIZED_TEAMS (always exactly 60 teams)
+    return AUTHORIZED_TEAMS.map(authItem => {
+      const existing = dbMap.get(authItem.teamId);
+      const members = (existing?.members && existing.members.length > 0) ? existing.members : authItem.members;
+      const teamQrToken = existing?.teamQrToken || `TQ-${authItem.teamId}-${authItem.regNum.slice(-4)}`;
+      const eventPassQrToken = existing?.eventPassQrToken || `EP-${authItem.teamId}-${authItem.regNum.slice(-4)}`;
+
+      return {
+        _id: existing?._id || authItem.teamId,
+        teamId: authItem.teamId,
+        teamName: authItem.teamName, // Official Team Name (e.g. INNOVATES)
+        teamLeadRegNum: authItem.regNum, // Official Reg Number (e.g. 9924008110)
+        teamLeadName: authItem.leadName, // Official Team Lead Name (e.g. POLANKI VYSHNAVI)
+        membersCount: members ? members.length : 4,
+        members: members,
+        college: existing?.college || 'KARE',
+        department: existing?.department || 'CSE',
+        selectedProblemCode: existing?.selectedProblemCode || 'Not Selected',
+        selectionConfirmed: Boolean(existing?.selectionConfirmed),
+        teamQrToken: teamQrToken,
+        publicQrUrl: existing?.publicQrUrl || `/team/${teamQrToken}`,
+        eventPassQrToken: eventPassQrToken,
+        eventPassStatus: existing?.eventPassStatus || 'ISSUED',
+        registrationStatus: existing?.registrationStatus || 'CONFIRMED',
+        attendanceCount: existing?.attendanceCount || 0
+      };
+    });
+  }, [allTeams, liveData]);
 
   const filteredTeams = teamsToDisplay.filter(t => {
     if (!teamSearchTerm) return true;
