@@ -45,11 +45,11 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let rawUrl = import.meta.env.VITE_API_URL || '';
     
-    // Automatically fallback to Render production backend when running on remote deployments (like Vercel)
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      if (!rawUrl || rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')) {
-        rawUrl = PRODUCTION_BACKEND_URL;
-      }
+    // If VITE_API_URL is not provided on remote hosts (e.g. Vercel), use relative path so vercel.json rewrites handle proxying
+    if (!rawUrl && typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      rawUrl = '';
+    } else if (!rawUrl) {
+      rawUrl = 'http://localhost:5000';
     }
     
     axios.defaults.baseURL = getCleanBaseUrl(rawUrl);
