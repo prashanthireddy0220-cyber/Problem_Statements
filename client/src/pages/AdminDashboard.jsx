@@ -87,51 +87,13 @@ export default function AdminDashboard() {
 
   const fetchAllData = async () => {
     try {
-      if (activeTab === 'live') {
+      if (activeTab === 'live' || activeTab === 'teams') {
         const res = await axios.get('/api/admin/live-activity');
-        setLiveData(res.data);
-        if (res.data && res.data.teams && res.data.teams.length > 0 && allTeams.length === 0) {
-          const mappedFromLive = res.data.teams.map(t => ({
-            _id: t.teamId,
-            teamId: t.teamCode || t.teamId,
-            teamName: t.teamCode || t.teamId,
-            teamLeadRegNum: t.teamLeadRegNum,
-            teamLeadName: t.teamLeadName,
-            membersCount: 4,
-            members: [],
-            college: t.college || 'KARE',
-            department: 'CSE',
-            selectedProblemCode: t.selectedProblemCode || 'Not Selected',
-            selectionConfirmed: t.status.includes('Completed'),
-            teamQrToken: `TQ-${t.teamCode}-${t.teamLeadRegNum.slice(-4)}`,
-            publicQrUrl: `/team/TQ-${t.teamCode}-${t.teamLeadRegNum.slice(-4)}`,
-            eventPassQrToken: `EP-${t.teamCode}-${t.teamLeadRegNum.slice(-4)}`,
-            eventPassStatus: 'ISSUED',
-            registrationStatus: 'CONFIRMED',
-            attendanceCount: 0
-          }));
-          setAllTeams(mappedFromLive);
-        }
-      }
-      
-      if (activeTab === 'teams' || allTeams.length === 0) {
-        try {
-          const res = await axios.get('/api/teams/admin/all');
-          if (res.data && res.data.teams && res.data.teams.length > 0) {
+        if (res.data) {
+          setLiveData(res.data);
+          if (res.data.teams && res.data.teams.length > 0) {
             setAllTeams(res.data.teams);
-          } else {
-            const fallbackRes = await axios.get('/api/admin/teams');
-            if (fallbackRes.data && fallbackRes.data.teams && fallbackRes.data.teams.length > 0) {
-              setAllTeams(fallbackRes.data.teams);
-            }
           }
-        } catch (tErr) {
-          try {
-            const fallbackRes = await axios.get('/api/admin/teams');
-            if (fallbackRes.data && fallbackRes.data.teams && fallbackRes.data.teams.length > 0) {
-              setAllTeams(fallbackRes.data.teams);
-            }
-          } catch (e2) {}
         }
       }
 
