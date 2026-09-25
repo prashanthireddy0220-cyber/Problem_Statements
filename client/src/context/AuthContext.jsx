@@ -41,14 +41,21 @@ export const AuthProvider = ({ children }) => {
 
   const PRODUCTION_BACKEND_URL = 'https://problem-statements-w7wq.onrender.com';
 
-  // Configure Axios Base URL - default to production backend URL to ensure seamless connectivity locally and on Vercel
+  // Configure Axios Base URL - prioritize production backend URL and eliminate any localhost fallbacks
   useEffect(() => {
-    const rawUrl = import.meta.env.VITE_API_URL || PRODUCTION_BACKEND_URL;
+    let rawUrl = import.meta.env.VITE_API_URL || PRODUCTION_BACKEND_URL;
+    if (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')) {
+      rawUrl = PRODUCTION_BACKEND_URL;
+    }
     axios.defaults.baseURL = getCleanBaseUrl(rawUrl);
   }, []);
   
   // Set initial synchronous baseURL
-  axios.defaults.baseURL = getCleanBaseUrl(import.meta.env.VITE_API_URL || PRODUCTION_BACKEND_URL);
+  let initialUrl = import.meta.env.VITE_API_URL || PRODUCTION_BACKEND_URL;
+  if (initialUrl.includes('localhost') || initialUrl.includes('127.0.0.1')) {
+    initialUrl = PRODUCTION_BACKEND_URL;
+  }
+  axios.defaults.baseURL = getCleanBaseUrl(initialUrl);
 
   // Set default authorization header on axios
   useEffect(() => {
