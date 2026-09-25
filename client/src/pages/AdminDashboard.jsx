@@ -301,8 +301,30 @@ export default function AdminDashboard() {
     window.open('/api/attendance/admin/export', '_blank');
   };
 
-  // Filtered Teams List
-  const filteredTeams = allTeams.filter(t => {
+  // Filtered Teams List (Falls back to liveData.teams if allTeams is empty)
+  const teamsToDisplay = (allTeams && allTeams.length > 0)
+    ? allTeams
+    : ((liveData && liveData.teams && liveData.teams.length > 0) ? liveData.teams.map(t => ({
+        _id: t._id || t.teamId || t.teamCode,
+        teamId: t.teamCode || t.teamId,
+        teamName: t.teamName || t.teamCode || t.teamId,
+        teamLeadRegNum: t.teamLeadRegNum,
+        teamLeadName: t.teamLeadName,
+        membersCount: t.membersCount || (t.members ? t.members.length : 4),
+        members: t.members || [],
+        college: t.college || 'KARE',
+        department: t.department || 'CSE',
+        selectedProblemCode: t.selectedProblemCode || 'Not Selected',
+        selectionConfirmed: Boolean(t.selectionConfirmed),
+        teamQrToken: t.teamQrToken || `TQ-${t.teamCode || t.teamId}-${(t.teamLeadRegNum || '0000').slice(-4)}`,
+        publicQrUrl: t.publicQrUrl || `/team/TQ-${t.teamCode || t.teamId}-${(t.teamLeadRegNum || '0000').slice(-4)}`,
+        eventPassQrToken: t.eventPassQrToken || `EP-${t.teamCode || t.teamId}-${(t.teamLeadRegNum || '0000').slice(-4)}`,
+        eventPassStatus: t.eventPassStatus || 'ISSUED',
+        registrationStatus: t.registrationStatus || 'CONFIRMED',
+        attendanceCount: t.attendanceCount || 0
+      })) : []);
+
+  const filteredTeams = teamsToDisplay.filter(t => {
     if (!teamSearchTerm) return true;
     const term = teamSearchTerm.toLowerCase();
     return (
@@ -518,7 +540,7 @@ export default function AdminDashboard() {
           </div>
 
           <div style={{ fontSize: '0.85rem', color: '#00F2FE', marginBottom: '1rem', fontWeight: '700' }}>
-            Showing {filteredTeams.length} of {allTeams.length} Registered Teams
+            Showing {filteredTeams.length} of {teamsToDisplay.length} Registered Teams
           </div>
 
           <div className="alpha-table-container">

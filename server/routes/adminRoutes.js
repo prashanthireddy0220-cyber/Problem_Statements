@@ -132,11 +132,23 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
 
     const activeRegNums = new Set(activeSessions.map(s => s.registrationNumber));
 
+    const attendanceRecords = await Attendance.find().catch(() => []);
+    const attendanceByTeam = {};
+    attendanceRecords.forEach(r => {
+      if (r.teamName) {
+        attendanceByTeam[r.teamName] = (attendanceByTeam[r.teamName] || 0) + 1;
+      }
+    });
+
+    const config = require('../config/env');
+    const appBaseUrl = config.FRONTEND_URL || 'http://localhost:5173';
+
     // Map ALL 60 teams from authorized dataset so no team is ever missing in Admin Portal
     const activity = authorizedTeams.map(item => {
       const dbTeam = teams.find(t => t.name === item.teamId || t.teamId === item.teamId || t.teamLeadRegNum === item.regNum);
       const dbLead = teamLeads.find(l => l.registrationNumber === item.regNum);
       const isOnline = activeRegNums.has(item.regNum);
+      const members = (dbTeam?.members && dbTeam.members.length > 0) ? dbTeam.members : (item.members || []);
 
       let statusStr = '⚪ Not Started';
       if (dbTeam?.selectionConfirmed) {
@@ -145,19 +157,31 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
         statusStr = (settings.currentPhase === 'SELECTION_OPEN' || settings.currentPhase === 'SELECTION') ? '🟠 Selecting' : '🟢 Viewing';
       }
 
+      const teamQrToken = dbTeam?.teamQrToken || `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
+      const eventPassQrToken = dbTeam?.eventPassQrToken || `EP-${item.teamId}-${item.regNum.slice(-4)}`;
+
       return {
-        teamId: dbTeam?._id || item.teamId,
+        _id: dbTeam?._id || item.teamId,
+        teamId: item.teamId,
         teamCode: item.teamId,
         teamName: item.teamName || item.teamId, // Official Team Name (e.g. INNOVATES)
         teamLeadRegNum: item.regNum,
-        teamLeadName: dbLead?.name || item.leadName || `Team Lead (${item.teamId})`, // Official Lead Name (e.g. POLANKI VYSHNAVI)
+        teamLeadName: dbLead?.name || item.leadName || `Team Lead (${item.teamId})`, // Official Lead Name
         college: dbTeam?.college || 'KARE',
         department: dbTeam?.department || 'CSE',
         isOnline,
         statusStr,
-        selectedProblemCode: dbTeam?.selectedProblemCode || null,
+        selectedProblemCode: dbTeam?.selectedProblemCode || 'Not Selected',
         selectionConfirmed: Boolean(dbTeam?.selectionConfirmed),
-        selectedAt: dbTeam?.selectedAt || null
+        selectedAt: dbTeam?.selectedAt || null,
+        membersCount: members.length,
+        members: members,
+        teamQrToken: teamQrToken,
+        publicQrUrl: `${appBaseUrl}/team/${teamQrToken}`,
+        eventPassQrToken: eventPassQrToken,
+        eventPassStatus: dbTeam?.eventPassStatus || 'ISSUED',
+        registrationStatus: dbTeam?.registrationStatus || 'CONFIRMED',
+        attendanceCount: attendanceByTeam[item.teamId] || attendanceByTeam[item.teamName] || 0
       };
     });
 
