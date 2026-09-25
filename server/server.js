@@ -147,10 +147,11 @@ async function triggerAutoSeed() {
 
     console.log(`🧹 Purging legacy/invalid team records from database...`);
 
-    // 1. Delete Team documents where name is NOT in validTeamIds OR teamLeadRegNum is NOT in validRegNums OR teamLeadRegNum is missing
+    // Delete Team documents where name/teamId is NOT in validTeamIds OR teamLeadRegNum is NOT in validRegNums
     await Team.deleteMany({
       $or: [
         { name: { $nin: validTeamIds } },
+        { teamId: { $nin: validTeamIds } },
         { teamLeadRegNum: { $nin: validRegNums } },
         { teamLeadRegNum: { $exists: false } },
         { teamLeadRegNum: null },
@@ -158,7 +159,6 @@ async function triggerAutoSeed() {
       ]
     });
 
-    // 2. Delete TeamLead documents where registrationNumber is NOT in validRegNums OR missing
     await TeamLead.deleteMany({
       $or: [
         { registrationNumber: { $nin: validRegNums } },
@@ -168,7 +168,6 @@ async function triggerAutoSeed() {
       ]
     });
 
-    // 3. Delete Participant documents where registrationNumber is NOT in validRegNums
     await Participant.deleteMany({
       $or: [
         { registrationNumber: { $nin: validRegNums } },
@@ -180,8 +179,7 @@ async function triggerAutoSeed() {
     console.log(`🌱 Ensuring all ${authorizedTeams.length} authorized Teams & Team Leads exist (ALPHA-001 to ALPHA-060)...`);
 
     for (const item of authorizedTeams) {
-      // Find team doc by name / teamId
-      let teamDoc = await Team.findOne({ $or: [{ name: item.teamId }, { name: item.teamName }, { teamId: item.teamId }] });
+      let teamDoc = await Team.findOne({ $or: [{ name: item.teamId }, { teamId: item.teamId }, { teamLeadRegNum: item.regNum }] });
 
       const qrToken = `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
       const passToken = `EP-${item.teamId}-${item.regNum.slice(-4)}`;
@@ -212,7 +210,7 @@ async function triggerAutoSeed() {
         await teamDoc.save();
       }
 
-      // Ensure TeamLead doc exists with exact lead name
+      // Delete any secondary duplicate TeamLead docs for this regNum
       const leadDocs = await TeamLead.find({ registrationNumber: item.regNum });
       let leadDoc = null;
       if (leadDocs.length > 0) {
@@ -227,23 +225,22 @@ async function triggerAutoSeed() {
       if (!leadDoc) {
         leadDoc = await TeamLead.create({
           registrationNumber: item.regNum,
-          name: item.leadName || `Team Lead (${item.teamId})`,
+          name: item.leadName,
           teamId: teamDoc._id,
           phone: '9876543210',
           email: `${item.teamId.toLowerCase()}@hackathon.edu`
         });
       } else {
         leadDoc.teamId = teamDoc._id;
-        leadDoc.name = item.leadName || leadDoc.name;
+        leadDoc.name = item.leadName;
         await leadDoc.save();
       }
 
-      // Ensure Participant doc exists
       let partDoc = await Participant.findOne({ registrationNumber: item.regNum });
       if (!partDoc) {
         await Participant.create({
           registrationNumber: item.regNum,
-          name: item.leadName || `Team Lead (${item.teamId})`,
+          name: item.leadName,
           teamName: item.teamName || item.teamId,
           college: 'KARE',
           department: 'CSE',
@@ -252,7 +249,7 @@ async function triggerAutoSeed() {
         });
       } else {
         partDoc.teamName = item.teamName || item.teamId;
-        partDoc.name = item.leadName || partDoc.name;
+        partDoc.name = item.leadName;
         await partDoc.save();
       }
     }
