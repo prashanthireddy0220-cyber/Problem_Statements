@@ -534,62 +534,20 @@ export default function AdminDashboard() {
                   <th>Team Lead</th>
                   <th>Members</th>
                   <th>Problem Statement</th>
-                  <th>Team QR</th>
-                  <th>Event Pass</th>
-                  <th>Attendance</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredTeams.map((t) => (
-                  <tr key={t._id}>
+                  <tr key={t._id} onClick={() => setSelectedTeamDetail(t)} style={{ cursor: 'pointer' }} title="Click to view full team members list">
                     <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800' }}>{t.teamId}</td>
                     <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{t.teamName}</td>
                     <td>
-                      <div>{t.teamLeadName}</div>
+                      <div style={{ fontWeight: '700', color: '#F8FAFC' }}>{t.teamLeadName}</div>
                       <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontFamily: 'Orbitron, monospace' }}>{t.teamLeadRegNum}</div>
                     </td>
                     <td style={{ fontWeight: '700', color: '#00E676' }}>{t.membersCount} Members</td>
                     <td style={{ fontFamily: 'Orbitron, monospace', color: t.selectionConfirmed ? '#FFD700' : '#94A3B8' }}>
                       {t.selectedProblemCode}
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => setQrModalTeam(t)}
-                        className="btn-alpha-outline"
-                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                      >
-                        <QrCode size={14} color="#00F2FE" /> View Team QR
-                      </button>
-                    </td>
-                    <td>
-                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(0,230,118,0.15)', color: '#00E676' }}>
-                        {t.eventPassStatus}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: '700', color: '#00F2FE' }}>
-                      {t.attendanceCount} Check-ins
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <button
-                          onClick={() => setSelectedTeamDetail(t)}
-                          className="btn-alpha-cyan"
-                          style={{ padding: '0.3rem 0.61rem', fontSize: '0.72rem' }}
-                          title="View complete team members list"
-                        >
-                          <Eye size={13} /> View Team
-                        </button>
-
-                        <button
-                          onClick={() => handleRegenerateTeamQr(t._id, t.teamName)}
-                          className="btn-alpha-outline"
-                          style={{ padding: '0.3rem 0.61rem', fontSize: '0.72rem' }}
-                          title="Regenerate Team QR Code Token"
-                        >
-                          <RefreshCw size={13} /> QR
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))}
