@@ -246,6 +246,65 @@ router.post('/team-leads/:regNum/revoke', authenticateToken, requireRole('ADMIN'
   }
 });
 
+// 5b. GET ALL TEAMS FOR ADMIN MANAGEMENT (Alias Endpoint)
+router.get('/teams', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const teams = await Team.find();
+    const teamLeads = await TeamLead.find();
+    const attendanceRecords = await Attendance.find();
+    const config = require('../config/env');
+    const appBaseUrl = config.FRONTEND_URL || 'http://localhost:5173';
+    const AUTHORIZED_TEAMS = require('../data/teamsData');
+
+    const attendanceByTeam = {};
+    attendanceRecords.forEach(r => {
+      if (r.teamName) {
+        attendanceByTeam[r.teamName] = (attendanceByTeam[r.teamName] || 0) + 1;
+      }
+    });
+
+    const detailedTeams = AUTHORIZED_TEAMS.map((item) => {
+      const dbTeam = teams.find(t => t.name === item.teamId || t.teamId === item.teamId || t.teamLeadRegNum === item.regNum);
+      const dbLead = teamLeads.find(l => l.registrationNumber === item.regNum);
+      const members = (dbTeam?.members && dbTeam.members.length > 0) ? dbTeam.members : item.members;
+      
+      const teamQrToken = dbTeam?.teamQrToken || `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
+      const eventPassQrToken = dbTeam?.eventPassQrToken || `EP-${item.teamId}-${item.regNum.slice(-4)}`;
+
+      return {
+        _id: dbTeam?._id || item.teamId,
+        teamId: item.teamId,
+        teamName: item.teamName,
+        teamLeadRegNum: item.regNum,
+        teamLeadName: dbLead?.name || item.leadName || `Team Lead (${item.teamId})`,
+        membersCount: members ? members.length : 0,
+        members: members || [],
+        college: dbTeam?.college || 'KARE',
+        department: dbTeam?.department || 'CSE',
+        selectedProblemCode: dbTeam?.selectedProblemCode || 'Not Selected',
+        selectionConfirmed: Boolean(dbTeam?.selectionConfirmed),
+        teamQrToken: teamQrToken,
+        publicQrUrl: `${appBaseUrl}/team/${teamQrToken}`,
+        eventPassQrToken: eventPassQrToken,
+        eventPassStatus: dbTeam?.eventPassStatus || 'ISSUED',
+        registrationStatus: dbTeam?.registrationStatus || 'CONFIRMED',
+        attendanceCount: attendanceByTeam[item.teamId] || attendanceByTeam[item.teamName] || 0
+      };
+    });
+
+    return res.json({ teams: detailedTeams });
+  } catch (err) {
+    console.error('Admin fetch teams error:', err);
+    return res.status(500).json({ error: 'Failed to fetch team list.' });
+  }
+});
+
+router.get('/all-teams', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  const teamsHandler = router.stack.find(r => r.route && r.route.path === '/teams')?.route?.stack[2]?.handle;
+  if (teamsHandler) return teamsHandler(req, res);
+  return res.redirect('/api/admin/teams');
+});
+
 // 6. ADMIN: GET AUDIT LOGS
 router.get('/audit-logs', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {

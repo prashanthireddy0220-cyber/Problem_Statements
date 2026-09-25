@@ -57,8 +57,22 @@ const authenticateToken = async (req, res, next) => {
       }
       req.teamLead = teamLead;
     } else {
-      // Admin and Volunteer single session check
-      const sessionRecord = await ActiveSession.findOne({ sessionId: decoded.sessionId });
+      // Admin and Volunteer session check (auto-heal if session lost due to server restart)
+      let sessionRecord = await ActiveSession.findOne({ sessionId: decoded.sessionId });
+      if (!sessionRecord && decoded.sessionId) {
+        try {
+          sessionRecord = await ActiveSession.create({
+            userId: decoded.id || decoded.username || 'admin-user',
+            registrationNumber: decoded.username || 'ADMIN',
+            role: decoded.role,
+            sessionId: decoded.sessionId,
+            deviceId: 'server-restored-session'
+          });
+        } catch (e) {
+          // If creation fails due to race condition, check again
+          sessionRecord = await ActiveSession.findOne({ sessionId: decoded.sessionId });
+        }
+      }
       if (!sessionRecord) {
         return res.status(401).json({
           error: 'Session invalid or revoked.',

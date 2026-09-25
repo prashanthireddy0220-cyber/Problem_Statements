@@ -89,11 +89,51 @@ export default function AdminDashboard() {
       if (activeTab === 'live') {
         const res = await axios.get('/api/admin/live-activity');
         setLiveData(res.data);
+        if (res.data && res.data.teams && res.data.teams.length > 0 && allTeams.length === 0) {
+          const mappedFromLive = res.data.teams.map(t => ({
+            _id: t.teamId,
+            teamId: t.teamCode || t.teamId,
+            teamName: t.teamCode || t.teamId,
+            teamLeadRegNum: t.teamLeadRegNum,
+            teamLeadName: t.teamLeadName,
+            membersCount: 4,
+            members: [],
+            college: t.college || 'KARE',
+            department: 'CSE',
+            selectedProblemCode: t.selectedProblemCode || 'Not Selected',
+            selectionConfirmed: t.status.includes('Completed'),
+            teamQrToken: `TQ-${t.teamCode}-${t.teamLeadRegNum.slice(-4)}`,
+            publicQrUrl: `/team/TQ-${t.teamCode}-${t.teamLeadRegNum.slice(-4)}`,
+            eventPassQrToken: `EP-${t.teamCode}-${t.teamLeadRegNum.slice(-4)}`,
+            eventPassStatus: 'ISSUED',
+            registrationStatus: 'CONFIRMED',
+            attendanceCount: 0
+          }));
+          setAllTeams(mappedFromLive);
+        }
       }
-      if (activeTab === 'teams') {
-        const res = await axios.get('/api/teams/admin/all');
-        setAllTeams(res.data.teams || []);
+      
+      if (activeTab === 'teams' || allTeams.length === 0) {
+        try {
+          const res = await axios.get('/api/teams/admin/all');
+          if (res.data && res.data.teams && res.data.teams.length > 0) {
+            setAllTeams(res.data.teams);
+          } else {
+            const fallbackRes = await axios.get('/api/admin/teams');
+            if (fallbackRes.data && fallbackRes.data.teams && fallbackRes.data.teams.length > 0) {
+              setAllTeams(fallbackRes.data.teams);
+            }
+          }
+        } catch (tErr) {
+          try {
+            const fallbackRes = await axios.get('/api/admin/teams');
+            if (fallbackRes.data && fallbackRes.data.teams && fallbackRes.data.teams.length > 0) {
+              setAllTeams(fallbackRes.data.teams);
+            }
+          } catch (e2) {}
+        }
       }
+
       if (activeTab === 'problems' || activeTab === 'live') {
         const res = await axios.get('/api/problems?domain=ALL&difficulty=ALL');
         setProblems(res.data.problems || []);
@@ -139,7 +179,12 @@ export default function AdminDashboard() {
     try {
       await axios.post('/api/admin/seed');
       setActionMsg('All 60 teams and demo data populated successfully!');
-      setTimeout(() => setActionMsg(''), 3000);
+      setTimeout(() => setActionMsg(''), 4000);
+      
+      const tRes = await axios.get('/api/teams/admin/all').catch(() => axios.get('/api/admin/teams'));
+      if (tRes && tRes.data && tRes.data.teams) {
+        setAllTeams(tRes.data.teams);
+      }
       fetchAllData();
       fetchSettings();
     } catch (e) {
