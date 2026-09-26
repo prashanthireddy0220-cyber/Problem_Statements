@@ -114,10 +114,18 @@ router.get('/', authenticateToken, async (req, res) => {
     const state = await getOrUpdateSystemState();
     const isAdmin = req.user && req.user.role === 'ADMIN';
 
-    // If problem statements are not released yet and user is not Admin, return empty array with state info
+    // If problem statements are not released yet and user is not Admin, check if team lead has already selected a problem
     if (!state.problemStatementsReleased && !isAdmin) {
+      let teamSelectedProblems = [];
+      if (req.user && req.user.role === 'TEAM_LEAD') {
+        const teamLead = await TeamLead.findOne({ registrationNumber: req.user.registrationNumber }).populate('teamId');
+        if (teamLead?.teamId?.selectedProblemCode) {
+          const selPs = await ProblemStatement.findOne({ problemId: teamLead.teamId.selectedProblemCode });
+          if (selPs) teamSelectedProblems = [selPs];
+        }
+      }
       return res.json({
-        problems: [],
+        problems: teamSelectedProblems,
         phase: state.currentPhase,
         timerState: state,
         message: 'Problem Statements will be released soon.'

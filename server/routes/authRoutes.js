@@ -313,12 +313,21 @@ router.get('/me', authenticateToken, async (req, res) => {
     if (req.user.role === 'TEAM_LEAD') {
       const teamLead = await TeamLead.findOne({ registrationNumber: req.user.registrationNumber }).populate('teamId');
       if (teamLead) {
-        userData.team = teamLead.teamId ? {
-          id: teamLead.teamId._id,
-          name: teamLead.teamId.name,
-          college: teamLead.teamId.college,
-          selectionConfirmed: teamLead.teamId.selectionConfirmed,
-          selectedProblemCode: teamLead.teamId.selectedProblemCode
+        const teamDoc = teamLead.teamId;
+        userData.team = teamDoc ? {
+          id: teamDoc._id,
+          teamId: teamDoc.teamId || teamDoc.name,
+          name: teamDoc.teamName || teamDoc.name,
+          teamName: teamDoc.teamName || teamDoc.name,
+          college: teamDoc.college || 'KARE',
+          department: teamDoc.department || 'CSE',
+          registrationStatus: teamDoc.registrationStatus || 'CONFIRMED',
+          eventPassStatus: teamDoc.eventPassStatus || 'ISSUED',
+          members: teamDoc.members || [],
+          teamQrToken: teamDoc.teamQrToken,
+          eventPassQrToken: teamDoc.eventPassQrToken,
+          selectionConfirmed: Boolean(teamDoc.selectionConfirmed),
+          selectedProblemCode: teamDoc.selectedProblemCode || null
         } : null;
       }
     }

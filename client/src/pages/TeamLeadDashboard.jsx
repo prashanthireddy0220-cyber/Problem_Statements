@@ -90,6 +90,23 @@ export default function TeamLeadDashboard() {
       const res = await axios.get('/api/teams/my-team');
       if (res.data) {
         setMyTeamData(res.data);
+        if (res.data.team?.selectionConfirmed) {
+          setConfirmedData(prev => ({
+            ...prev,
+            teamName: res.data.team.name || res.data.team.teamName,
+            problemId: res.data.team.selectedProblemCode,
+            problemCode: res.data.team.selectedProblemCode,
+            problemTitle: res.data.team.selectedProblem?.title || prev?.problemTitle,
+            domain: res.data.team.selectedProblem?.domain || prev?.domain,
+            description: res.data.team.selectedProblem?.description || prev?.description,
+            requirements: res.data.team.selectedProblem?.requirements || prev?.requirements,
+            expectedSolution: res.data.team.selectedProblem?.expectedSolution || prev?.expectedSolution,
+            technologies: res.data.team.selectedProblem?.technologies || prev?.technologies,
+            selectedProblem: res.data.team.selectedProblem || prev?.selectedProblem,
+            selectedAt: res.data.team.selectedAt || prev?.selectedAt,
+            status: 'CONFIRMED'
+          }));
+        }
       }
     } catch (err) {
       console.error('Error loading team details:', err);
@@ -234,11 +251,12 @@ export default function TeamLeadDashboard() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Check confirmed problem selection
+  // Check confirmed problem selection from user session
   useEffect(() => {
-    if (user && user.team && user.team.selectionConfirmed) {
-      setConfirmedData({
-        teamName: user.team.name,
+    if (user?.team?.selectionConfirmed) {
+      setConfirmedData(prev => prev || {
+        teamName: user.team.name || user.team.teamName,
+        problemId: user.team.selectedProblemCode,
         problemCode: user.team.selectedProblemCode,
         status: 'CONFIRMED'
       });
@@ -483,7 +501,7 @@ export default function TeamLeadDashboard() {
                     </p>
                   </div>
 
-                  {myTeamData?.team?.selectionConfirmed ? (
+                  {(myTeamData?.team?.selectionConfirmed || user?.team?.selectionConfirmed || confirmedData) ? (
                     <div style={{ background: 'rgba(0,230,118,0.15)', border: '1px solid #00E676', padding: '0.4rem 0.85rem', borderRadius: '20px', color: '#00E676', fontSize: '0.85rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <CheckCircle2 size={16} /> SELECTION CONFIRMED
                     </div>
@@ -494,22 +512,31 @@ export default function TeamLeadDashboard() {
                   )}
                 </div>
 
-                {myTeamData?.team?.selectionConfirmed ? (
-                  <div className="glass-card" style={{ padding: '1.25rem', marginTop: '1.25rem', background: 'rgba(15,23,42,0.8)' }}>
-                    <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '1.25rem', fontWeight: '900', color: '#FFD700', marginBottom: '0.35rem' }}>
-                      {myTeamData.team.selectedProblemCode}
-                    </div>
-                    {myTeamData.team.selectedProblem && (
-                      <div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#F8FAFC', marginBottom: '0.5rem' }}>
-                          {myTeamData.team.selectedProblem.title}
+                {(myTeamData?.team?.selectionConfirmed || user?.team?.selectionConfirmed || confirmedData) ? (
+                  (() => {
+                    const selCode = myTeamData?.team?.selectedProblemCode || user?.team?.selectedProblemCode || confirmedData?.problemCode || confirmedData?.problemId;
+                    const selObj = myTeamData?.team?.selectedProblem || problems.find(p => p.problemId === selCode) || confirmedData?.selectedProblem || {};
+                    const selTitle = selObj.title || confirmedData?.problemTitle;
+                    const selDesc = selObj.description || confirmedData?.description;
+
+                    return (
+                      <div className="glass-card" style={{ padding: '1.25rem', marginTop: '1.25rem', background: 'rgba(15,23,42,0.8)' }}>
+                        <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '1.25rem', fontWeight: '900', color: '#FFD700', marginBottom: '0.35rem' }}>
+                          {selCode}
                         </div>
-                        <div style={{ fontSize: '0.88rem', color: '#94A3B8', lineHeight: '1.5' }}>
-                          {myTeamData.team.selectedProblem.description}
-                        </div>
+                        {selTitle && (
+                          <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#F8FAFC', marginBottom: '0.5rem' }}>
+                            {selTitle}
+                          </div>
+                        )}
+                        {selDesc && (
+                          <div style={{ fontSize: '0.88rem', color: '#94A3B8', lineHeight: '1.5' }}>
+                            {selDesc}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()
                 ) : (
                   <div style={{ padding: '1.25rem', marginTop: '1.25rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', textAlign: 'center', color: '#94A3B8', fontSize: '0.9rem' }}>
                     No Problem Statement selected yet. Click the button above or visit the <strong>Problem Statements</strong> tab to select one during the selection phase.
@@ -529,13 +556,13 @@ export default function TeamLeadDashboard() {
           {confirmedData || (user?.team?.selectionConfirmed) || (myTeamData?.team?.selectionConfirmed) ? (
             (() => {
               const activeSelectedCode = confirmedData?.problemId || confirmedData?.problemCode || myTeamData?.team?.selectedProblemCode || user?.team?.selectedProblemCode;
-              const selectedProblemObj = myTeamData?.team?.selectedProblem || problems.find(p => p.problemId === activeSelectedCode) || {};
-              const activeProblemTitle = confirmedData?.problemTitle || selectedProblemObj?.title || 'Selected Problem Statement';
-              const activeProblemDomain = confirmedData?.domain || selectedProblemObj?.domain || 'IoT & Smart Energy';
-              const activeProblemDesc = selectedProblemObj?.description || 'Your selected problem statement has been confirmed and locked in the database.';
-              const activeProblemRequirements = selectedProblemObj?.requirements || [];
-              const activeProblemExpectedSolution = selectedProblemObj?.expectedSolution || '';
-              const activeProblemTech = selectedProblemObj?.technologies || [];
+              const selectedProblemObj = myTeamData?.team?.selectedProblem || problems.find(p => p.problemId === activeSelectedCode) || confirmedData?.selectedProblem || {};
+              const activeProblemTitle = selectedProblemObj?.title || confirmedData?.problemTitle || 'Selected Problem Statement';
+              const activeProblemDomain = selectedProblemObj?.domain || confirmedData?.domain || '';
+              const activeProblemDesc = selectedProblemObj?.description || confirmedData?.description || 'Your selected problem statement has been confirmed and locked in the database.';
+              const activeProblemRequirements = selectedProblemObj?.requirements || confirmedData?.requirements || [];
+              const activeProblemExpectedSolution = selectedProblemObj?.expectedSolution || confirmedData?.expectedSolution || '';
+              const activeProblemTech = selectedProblemObj?.technologies || confirmedData?.technologies || [];
 
               return (
                 <div className="glass-panel" style={{ maxWidth: '950px', margin: '2rem auto', padding: '2.5rem 2rem', textAlign: 'center', borderColor: '#00E676', boxShadow: '0 0 40px rgba(0, 230, 118, 0.2)' }}>

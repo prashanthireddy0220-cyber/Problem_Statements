@@ -118,8 +118,11 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
 
     // Fetch problem details if selected
     let selectedProblem = null;
-    if (team?.selectedProblemCode) {
-      selectedProblem = await ProblemStatement.findOne({ problemId: team.selectedProblemCode });
+    if (team?.selectedProblemCode || team?.selectedProblemId) {
+      const searchOr = [];
+      if (team.selectedProblemCode) searchOr.push({ problemId: team.selectedProblemCode.trim().toUpperCase() });
+      if (team.selectedProblemId) searchOr.push({ _id: team.selectedProblemId });
+      selectedProblem = await ProblemStatement.findOne({ $or: searchOr });
     }
 
     const teamCode = team?.teamId || team?.name || authItem?.teamId || 'ALPHA-000';
