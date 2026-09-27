@@ -994,30 +994,53 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
                 ) : (
-                  attRecords.map((r, idx) => (
-                    <tr key={r._id || idx}>
-                      <td style={{ color: '#94A3B8', fontWeight: '700' }}>{idx + 1}</td>
-                      <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{r.participantRegNum}</td>
-                      <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{r.participantName}</td>
-                      <td><span style={{ color: '#FFD700', fontWeight: '600' }}>{r.teamId || 'ALPHA'}</span> ({r.teamName})</td>
-                      <td>{r.sessionName}</td>
-                      <td>
-                        {r.status === 'PRESENT' ? (
-                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(0,230,118,0.2)', color: '#00E676', border: '1px solid rgba(0,230,118,0.4)' }}>
-                            🟢 PRESENT
-                          </span>
-                        ) : (
-                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(255,75,75,0.2)', color: '#FF4B4B', border: '1px solid rgba(255,75,75,0.4)' }}>
-                            🔴 ABSENT
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>
-                        {r.markedAt ? new Date(r.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
-                      </td>
-                      <td style={{ fontSize: '0.85rem', color: '#94A3B8' }}>{r.markedByVolunteer || '—'}</td>
-                    </tr>
-                  ))
+                  attRecords.map((r, idx) => {
+                    const extractAlphaCode = (str) => {
+                      if (!str) return null;
+                      const m = String(str).match(/ALPHA-?(\d+)/i);
+                      return m ? `ALPHA-${m[1].padStart(3, '0')}` : null;
+                    };
+
+                    const cleanReg = String(r.participantRegNum || '').trim().toUpperCase();
+                    const targetTeamCode = extractAlphaCode(r.teamId) || extractAlphaCode(cleanReg) || extractAlphaCode(r.teamName) || extractAlphaCode(r.participantName);
+
+                    let authTeam = AUTHORIZED_TEAMS.find(t => t.teamId === targetTeamCode || t.regNum === cleanReg);
+                    if (!authTeam && cleanReg) {
+                      authTeam = AUTHORIZED_TEAMS.find(t => t.members && t.members.some(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg));
+                    }
+
+                    const authMember = authTeam?.members?.find(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg);
+
+                    const displayName = authMember?.name || (authTeam && (!r.participantName || r.participantName.includes('Team Lead ('))) ? authTeam.leadName : r.participantName;
+                    const displayTeamId = authTeam?.teamId || r.teamId || 'ALPHA';
+                    const displayTeamName = authTeam?.teamName || r.teamName || 'Team';
+                    const displayRegNum = authMember?.registrationNumber || (authTeam ? authTeam.regNum : r.participantRegNum);
+
+                    return (
+                      <tr key={r._id || idx}>
+                        <td style={{ color: '#94A3B8', fontWeight: '700' }}>{idx + 1}</td>
+                        <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{displayRegNum}</td>
+                        <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{displayName}</td>
+                        <td><span style={{ color: '#FFD700', fontWeight: '600' }}>{displayTeamId}</span> ({displayTeamName})</td>
+                        <td>{r.sessionName}</td>
+                        <td>
+                          {r.status === 'PRESENT' ? (
+                            <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(0,230,118,0.2)', color: '#00E676', border: '1px solid rgba(0,230,118,0.4)' }}>
+                              🟢 PRESENT
+                            </span>
+                          ) : (
+                            <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(255,75,75,0.2)', color: '#FF4B4B', border: '1px solid rgba(255,75,75,0.4)' }}>
+                              🔴 ABSENT
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>
+                          {r.markedAt ? new Date(r.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </td>
+                        <td style={{ fontSize: '0.85rem', color: '#94A3B8' }}>{r.markedByVolunteer || '—'}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

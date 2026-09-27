@@ -105,29 +105,67 @@ router.delete('/sessions/:id', authenticateToken, requireRole('ADMIN'), async (r
 
 const AUTHORIZED_TEAMS = require('../data/teamsData');
 
-// Helper to resolve real student name from registration number
-function getRealStudentName(regNum, fallbackName) {
-  if (!regNum) return fallbackName || 'Student';
-  const clean = String(regNum).trim().toUpperCase();
+// Helper to resolve real student name, official teamId, and official teamName from any combination of input fields
+function resolveParticipantDetails(rawRegNum, rawName, rawTeamId, rawTeamName) {
+  const cleanReg = String(rawRegNum || '').trim().toUpperCase();
+  const cleanName = String(rawName || '').trim();
+  const cleanTeamId = String(rawTeamId || '').trim().toUpperCase();
+  const cleanTeamName = String(rawTeamName || '').trim();
 
-  // Search across all AUTHORIZED_TEAMS members
+  // Extract ALPHA team code if present (e.g. ALPHA-004, ALPHA-4, TQ-ALPHA-004)
+  const extractAlphaTeamId = (str) => {
+    if (!str) return null;
+    const m = String(str).match(/ALPHA-?(\d+)/i);
+    return m ? `ALPHA-${m[1].padStart(3, '0')}` : null;
+  };
+
+  const targetTeamId = extractAlphaTeamId(cleanTeamId) || extractAlphaTeamId(cleanReg) || extractAlphaTeamId(cleanTeamName) || extractAlphaTeamId(cleanName);
+
+  let foundTeam = null;
+  let foundMember = null;
+
   for (const t of AUTHORIZED_TEAMS) {
-    if (t.members && Array.isArray(t.members)) {
-      const match = t.members.find(m => String(m.registrationNumber).trim().toUpperCase() === clean);
-      if (match && match.name && !match.name.includes('Team Lead (')) {
-        return match.name;
+    if (targetTeamId && t.teamId === targetTeamId) {
+      foundTeam = t;
+    } else if (cleanReg && (t.regNum === cleanReg || t.teamId === cleanReg)) {
+      foundTeam = t;
+    } else if (t.members && t.members.some(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg)) {
+      foundTeam = t;
+    }
+
+    if (foundTeam) {
+      if (t.members && Array.isArray(t.members)) {
+        foundMember = t.members.find(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg);
       }
-    }
-    if (t.regNum && String(t.regNum).trim().toUpperCase() === clean && t.leadName && !t.leadName.includes('Team Lead (')) {
-      return t.leadName;
+      break;
     }
   }
 
-  if (fallbackName && !fallbackName.includes('Team Lead (') && !fallbackName.startsWith('Student')) {
-    return fallbackName;
+  if (foundTeam) {
+    const finalRegNum = foundMember ? foundMember.registrationNumber : (foundTeam.regNum || cleanReg);
+    const finalName = foundMember ? foundMember.name : foundTeam.leadName;
+    const finalTeamId = foundTeam.teamId;
+    const finalTeamName = foundTeam.teamName;
+
+    return {
+      registrationNumber: finalRegNum,
+      name: finalName,
+      teamId: finalTeamId,
+      teamName: finalTeamName
+    };
   }
 
-  return clean;
+  let fallbackName = cleanName;
+  if (!fallbackName || fallbackName.includes('Team Lead (') || fallbackName === 'Student') {
+    fallbackName = cleanReg;
+  }
+
+  return {
+    registrationNumber: cleanReg,
+    name: fallbackName,
+    teamId: cleanTeamId || 'ALPHA-001',
+    teamName: cleanTeamName || cleanTeamId || 'Team'
+  };
 }
 
 // Helper to extract registration number or Team ID from raw QR payloads / URLs
@@ -641,7 +679,7 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
         t.members.forEach(m => {
           allParticipants.push({
             registrationNumber: m.registrationNumber,
-            name: getRealStudentName(m.registrationNumber, m.name),
+            name: m.name,
             teamName: t.teamName,
             teamId: t.teamId,
             role: m.role || 'MEMBER',
@@ -653,14 +691,17 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
 
     if (allParticipants.length === 0) {
       const dbParts = await Participant.find();
-      allParticipants = dbParts.map(p => ({
-        registrationNumber: p.registrationNumber,
-        name: getRealStudentName(p.registrationNumber, p.name),
-        teamName: p.teamName,
-        teamId: 'ALPHA',
-        role: p.isTeamLead ? 'LEAD' : 'MEMBER',
-        college: p.college || 'KARE'
-      }));
+      allParticipants = dbParts.map(p => {
+        const details = resolveParticipantDetails(p.registrationNumber, p.name, 'ALPHA', p.teamName);
+        return {
+          registrationNumber: details.registrationNumber,
+          name: details.name,
+          teamName: details.teamName,
+          teamId: details.teamId,
+          role: p.isTeamLead ? 'LEAD' : 'MEMBER',
+          college: p.college || 'KARE'
+        };
+      });
     }
 
     let attendanceFilter = {};
@@ -687,13 +728,13 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
       resultRows = allParticipants.map(p => {
         const cleanReg = (p.registrationNumber || '').trim().toUpperCase();
         const att = recordsMap[cleanReg];
-        const realName = getRealStudentName(p.registrationNumber, p.name);
+        const details = resolveParticipantDetails(p.registrationNumber, p.name, p.teamId, p.teamName);
         return {
           _id: att?._id || `temp-${p.registrationNumber}`,
-          participantRegNum: p.registrationNumber,
-          participantName: realName,
-          teamName: p.teamName,
-          teamId: p.teamId,
+          participantRegNum: details.registrationNumber,
+          participantName: details.name,
+          teamName: details.teamName,
+          teamId: details.teamId,
           sessionName: sName,
           sessionId: sessionId,
           status: att ? att.status : 'ABSENT',
@@ -705,13 +746,13 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
       // If ALL sessions selected, map existing attendance logs or expand
       if (attRecords.length > 0) {
         resultRows = attRecords.map(r => {
-          const realName = getRealStudentName(r.participantRegNum, r.participantName);
+          const details = resolveParticipantDetails(r.participantRegNum, r.participantName, r.teamId, r.teamName);
           return {
             _id: r._id,
-            participantRegNum: r.participantRegNum,
-            participantName: realName,
-            teamName: r.teamName,
-            teamId: r.teamId || 'ALPHA',
+            participantRegNum: details.registrationNumber,
+            participantName: details.name,
+            teamName: details.teamName,
+            teamId: details.teamId,
             sessionName: r.sessionName,
             sessionId: r.sessionId,
             status: r.status || 'PRESENT',
@@ -721,13 +762,13 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
         });
       } else {
         resultRows = allParticipants.map(p => {
-          const realName = getRealStudentName(p.registrationNumber, p.name);
+          const details = resolveParticipantDetails(p.registrationNumber, p.name, p.teamId, p.teamName);
           return {
             _id: `temp-${p.registrationNumber}`,
-            participantRegNum: p.registrationNumber,
-            participantName: realName,
-            teamName: p.teamName,
-            teamId: p.teamId,
+            participantRegNum: details.registrationNumber,
+            participantName: details.name,
+            teamName: details.teamName,
+            teamId: details.teamId,
             sessionName: 'No Session Selected',
             sessionId: 'N/A',
             status: 'ABSENT',
@@ -759,11 +800,17 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
       );
     }
 
-    // Always ensure participantName is real full student name
-    resultRows = resultRows.map(r => ({
-      ...r,
-      participantName: getRealStudentName(r.participantRegNum, r.participantName)
-    }));
+    // Always ensure participantName, teamId, and teamName are fully resolved
+    resultRows = resultRows.map(r => {
+      const details = resolveParticipantDetails(r.participantRegNum, r.participantName, r.teamId, r.teamName);
+      return {
+        ...r,
+        participantRegNum: details.registrationNumber,
+        participantName: details.name,
+        teamId: details.teamId,
+        teamName: details.teamName
+      };
+    });
 
     const totalRegistered = allParticipants.length;
     const totalPresentCount = resultRows.filter(r => r.status === 'PRESENT').length;
@@ -801,7 +848,7 @@ router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req,
         t.members.forEach(m => {
           allParticipants.push({
             registrationNumber: m.registrationNumber,
-            name: getRealStudentName(m.registrationNumber, m.name),
+            name: m.name,
             teamName: t.teamName,
             teamId: t.teamId,
             role: m.role || 'MEMBER'
@@ -812,13 +859,16 @@ router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req,
 
     if (allParticipants.length === 0) {
       const dbParts = await Participant.find();
-      allParticipants = dbParts.map(p => ({
-        registrationNumber: p.registrationNumber,
-        name: getRealStudentName(p.registrationNumber, p.name),
-        teamName: p.teamName,
-        teamId: 'ALPHA',
-        role: p.isTeamLead ? 'LEAD' : 'MEMBER'
-      }));
+      allParticipants = dbParts.map(p => {
+        const details = resolveParticipantDetails(p.registrationNumber, p.name, 'ALPHA', p.teamName);
+        return {
+          registrationNumber: details.registrationNumber,
+          name: details.name,
+          teamName: details.teamName,
+          teamId: details.teamId,
+          role: p.isTeamLead ? 'LEAD' : 'MEMBER'
+        };
+      });
     }
 
     const recordsMap = {};
@@ -830,12 +880,17 @@ router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req,
     const exportRows = allParticipants.map(p => {
       const cleanReg = (p.registrationNumber || '').trim().toUpperCase();
       const match = recordsMap[cleanReg];
-      const realName = getRealStudentName(cleanReg, p.name);
+      const details = resolveParticipantDetails(
+        match?.participantRegNum || p.registrationNumber,
+        match?.participantName || p.name,
+        match?.teamId || p.teamId,
+        match?.teamName || p.teamName
+      );
       return {
-        'Registration Number': p.registrationNumber,
-        'Student Name': realName,
-        'Team ID': p.teamId,
-        'Team Name': p.teamName,
+        'Registration Number': details.registrationNumber,
+        'Student Name': details.name,
+        'Team ID': details.teamId,
+        'Team Name': details.teamName,
         'Role': p.role,
         'College': 'KARE',
         'Session': match ? match.sessionName : (sessionId && sessionId !== 'ALL' ? sessionId : 'N/A'),
