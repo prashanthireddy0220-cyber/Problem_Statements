@@ -195,7 +195,10 @@ export default function PublicTeamPage() {
 
       {/* FOOTER VERIFICATION NOTE */}
       <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: '0.8rem', paddingBottom: '2rem' }}>
-        Event ALPHA 2026 • Verified Public QR Pass • KARE IEEE Education Society
+        <div style={{ background: 'rgba(0, 242, 254, 0.05)', border: '1px solid rgba(0, 242, 254, 0.2)', padding: '0.75rem', borderRadius: '10px', display: 'inline-block', marginBottom: '1rem', maxWidth: '580px', color: '#CBD5E1' }}>
+          ℹ️ <strong>Attendance Security Note:</strong> Scanning via Google Lens or phone camera opens read-only team credentials. Official attendance check-in can ONLY be recorded by logging in to the authorized <strong>Volunteer Attendance Portal</strong>.
+        </div>
+        <div>Event ALPHA 2026 • Verified Public QR Pass • KARE IEEE Education Society</div>
       </div>
     </div>
   );

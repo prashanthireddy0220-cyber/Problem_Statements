@@ -82,6 +82,7 @@ export default function TeamLeadDashboard() {
   const [selectedAttSession, setSelectedAttSession] = useState(null);
   const [attQrDataUrl, setAttQrDataUrl] = useState('');
   const [myAttendanceRecords, setMyAttendanceRecords] = useState({});
+  const [myAttendanceFullData, setMyAttendanceFullData] = useState(null);
 
   // 1. Fetch My Team Details
   const fetchMyTeam = async () => {
@@ -185,8 +186,9 @@ export default function TeamLeadDashboard() {
         }
 
         const myAttRes = await axios.get('/api/attendance/my-attendance');
-        if (myAttRes.data?.markedSessions) {
-          setMyAttendanceRecords(myAttRes.data.markedSessions);
+        if (myAttRes.data) {
+          setMyAttendanceRecords(myAttRes.data.markedSessions || {});
+          setMyAttendanceFullData(myAttRes.data);
         }
       } catch (e) {}
     };
@@ -198,15 +200,15 @@ export default function TeamLeadDashboard() {
 
   // Generate Attendance Session QR Data URL
   useEffect(() => {
-    if (selectedAttSession && user?.registrationNumber) {
-      const attPayload = `ATTENDANCE:${selectedAttSession.sessionId}:${user.registrationNumber}:${user.team?.name || 'TEAM'}`;
+    if (selectedAttSession && (user?.registrationNumber || displayTeamId)) {
+      const attPayload = `ALPHA-SESSION-ATTENDANCE-QR:${selectedAttSession.sessionId}:${displayTeamId}:${displayLeadRegNum}`;
       QRCode.toDataURL(attPayload, {
         width: 320,
         margin: 2,
         color: { dark: '#FFD700', light: '#0F172A' }
       }).then(setAttQrDataUrl).catch(console.error);
     }
-  }, [selectedAttSession, user]);
+  }, [selectedAttSession, user, displayTeamId, displayLeadRegNum]);
 
   // Server-synchronized 1-second countdown ticker
   useEffect(() => {
@@ -886,130 +888,270 @@ export default function TeamLeadDashboard() {
               <Calendar size={22} color="#FFD700" /> ATTENDANCE SESSIONS
             </h2>
             <p style={{ color: '#94A3B8', fontSize: '0.88rem', marginTop: '0.25rem' }}>
-              Select an active attendance session below to display your session-specific Attendance QR code for volunteer check-in.
+              Select an active attendance session below to display your session Attendance QR code and view real-time member attendance statuses.
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-            {attSessions.map((sess) => {
-              const isSelected = selectedAttSession?._id === sess._id;
-              const isMarked = Boolean(myAttendanceRecords[sess.sessionId]);
-              const record = myAttendanceRecords[sess.sessionId];
+          {/* SESSION CARDS / PICKER */}
+          {attSessions.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+              {attSessions.map((sess) => {
+                const isSelected = selectedAttSession?._id === sess._id;
+                const sessData = myAttendanceFullData?.sessionDetailsList?.find(s => s.sessionId === sess.sessionId);
+                const overallStatus = sessData?.overallStatus || (myAttendanceRecords[sess.sessionId] ? 'ALL_PRESENT' : 'NOT_MARKED');
 
-              return (
-                <div
-                  key={sess._id}
-                  onClick={() => setSelectedAttSession(sess)}
-                  className="glass-card"
-                  style={{
-                    padding: '1.5rem',
-                    cursor: 'pointer',
-                    borderLeft: isMarked ? '4px solid #00E676' : (isSelected ? '4px solid #FFD700' : '4px solid rgba(255,255,255,0.1)'),
-                    background: isMarked ? 'rgba(0,230,118,0.05)' : (isSelected ? 'rgba(255,215,0,0.06)' : 'rgba(255,255,255,0.02)'),
-                    boxShadow: isSelected ? '0 0 20px rgba(255, 215, 0, 0.15)' : 'none'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.78rem', fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{sess.sessionId}</span>
-                    
-                    <span style={{
-                      fontSize: '0.75rem',
-                      fontWeight: '800',
-                      padding: '0.2rem 0.6rem',
-                      borderRadius: '12px',
-                      background: isMarked ? 'rgba(0,230,118,0.2)' : (sess.status === 'ACTIVE' ? 'rgba(0,242,254,0.15)' : 'rgba(255,215,0,0.15)'),
-                      color: isMarked ? '#00E676' : (sess.status === 'ACTIVE' ? '#00F2FE' : '#FFD700')
-                    }}>
-                      {isMarked ? '✅ PRESENT' : sess.status}
-                    </span>
-                  </div>
-
-                  <h3 style={{ fontSize: '1.1rem', color: '#F8FAFC', marginBottom: '0.35rem' }}>{sess.sessionName}</h3>
-                  <div style={{ fontSize: '0.82rem', color: '#94A3B8' }}>
-                    📅 {sess.date} • ⏰ {sess.startTime} - {sess.endTime}
-                  </div>
-
-                  <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.8rem' }}>
-                    {isMarked ? (
-                      <span style={{ color: '#00E676', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <CheckCircle2 size={14} /> Checked in at {new Date(record.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                return (
+                  <div
+                    key={sess._id}
+                    onClick={() => setSelectedAttSession(sess)}
+                    className="glass-card"
+                    style={{
+                      padding: '1.25rem',
+                      cursor: 'pointer',
+                      borderLeft: overallStatus === 'ALL_PRESENT' ? '4px solid #00E676' : (overallStatus === 'SOME_ABSENT' ? '4px solid #FFD700' : (overallStatus === 'ALL_ABSENT' ? '4px solid #FF4B4B' : '4px solid rgba(0, 242, 254, 0.4)')),
+                      background: isSelected ? 'rgba(0, 242, 254, 0.08)' : 'rgba(255,255,255,0.02)',
+                      boxShadow: isSelected ? '0 0 20px rgba(0, 242, 254, 0.15)' : 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.78rem', fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{sess.sessionId}</span>
+                      
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '800',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '12px',
+                        background: sess.status === 'ACTIVE' ? 'rgba(0,230,118,0.2)' : 'rgba(255,215,0,0.15)',
+                        color: sess.status === 'ACTIVE' ? '#00E676' : '#FFD700'
+                      }}>
+                        {sess.status}
                       </span>
-                    ) : (
-                      <span style={{ color: '#94A3B8' }}>
-                        ⏳ Click to generate Attendance QR for volunteer scan
-                      </span>
-                    )}
+                    </div>
+
+                    <h3 style={{ fontSize: '1.05rem', color: '#F8FAFC', marginBottom: '0.35rem' }}>{sess.sessionName}</h3>
+                    <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
+                      📅 {sess.date} • ⏰ {sess.startTime} - {sess.endTime}
+                    </div>
+
+                    <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.8rem' }}>
+                      {overallStatus === 'ALL_PRESENT' ? (
+                        <span style={{ color: '#00E676', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <CheckCircle2 size={14} /> 🟢 ALL MEMBERS PRESENT
+                        </span>
+                      ) : overallStatus === 'SOME_ABSENT' ? (
+                        <span style={{ color: '#FFD700', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <AlertCircle size={14} /> 🟡 SOME MEMBERS ABSENT ({sessData?.presentCount}/{sessData?.totalMembers})
+                        </span>
+                      ) : overallStatus === 'ALL_ABSENT' ? (
+                        <span style={{ color: '#FF4B4B', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <ShieldAlert size={14} /> 🔴 ALL MEMBERS ABSENT
+                        </span>
+                      ) : (
+                        <span style={{ color: '#94A3B8' }}>
+                          ⏳ Attendance Not Taken Yet
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* NO ATTENDANCE SESSION CREATED BANNER (QR Code hidden) */
+            <div className="glass-card" style={{ padding: '3rem 2rem', textAlign: 'center', color: '#94A3B8', border: '1px dashed rgba(255,255,255,0.15)', marginBottom: '1.5rem' }}>
+              <Clock size={40} color="#94A3B8" style={{ marginBottom: '1rem' }} />
+              <h3 style={{ color: '#F8FAFC', fontSize: '1.2rem', marginBottom: '0.5rem' }}>NO ATTENDANCE SESSION CREATED YET</h3>
+              <p style={{ fontSize: '0.9rem', maxWidth: '500px', margin: '0 auto' }}>
+                Attendance session has not been created by Admin. The Session QR code will be displayed here automatically once an attendance session is created.
+              </p>
+            </div>
+          )}
 
-          {/* ATTENDANCE SESSION QR CODE OR MARKED PRESENT BANNER */}
-          {selectedAttSession ? (
-            myAttendanceRecords[selectedAttSession.sessionId] ? (
-              <div className="glass-panel" style={{ padding: '2.5rem 2rem', textAlign: 'center', maxWidth: '560px', margin: '0 auto', borderColor: '#00E676', background: 'rgba(0, 230, 118, 0.06)', boxShadow: '0 0 35px rgba(0, 230, 118, 0.2)' }}>
-                <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: 'rgba(0, 230, 118, 0.15)', border: '2px solid #00E676', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', boxShadow: '0 0 25px rgba(0, 230, 118, 0.4)' }}>
-                  <CheckCircle2 size={40} color="#00E676" />
-                </div>
-
-                <h3 style={{ fontFamily: 'var(--font-heading)', color: '#00E676', fontSize: '1.5rem', fontWeight: '800', marginBottom: '0.5rem', letterSpacing: '1px' }}>
-                  ATTENDANCE CHECKED IN ✅
-                </h3>
-
-                <div style={{ fontSize: '1.1rem', color: '#F8FAFC', fontWeight: '700', marginBottom: '0.5rem' }}>
-                  {selectedAttSession.sessionName}
-                </div>
-
-                <p style={{ color: '#CBD5E1', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-                  Attendance status for Team <strong>{displayTeamName}</strong> ({displayTeamId}) is recorded as <strong>PRESENT</strong>.
-                </p>
-
-                <div style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(0, 230, 118, 0.3)', display: 'inline-block', width: '100%', maxWidth: '420px' }}>
-                  <div style={{ fontSize: '0.78rem', color: '#94A3B8', textTransform: 'uppercase' }}>Check-in Confirmation</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#00E676', marginTop: '0.25rem' }}>
-                    Checked in at {new Date(myAttendanceRecords[selectedAttSession.sessionId].markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#CBD5E1', marginTop: '0.35rem' }}>
-                    Verified by: <strong style={{ color: '#00F2FE' }}>{myAttendanceRecords[selectedAttSession.sessionId].markedByVolunteer || 'Event Volunteer'}</strong>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', maxWidth: '560px', margin: '0 auto', borderColor: '#FFD700', boxShadow: '0 0 30px rgba(255, 215, 0, 0.15)' }}>
-                <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#FFD700', fontWeight: '800', letterSpacing: '1px' }}>
+          {/* ATTENDANCE SESSION CONTENT (QR CODE DISPLAYED ONLY WHEN ATTENDANCE SESSION IS CREATED) */}
+          {attSessions.length > 0 && selectedAttSession && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', alignItems: 'flex-start' }}>
+              
+              {/* LEFT COLUMN: QR CODE (BELOW 25% ONLY - Max Width 24%) */}
+              <div
+                className="glass-card"
+                style={{
+                  flex: '0 0 24%',
+                  maxWidth: '24%',
+                  minWidth: '220px',
+                  padding: '1.25rem',
+                  textAlign: 'center',
+                  border: '1px solid var(--border-cyan)',
+                  background: 'rgba(15, 23, 42, 0.95)',
+                  boxShadow: '0 0 25px rgba(0, 242, 254, 0.15)'
+                }}
+              >
+                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#FFD700', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>
                   SESSION ATTENDANCE QR CODE
                 </div>
 
-                <h3 style={{ fontSize: '1.4rem', color: '#F8FAFC', margin: '0.35rem 0' }}>
-                  {selectedAttSession.sessionName}
-                </h3>
-
-                <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-                  Present this QR code to authorized volunteers at the hall entry scanner for attendance check-in.
-                </p>
-
-                <div style={{ background: '#0F172A', padding: '1.25rem', borderRadius: '16px', border: '2px dashed #FFD700', display: 'inline-block', marginBottom: '1rem' }}>
+                <div style={{ background: '#0F172A', padding: '0.75rem', borderRadius: '12px', border: '2px dashed #FFD700', display: 'inline-block', width: '100%', marginBottom: '0.75rem' }}>
                   {attQrDataUrl ? (
-                    <img src={attQrDataUrl} alt="Session Attendance QR" style={{ width: '200px', height: '200px', display: 'block' }} />
+                    <img src={attQrDataUrl} alt="Session Attendance QR" style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '8px' }} />
                   ) : (
-                    <div style={{ width: '200px', height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>Generating Session QR...</div>
+                    <div style={{ padding: '2rem 0', color: '#94A3B8', fontSize: '0.8rem' }}>Generating QR...</div>
                   )}
-                  <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '0.85rem', color: '#FFD700', marginTop: '0.65rem' }}>
-                    Team ID: {displayTeamId} ({displayTeamName})
-                  </div>
                 </div>
 
-                <div style={{ fontSize: '0.78rem', color: '#94A3B8', background: 'rgba(255,255,255,0.03)', padding: '0.65rem', borderRadius: '8px' }}>
-                  ℹ️ Note: This Attendance QR code is generated dynamically for <strong>{selectedAttSession.sessionName}</strong>. It is separate from your permanent Team QR code.
+                <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '0.82rem', color: '#00F2FE', fontWeight: '800', marginBottom: '0.35rem' }}>
+                  {displayTeamId}
+                </div>
+                
+                <div style={{ fontSize: '0.75rem', color: '#94A3B8', lineHeight: '1.4' }}>
+                  Present to volunteer scanner for attendance check-in.
                 </div>
               </div>
-            )
-          ) : (
-            <div style={{ textAlign: 'center', color: '#94A3B8', padding: '2rem' }}>
-              No attendance sessions available.
+
+              {/* RIGHT COLUMN: OVERALL TEAM STATUS & MEMBER DETAILS */}
+              <div style={{ flex: '1 1 500px', minWidth: '300px' }}>
+                
+                {/* OVERALL TEAM ATTENDANCE STATUS CARD */}
+                {(() => {
+                  const sessData = myAttendanceFullData?.sessionDetailsList?.find(s => s.sessionId === selectedAttSession.sessionId);
+                  const overallStatus = sessData?.overallStatus || (myAttendanceRecords[selectedAttSession.sessionId] ? 'ALL_PRESENT' : 'NOT_MARKED');
+                  const presentCount = sessData?.presentCount || 0;
+                  const absentCount = sessData?.absentCount || 0;
+                  const totalMembers = sessData?.totalMembers || displayMembers.length;
+
+                  let bannerColor = '#00F2FE';
+                  let bannerBg = 'rgba(0, 242, 254, 0.08)';
+                  let statusTitle = 'ATTENDANCE NOT TAKEN YET';
+                  let statusDesc = `Volunteer check-in pending for ${selectedAttSession.sessionName}.`;
+
+                  if (overallStatus === 'ALL_PRESENT') {
+                    bannerColor = '#00E676';
+                    bannerBg = 'rgba(0, 230, 118, 0.1)';
+                    statusTitle = 'ALL MEMBERS PRESENT ✅';
+                    statusDesc = `All ${totalMembers} team members are marked Present for ${selectedAttSession.sessionName}.`;
+                  } else if (overallStatus === 'SOME_ABSENT') {
+                    bannerColor = '#FFD700';
+                    bannerBg = 'rgba(255, 215, 0, 0.1)';
+                    statusTitle = `SOME MEMBERS ABSENT ⚠️ (${presentCount}/${totalMembers} Present, ${absentCount} Absent)`;
+                    statusDesc = `${presentCount} member(s) Present, ${absentCount} member(s) Absent for ${selectedAttSession.sessionName}.`;
+                  } else if (overallStatus === 'ALL_ABSENT') {
+                    bannerColor = '#FF4B4B';
+                    bannerBg = 'rgba(255, 75, 75, 0.1)';
+                    statusTitle = `ALL MEMBERS ABSENT 🔴 (0/${totalMembers} Present)`;
+                    statusDesc = `All ${totalMembers} team members are marked Absent for ${selectedAttSession.sessionName}.`;
+                  }
+
+                  return (
+                    <div
+                      className="glass-panel"
+                      style={{
+                        padding: '1.5rem',
+                        marginBottom: '1.5rem',
+                        borderLeft: `5px solid ${bannerColor}`,
+                        background: bannerBg,
+                        borderColor: bannerColor
+                      }}
+                    >
+                      <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '800' }}>
+                        OVERALL TEAM ATTENDANCE STATUS
+                      </div>
+
+                      <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: bannerColor, margin: '0.35rem 0' }}>
+                        {statusTitle}
+                      </h3>
+
+                      <p style={{ color: '#CBD5E1', fontSize: '0.88rem', margin: 0 }}>
+                        {statusDesc}
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* TEAM DETAILS & ALL TEAM MEMBERS ROSTER */}
+                <div className="glass-card" style={{ padding: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>{displayTeamId}</span>
+                      <h3 style={{ fontSize: '1.15rem', color: '#F8FAFC', margin: '0.15rem 0' }}>{displayTeamName}</h3>
+                    </div>
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.85rem', color: '#F8FAFC', fontWeight: '700' }}>Lead: {displayLeadName}</div>
+                      <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>{displayDepartment} • {displayCollege}</div>
+                    </div>
+                  </div>
+
+                  {/* ALL MEMBERS ATTENDANCE STATUS TABLE */}
+                  {(() => {
+                    const sessData = myAttendanceFullData?.sessionDetailsList?.find(s => s.sessionId === selectedAttSession.sessionId);
+                    const memberList = sessData?.members || displayMembers.map(m => ({
+                      name: m.name,
+                      registrationNumber: m.registrationNumber,
+                      role: m.role || 'MEMBER',
+                      status: 'NOT_MARKED'
+                    }));
+
+                    return (
+                      <div>
+                        <div style={{ fontSize: '0.82rem', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <Users size={16} color="#00F2FE" /> ALL TEAM MEMBERS ATTENDANCE BREAKDOWN:
+                        </div>
+
+                        <div className="alpha-table-container">
+                          <table className="alpha-table">
+                            <thead>
+                              <tr>
+                                <th style={{ width: '40px' }}>#</th>
+                                <th>Member Name</th>
+                                <th>Registration No</th>
+                                <th>Role</th>
+                                <th>Attendance Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {memberList.map((m, idx) => {
+                                const isPresent = m.status === 'PRESENT';
+                                const isAbsent = m.status === 'ABSENT';
+
+                                return (
+                                  <tr key={idx}>
+                                    <td style={{ color: '#94A3B8', fontWeight: '700' }}>{idx + 1}</td>
+                                    <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{m.name}</td>
+                                    <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{m.registrationNumber}</td>
+                                    <td>
+                                      <span style={{ fontSize: '0.75rem', color: m.role === 'LEAD' ? '#FFD700' : '#CBD5E1', fontWeight: '600' }}>
+                                        {m.role || (idx === 0 ? 'LEAD' : 'MEMBER')}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      {isPresent ? (
+                                        <span style={{ padding: '0.25rem 0.65rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(0,230,118,0.2)', color: '#00E676', border: '1px solid rgba(0,230,118,0.4)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                          <CheckCircle2 size={13} /> PRESENT
+                                        </span>
+                                      ) : isAbsent ? (
+                                        <span style={{ padding: '0.25rem 0.65rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(255,75,75,0.2)', color: '#FF4B4B', border: '1px solid rgba(255,75,75,0.4)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                          <ShieldAlert size={13} /> ABSENT
+                                        </span>
+                                      ) : (
+                                        <span style={{ padding: '0.25rem 0.65rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', background: 'rgba(255,255,255,0.06)', color: '#94A3B8' }}>
+                                          ⏳ PENDING
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                </div>
+              </div>
+
             </div>
           )}
+
         </div>
       )}
 

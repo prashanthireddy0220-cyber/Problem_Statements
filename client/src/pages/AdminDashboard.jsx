@@ -49,6 +49,9 @@ export default function AdminDashboard() {
   const [attSessions, setAttSessions] = useState([]);
   const [attRecords, setAttRecords] = useState([]);
   const [attStats, setAttStats] = useState({});
+  const [attSessionFilter, setAttSessionFilter] = useState('ALL');
+  const [attStatusFilter, setAttStatusFilter] = useState('ALL');
+  const [attSearchFilter, setAttSearchFilter] = useState('');
   const [showCreateSessModal, setShowCreateSessModal] = useState(false);
   const [newSess, setNewSess] = useState({
     sessionName: 'Day 1 Morning Keynote',
@@ -67,7 +70,7 @@ export default function AdminDashboard() {
     fetchAllData();
     const interval = setInterval(fetchAllData, 3000);
     return () => clearInterval(interval);
-  }, [activeTab]);
+  }, [activeTab, attSessionFilter, attStatusFilter, attSearchFilter]);
 
   useEffect(() => {
     fetchSettings();
@@ -104,7 +107,13 @@ export default function AdminDashboard() {
       if (activeTab === 'attendance' || activeTab === 'analytics') {
         const sRes = await axios.get('/api/attendance/sessions');
         setAttSessions(sRes.data.sessions || []);
-        const rRes = await axios.get('/api/attendance/admin/records');
+        const rRes = await axios.get('/api/attendance/admin/records', {
+          params: {
+            sessionId: attSessionFilter,
+            status: attStatusFilter,
+            search: attSearchFilter
+          }
+        });
         setAttRecords(rRes.data.records || []);
         setAttStats(rRes.data.stats || {});
       }
@@ -835,16 +844,33 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 5: CENTRALIZED ATTENDANCE MANAGER */}
+      {/* TAB 5: CENTRALIZED ATTENDANCE MANAGER (INDIVIDUAL ATTENDANCE MATRIX) */}
       {activeTab === 'attendance' && (
         <div className="glass-panel" style={{ padding: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC' }}>CENTRALIZED ATTENDANCE MANAGEMENT</h2>
-            <button onClick={() => setShowCreateSessModal(true)} className="btn-alpha-gold">
-              <Plus size={18} /> Create Attendance Session
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC' }}>INDIVIDUAL ATTENDANCE MANAGEMENT</h2>
+              <p style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '0.2rem' }}>
+                View and manage individual participant attendance records (Present / Absent) across all event sessions.
+              </p>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => window.open(`/api/attendance/admin/export?sessionId=${attSessionFilter}`, '_blank')}
+                className="btn-alpha-outline"
+                style={{ fontSize: '0.85rem' }}
+              >
+                <Download size={15} /> Export Individual CSV
+              </button>
+              
+              <button onClick={() => setShowCreateSessModal(true)} className="btn-alpha-gold" style={{ fontSize: '0.85rem' }}>
+                <Plus size={18} /> Create Attendance Session
+              </button>
+            </div>
           </div>
 
+          {/* SESSIONS STATUS LIST */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
             {attSessions.map((s) => (
               <div key={s._id} className="glass-card" style={{ padding: '1.25rem' }}>
@@ -881,32 +907,118 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          <h3 style={{ fontSize: '1.1rem', color: '#00F2FE', marginBottom: '1rem' }}>CENTRAL ATTENDANCE LOG MATRIX</h3>
+          {/* INDIVIDUAL ATTENDANCE CONTROLS & STATS SUMMARY */}
+          <div style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '1.25rem', borderRadius: '14px', border: '1px solid var(--border-cyan)', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
+              
+              {/* Session Selector */}
+              <div>
+                <label style={{ fontSize: '0.75rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: '700' }}>Filter by Session:</label>
+                <select
+                  value={attSessionFilter}
+                  onChange={(e) => setAttSessionFilter(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', background: '#0F172A', border: '1px solid var(--border-cyan)', borderRadius: '8px', color: '#FFF', fontSize: '0.85rem', marginTop: '0.25rem' }}
+                >
+                  <option value="ALL">All Sessions (Global Matrix)</option>
+                  {attSessions.map(s => (
+                    <option key={s._id} value={s.sessionId}>{s.sessionName} ({s.sessionId})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Selector */}
+              <div>
+                <label style={{ fontSize: '0.75rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: '700' }}>Filter Individual Status:</label>
+                <select
+                  value={attStatusFilter}
+                  onChange={(e) => setAttStatusFilter(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', background: '#0F172A', border: '1px solid var(--border-cyan)', borderRadius: '8px', color: '#FFF', fontSize: '0.85rem', marginTop: '0.25rem' }}
+                >
+                  <option value="ALL">All Statuses (Present & Absent)</option>
+                  <option value="PRESENT">🟢 Present Only</option>
+                  <option value="ABSENT">🔴 Absent Only</option>
+                </select>
+              </div>
+
+              {/* Search Bar */}
+              <div>
+                <label style={{ fontSize: '0.75rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: '700' }}>Search Participant:</label>
+                <input
+                  type="text"
+                  placeholder="Search Name, Reg No, Team..."
+                  value={attSearchFilter}
+                  onChange={(e) => setAttSearchFilter(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', background: '#0F172A', border: '1px solid var(--border-cyan)', borderRadius: '8px', color: '#FFF', fontSize: '0.85rem', marginTop: '0.25rem' }}
+                />
+              </div>
+
+            </div>
+
+            {/* Quick Summary Badges */}
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.75rem' }}>
+              <span style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
+                Total Participants: <strong style={{ color: '#00F2FE' }}>{attStats.totalRegistered || 240}</strong>
+              </span>
+              <span style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
+                Individual Present: <strong style={{ color: '#00E676' }}>{attStats.present || 0}</strong>
+              </span>
+              <span style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
+                Individual Absent: <strong style={{ color: '#FF4B4B' }}>{attStats.absent || 0}</strong>
+              </span>
+              <span style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
+                Attendance Rate: <strong style={{ color: '#FFD700' }}>{attStats.percentage || 0}%</strong>
+              </span>
+            </div>
+          </div>
+
+          <h3 style={{ fontSize: '1.1rem', color: '#00F2FE', marginBottom: '1rem' }}>INDIVIDUAL PARTICIPANT ATTENDANCE MATRIX</h3>
           <div className="alpha-table-container">
             <table className="alpha-table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px' }}>#</th>
                   <th>Reg No</th>
                   <th>Student Name</th>
-                  <th>Team</th>
-                  <th>College</th>
+                  <th>Team ID & Name</th>
                   <th>Session Name</th>
+                  <th>Individual Status</th>
                   <th>Marked Time</th>
                   <th>Volunteer</th>
                 </tr>
               </thead>
               <tbody>
-                {attRecords.map((r) => (
-                  <tr key={r._id}>
-                    <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{r.participantRegNum}</td>
-                    <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{r.participantName}</td>
-                    <td>{r.teamName}</td>
-                    <td>{r.college}</td>
-                    <td>{r.sessionName}</td>
-                    <td>{new Date(r.markedAt).toLocaleTimeString()}</td>
-                    <td>{r.markedByVolunteer}</td>
+                {attRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#94A3B8' }}>
+                      No individual attendance records found for selected filters.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  attRecords.map((r, idx) => (
+                    <tr key={r._id || idx}>
+                      <td style={{ color: '#94A3B8', fontWeight: '700' }}>{idx + 1}</td>
+                      <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{r.participantRegNum}</td>
+                      <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{r.participantName}</td>
+                      <td><span style={{ color: '#FFD700', fontWeight: '600' }}>{r.teamId || 'ALPHA'}</span> ({r.teamName})</td>
+                      <td>{r.sessionName}</td>
+                      <td>
+                        {r.status === 'PRESENT' ? (
+                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(0,230,118,0.2)', color: '#00E676', border: '1px solid rgba(0,230,118,0.4)' }}>
+                            🟢 PRESENT
+                          </span>
+                        ) : (
+                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(255,75,75,0.2)', color: '#FF4B4B', border: '1px solid rgba(255,75,75,0.4)' }}>
+                            🔴 ABSENT
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>
+                        {r.markedAt ? new Date(r.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </td>
+                      <td style={{ fontSize: '0.85rem', color: '#94A3B8' }}>{r.markedByVolunteer || '—'}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

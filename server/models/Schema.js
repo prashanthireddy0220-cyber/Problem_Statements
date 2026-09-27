@@ -100,7 +100,9 @@ const AttendanceSchema = new mongoose.Schema({
   participantRegNum: { type: String, required: true, index: true },
   participantName: { type: String, required: true },
   teamName: { type: String, required: true },
+  teamId: { type: String },
   college: { type: String },
+  status: { type: String, enum: ['PRESENT', 'ABSENT'], default: 'PRESENT' },
   markedByVolunteer: { type: String, required: true },
   markedAt: { type: Date, default: Date.now }
 }, { timestamps: true });

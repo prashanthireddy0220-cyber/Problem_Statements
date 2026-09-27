@@ -12,6 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import VolunteerLogin from './pages/VolunteerLogin';
 import VolunteerScanner from './pages/VolunteerScanner';
 import PublicTeamPage from './pages/PublicTeamPage';
+import LandingPage from './pages/LandingPage';
 import { LogOut, ArrowLeft, ShieldAlert } from 'lucide-react';
 
 // Helper to determine dashboard route based on user role
@@ -27,13 +28,13 @@ export const getDashboardRoute = (role) => {
   }
 };
 
-// Smart Root Redirect Component
+// Smart Root Component: Redirects if logged in, renders LandingPage if unauthenticated
 const RootRedirect = () => {
   const { user, token } = useAuth();
   if (token && user) {
     return <Navigate to={getDashboardRoute(user.role)} replace />;
   }
-  return <Navigate to="/team-lead/login" replace />;
+  return <LandingPage />;
 };
 
 // Public Login Wrapper: If user is ALREADY logged in as this role, auto-redirect to dashboard

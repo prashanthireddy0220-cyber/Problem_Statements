@@ -95,10 +95,12 @@ export default function VolunteerScanner() {
     if (!rawInput || typeof rawInput !== 'string') return '';
     let str = rawInput.trim();
 
-    if (str.startsWith('ATTENDANCE:')) {
+    if (str.startsWith('ALPHA-SESSION-ATTENDANCE-QR:') || str.startsWith('ATTENDANCE:')) {
       const parts = str.split(':');
       if (parts.length >= 3 && parts[2]) {
         str = parts[2].trim();
+      } else if (parts.length >= 2 && parts[1]) {
+        str = parts[1].trim();
       }
     }
 
@@ -180,20 +182,56 @@ export default function VolunteerScanner() {
     }
   };
 
-  // Mark Attendance Request
-  const handleMarkAttendance = async () => {
+  // Team Member Toggle State for Volunteer
+  const [teamToggles, setTeamToggles] = useState({});
+
+  // Initialize toggles whenever scanned participant changes
+  useEffect(() => {
+    if (scannedParticipant) {
+      const initialMap = {};
+      const members = scannedParticipant.members || [
+        { name: scannedParticipant.name, registrationNumber: scannedParticipant.registrationNumber }
+      ];
+      members.forEach(m => {
+        initialMap[m.registrationNumber] = 'PRESENT';
+      });
+      setTeamToggles(initialMap);
+    }
+  }, [scannedParticipant]);
+
+  const toggleMemberStatus = (regNum) => {
+    setTeamToggles(prev => ({
+      ...prev,
+      [regNum]: prev[regNum] === 'ABSENT' ? 'PRESENT' : 'ABSENT'
+    }));
+  };
+
+  // Mark Team Attendance Request
+  const handleMarkTeamAttendance = async () => {
     if (!activeSession || !scannedParticipant) return;
     
     setMarkingLoading(true);
     setScanResult(null);
 
+    const members = scannedParticipant.members && scannedParticipant.members.length > 0
+      ? scannedParticipant.members
+      : [{ name: scannedParticipant.name, registrationNumber: scannedParticipant.registrationNumber }];
+
+    const attendanceList = members.map(m => ({
+      registrationNumber: m.registrationNumber,
+      name: m.name,
+      teamName: scannedParticipant.teamName,
+      status: teamToggles[m.registrationNumber] || 'PRESENT'
+    }));
+
     try {
-      const res = await axios.post('/api/attendance/scan', {
+      const res = await axios.post('/api/attendance/mark-team-attendance', {
         sessionId: activeSession.sessionId,
-        participantRegNum: scannedParticipant.registrationNumber
+        teamId: scannedParticipant.teamId,
+        attendanceList
       });
       setMarkingLoading(false);
-      setScanResult({ success: true, message: res.data.message, record: res.data.record });
+      setScanResult({ success: true, message: res.data.message, records: res.data.records });
       setScannedParticipant(null);
       setInputRegNum('');
       fetchRoster();
@@ -202,8 +240,7 @@ export default function VolunteerScanner() {
       const errData = err.response?.data;
       setScanResult({
         success: false,
-        isDuplicate: errData?.code === 'DUPLICATE_ATTENDANCE',
-        message: errData?.error || 'Failed to mark attendance.'
+        message: errData?.error || 'Failed to submit team attendance.'
       });
     }
   };
@@ -503,24 +540,65 @@ export default function VolunteerScanner() {
                 </div>
               </div>
 
-              {/* ALL 4 TEAM MEMBERS LIST */}
+              {/* ALL TEAM MEMBERS LIST WITH TOGGLE BUTTONS */}
               {scannedParticipant.members && scannedParticipant.members.length > 0 && (
-                <div style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#94A3B8', textTransform: 'uppercase', fontWeight: '800', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Users size={16} color="#00F2FE" /> FULL TEAM MEMBERS ROSTER ({scannedParticipant.members.length}):
+                <div style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.02)', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(0, 242, 254, 0.2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Users size={18} color="#00F2FE" /> TEAM MEMBERS ATTENDANCE TOGGLES ({scannedParticipant.members.length} Members)
+                    </div>
+                    <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>Click toggle to set Present / Absent</span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-                    {scannedParticipant.members.map((m, idx) => (
-                      <div key={idx} style={{ padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.8)', borderRadius: '8px', borderLeft: m.role === 'LEAD' ? '3px solid #00E676' : '3px solid #00F2FE' }}>
-                        <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#F8FAFC' }}>
-                          {idx + 1}. {m.name}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+                    {scannedParticipant.members.map((m, idx) => {
+                      const isPresent = (teamToggles[m.registrationNumber] || 'PRESENT') === 'PRESENT';
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: '0.85rem 1rem',
+                            background: 'rgba(15, 23, 42, 0.9)',
+                            borderRadius: '10px',
+                            border: `1px solid ${isPresent ? 'rgba(0, 230, 118, 0.3)' : 'rgba(255, 75, 75, 0.4)'}`,
+                            display: 'flex',
+                            justify: 'space-between',
+                            alignItems: 'center',
+                            gap: '0.75rem'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '0.92rem', fontWeight: '700', color: '#F8FAFC' }}>
+                              {idx + 1}. {m.name}
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: '#00F2FE', fontFamily: 'Orbitron, monospace', marginTop: '0.15rem' }}>
+                              {m.registrationNumber} • <span style={{ color: m.role === 'LEAD' ? '#FFD700' : '#CBD5E1' }}>{m.role || (idx === 0 ? 'LEAD' : 'MEMBER')}</span>
+                            </div>
+                          </div>
+
+                          {/* TOGGLE BUTTON */}
+                          <button
+                            type="button"
+                            onClick={() => toggleMemberStatus(m.registrationNumber)}
+                            style={{
+                              padding: '0.45rem 0.9rem',
+                              borderRadius: '20px',
+                              fontSize: '0.8rem',
+                              fontWeight: '800',
+                              cursor: 'pointer',
+                              border: isPresent ? '1px solid #00E676' : '1px solid #FF4B4B',
+                              background: isPresent ? 'linear-gradient(135deg, rgba(0,230,118,0.25) 0%, rgba(0,176,255,0.25) 100%)' : 'rgba(255, 75, 75, 0.25)',
+                              color: isPresent ? '#00E676' : '#FF4B4B',
+                              boxShadow: isPresent ? '0 0 10px rgba(0, 230, 118, 0.3)' : '0 0 10px rgba(255, 75, 75, 0.3)',
+                              transition: 'all 0.2s ease',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {isPresent ? '🟢 PRESENT' : '🔴 ABSENT'}
+                          </button>
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: '#00F2FE', fontFamily: 'Orbitron, monospace', marginTop: '0.15rem' }}>
-                          {m.registrationNumber} • <span style={{ color: m.role === 'LEAD' ? '#00E676' : '#94A3B8' }}>{m.role || (idx === 0 ? 'LEAD' : 'MEMBER')}</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -528,12 +606,12 @@ export default function VolunteerScanner() {
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button onClick={() => setScannedParticipant(null)} className="btn-alpha-outline">Cancel</button>
                 <button
-                  onClick={handleMarkAttendance}
+                  onClick={handleMarkTeamAttendance}
                   disabled={markingLoading}
                   className="btn-alpha-cyan"
                   style={{ background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)', padding: '0.75rem 1.5rem', fontWeight: '800' }}
                 >
-                  {markingLoading ? 'Recording...' : 'MARK ATTENDANCE FOR TEAM ✅'}
+                  {markingLoading ? 'Submitting...' : 'SUBMIT TEAM ATTENDANCE ✅'}
                 </button>
               </div>
             </div>

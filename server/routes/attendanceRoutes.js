@@ -110,11 +110,13 @@ function extractCleanId(rawInput) {
   if (!rawInput || typeof rawInput !== 'string') return '';
   let str = rawInput.trim();
 
-  // 1. Handle ATTENDANCE:sessionId:regNum:teamId payload
-  if (str.startsWith('ATTENDANCE:')) {
+  // 1. Handle ALPHA-SESSION-ATTENDANCE-QR or ATTENDANCE payloads
+  if (str.startsWith('ALPHA-SESSION-ATTENDANCE-QR:') || str.startsWith('ATTENDANCE:')) {
     const parts = str.split(':');
     if (parts.length >= 3 && parts[2]) {
       str = parts[2].trim();
+    } else if (parts.length >= 2 && parts[1]) {
+      str = parts[1].trim();
     }
   }
 
@@ -267,7 +269,7 @@ router.get('/participant/lookup', authenticateToken, async (req, res) => {
   }
 });
 
-// 5B. GET LOGGED-IN TEAM LEAD'S ATTENDANCE STATUS FOR ALL SESSIONS
+// 5B. GET LOGGED-IN TEAM LEAD'S TEAM ATTENDANCE STATUS FOR ALL SESSIONS
 router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async (req, res) => {
   try {
     const cleanRegNum = (req.user.registrationNumber || '').trim().toUpperCase();
@@ -288,47 +290,192 @@ router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async 
       (t.members && t.members.some(m => m.registrationNumber === cleanRegNum))
     );
 
-    const searchCriteria = [{ participantRegNum: cleanRegNum }];
-    if (authItem) {
-      if (authItem.regNum) searchCriteria.push({ participantRegNum: authItem.regNum });
-      if (authItem.teamId) searchCriteria.push({ participantRegNum: authItem.teamId });
-      if (authItem.teamName) searchCriteria.push({ teamName: authItem.teamName });
-      if (authItem.members) {
-        authItem.members.forEach(m => {
-          if (m.registrationNumber) searchCriteria.push({ participantRegNum: m.registrationNumber });
-        });
+    const teamId = authItem?.teamId || displayTeamId || 'ALPHA-001';
+    const teamName = authItem?.teamName || 'Team';
+    const members = authItem?.members || [
+      { name: req.user.name || 'Team Lead', registrationNumber: cleanRegNum, role: 'LEAD' }
+    ];
+
+    const allSessions = await AttendanceSession.find().sort({ createdAt: -1 });
+    const markedSessions = {};
+    const sessionDetailsList = [];
+
+    for (const sess of allSessions) {
+      const records = await Attendance.find({
+        sessionId: sess.sessionId,
+        $or: [
+          { teamId: teamId },
+          { teamName: teamName },
+          { participantRegNum: { $in: members.map(m => m.registrationNumber) } }
+        ]
+      });
+
+      const memberStatusMap = {};
+      records.forEach(r => {
+        memberStatusMap[r.participantRegNum] = {
+          status: r.status || 'PRESENT',
+          markedAt: r.markedAt,
+          markedByVolunteer: r.markedByVolunteer
+        };
+      });
+
+      let presentCount = 0;
+      let absentCount = 0;
+      let notMarkedCount = 0;
+
+      const memberDetails = members.map(m => {
+        const rec = memberStatusMap[m.registrationNumber];
+        let status = 'NOT_MARKED';
+        if (rec) {
+          status = rec.status;
+          if (status === 'PRESENT') presentCount++;
+          else if (status === 'ABSENT') absentCount++;
+        } else {
+          notMarkedCount++;
+        }
+        return {
+          name: m.name,
+          registrationNumber: m.registrationNumber,
+          role: m.role || 'MEMBER',
+          status,
+          markedAt: rec?.markedAt || null,
+          markedByVolunteer: rec?.markedByVolunteer || null
+        };
+      });
+
+      let overallStatus = 'NOT_MARKED';
+      if (records.length > 0) {
+        if (presentCount === members.length) {
+          overallStatus = 'ALL_PRESENT';
+        } else if (absentCount === members.length) {
+          overallStatus = 'ALL_ABSENT';
+        } else {
+          overallStatus = 'SOME_ABSENT';
+        }
+        markedSessions[sess.sessionId] = {
+          markedAt: records[0].markedAt,
+          markedByVolunteer: records[0].markedByVolunteer,
+          sessionName: sess.sessionName,
+          overallStatus,
+          presentCount,
+          absentCount,
+          totalMembers: members.length
+        };
       }
-    }
-    if (teamIdFromUser) {
-      searchCriteria.push({ participantRegNum: teamIdFromUser });
+
+      sessionDetailsList.push({
+        sessionId: sess.sessionId,
+        sessionName: sess.sessionName,
+        date: sess.date,
+        startTime: sess.startTime,
+        endTime: sess.endTime,
+        status: sess.status,
+        overallStatus,
+        presentCount,
+        absentCount,
+        notMarkedCount,
+        totalMembers: members.length,
+        members: memberDetails
+      });
     }
 
-    const records = await Attendance.find({ $or: searchCriteria });
-    const markedSessions = {};
-    records.forEach(r => {
-      markedSessions[r.sessionId] = {
-        markedAt: r.markedAt,
-        markedByVolunteer: r.markedByVolunteer,
-        sessionName: r.sessionName
-      };
+    return res.json({
+      team: {
+        teamId,
+        teamName,
+        leadName: authItem?.leadName || req.user.name,
+        leadRegNum: authItem?.regNum || cleanRegNum,
+        members
+      },
+      markedSessions,
+      sessionDetailsList
     });
-    return res.json({ markedSessions });
   } catch (err) {
     console.error('Fetch my-attendance error:', err);
     return res.status(500).json({ error: 'Failed to fetch my attendance.' });
   }
 });
 
-// 6. VOLUNTEER: MARK ATTENDANCE (Strict Validation + Duplicate Check)
+// 6. VOLUNTEER: MARK SINGLE OR BULK TEAM ATTENDANCE (With Present/Absent Toggles)
+router.post('/mark-team-attendance', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async (req, res) => {
+  try {
+    const { sessionId, teamId, attendanceList } = req.body;
+
+    if (!sessionId || !attendanceList || !Array.isArray(attendanceList) || attendanceList.length === 0) {
+      return res.status(400).json({ error: 'Session ID and attendance list of team members are required.' });
+    }
+
+    const session = await AttendanceSession.findOne({ sessionId });
+    if (!session) {
+      return res.status(404).json({ error: 'Attendance session not found.' });
+    }
+
+    if (session.status !== 'ACTIVE') {
+      return res.status(400).json({
+        error: `Cannot submit attendance. Session '${session.sessionName}' is currently ${session.status}.`,
+        code: 'SESSION_INACTIVE'
+      });
+    }
+
+    const firstMember = attendanceList[0];
+    const resolvedInfo = await resolveParticipant(firstMember.registrationNumber || teamId || '');
+    const teamName = resolvedInfo?.teamName || firstMember.teamName || 'Team';
+    const cleanTeamId = resolvedInfo?.teamId || teamId || 'ALPHA-001';
+
+    const volunteerName = req.user.username || req.user.name || 'Volunteer';
+    const savedRecords = [];
+
+    for (const item of attendanceList) {
+      const regNum = (item.registrationNumber || '').trim().toUpperCase();
+      const status = item.status === 'ABSENT' ? 'ABSENT' : 'PRESENT';
+      const name = item.name || 'Student';
+
+      const rec = await Attendance.findOneAndUpdate(
+        { sessionId: session.sessionId, participantRegNum: regNum },
+        {
+          sessionId: session.sessionId,
+          sessionName: session.sessionName,
+          participantRegNum: regNum,
+          participantName: name,
+          teamName: teamName,
+          teamId: cleanTeamId,
+          status: status,
+          markedByVolunteer: volunteerName,
+          markedAt: new Date()
+        },
+        { upsert: true, new: true }
+      );
+      savedRecords.push(rec);
+    }
+
+    await AuditLog.create({
+      actor: volunteerName,
+      role: req.user.role,
+      action: 'MARK_TEAM_ATTENDANCE',
+      target: `Team ${teamName} (${cleanTeamId}) - ${savedRecords.length} members`,
+      metadata: { session: session.sessionName }
+    });
+
+    return res.json({
+      message: `Attendance for Team ${teamName} recorded successfully! ✅`,
+      sessionName: session.sessionName,
+      records: savedRecords
+    });
+  } catch (err) {
+    console.error('Mark team attendance error:', err);
+    return res.status(500).json({ error: 'Server error while submitting team attendance.' });
+  }
+});
+
+// Single scan fallback route
 router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async (req, res) => {
   try {
-    const { sessionId, participantRegNum } = req.body;
+    const { sessionId, participantRegNum, status } = req.body;
 
     if (!sessionId || !participantRegNum) {
       return res.status(400).json({ error: 'Session ID and Participant Registration Number are required.' });
     }
 
-    // A. Validate Attendance Session Existence and ACTIVE status
     const session = await AttendanceSession.findOne({ sessionId });
     if (!session) {
       return res.status(404).json({ error: 'Attendance session not found.' });
@@ -341,9 +488,7 @@ router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async
       });
     }
 
-    // B. Validate Participant Existence in DB
     const participant = await resolveParticipant(participantRegNum);
-
     if (!participant) {
       const cleanId = extractCleanId(participantRegNum);
       return res.status(404).json({
@@ -352,65 +497,48 @@ router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async
       });
     }
 
-    // C. Check Duplicate Attendance in Same Session
-    const existingRecord = await Attendance.findOne({
-      sessionId: session.sessionId,
-      participantRegNum: participant.registrationNumber
-    });
+    const attendanceStatus = status === 'ABSENT' ? 'ABSENT' : 'PRESENT';
+    const volunteerName = req.user.username || req.user.name || 'Volunteer';
 
-    if (existingRecord) {
-      const timeStr = new Date(existingRecord.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      return res.status(400).json({
-        error: `Already Marked! ${participant.name} has already been marked present for '${session.sessionName}'.`,
-        code: 'DUPLICATE_ATTENDANCE',
-        alreadyMarked: true,
+    const attendanceRecord = await Attendance.findOneAndUpdate(
+      { sessionId: session.sessionId, participantRegNum: participant.registrationNumber },
+      {
+        sessionId: session.sessionId,
+        sessionName: session.sessionName,
+        participantRegNum: participant.registrationNumber,
         participantName: participant.name,
-        markedAtTime: timeStr,
-        record: existingRecord
-      });
-    }
+        teamName: participant.teamName,
+        teamId: participant.teamId,
+        college: participant.college || 'KARE',
+        status: attendanceStatus,
+        markedByVolunteer: volunteerName,
+        markedAt: new Date()
+      },
+      { upsert: true, new: true }
+    );
 
-    // D. Mark Attendance Record
-    const attendanceRecord = await Attendance.create({
-      sessionId: session.sessionId,
-      sessionName: session.sessionName,
-      participantRegNum: participant.registrationNumber,
-      participantName: participant.name,
-      teamName: participant.teamName,
-      college: participant.college || 'KARE',
-      markedByVolunteer: req.user.username || req.user.name || 'Volunteer',
-      markedAt: new Date()
-    });
-
-    // Audit Log
     await AuditLog.create({
-      actor: req.user.username || req.user.name || 'Volunteer',
+      actor: volunteerName,
       role: req.user.role,
       action: 'MARK_ATTENDANCE',
-      target: `${participant.name} (${participant.registrationNumber})`,
+      target: `${participant.name} (${participant.registrationNumber}) -> ${attendanceStatus}`,
       metadata: { session: session.sessionName }
     });
 
     const formattedTime = new Date(attendanceRecord.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     return res.json({
-      message: 'Attendance Recorded Successfully ✅',
+      message: `Attendance marked as ${attendanceStatus} ✅`,
       record: {
         registrationNumber: participant.registrationNumber,
         name: participant.name,
         teamName: participant.teamName,
-        college: participant.college,
+        status: attendanceStatus,
         sessionName: session.sessionName,
         markedAt: formattedTime
       }
     });
   } catch (err) {
-    if (err.code === 11000) { // MongoDB Unique constraint duplicate error
-      return res.status(400).json({
-        error: 'Already Marked! Attendance record already exists for this participant in this session.',
-        code: 'DUPLICATE_ATTENDANCE'
-      });
-    }
     console.error('Mark attendance error:', err);
     return res.status(500).json({ error: 'Server error while marking attendance.' });
   }
@@ -434,12 +562,23 @@ router.get('/session-roster', authenticateToken, async (req, res) => {
     }
 
     const records = await Attendance.find(filter).sort({ markedAt: -1 });
-    const totalRegistered = await Participant.countDocuments();
+    
+    // Count total participants from authorized teams (60 teams x 4 = 240 members)
+    let totalRegistered = 240;
+    try {
+      const dbCount = await Participant.countDocuments();
+      if (dbCount > 0) totalRegistered = dbCount;
+    } catch (e) {}
+
+    const presentCount = records.filter(r => r.status === 'PRESENT').length;
+    const absentCount = records.filter(r => r.status === 'ABSENT').length;
 
     return res.json({
       sessionId,
       records,
       markedCount: records.length,
+      presentCount,
+      absentCount,
       totalRegistered
     });
   } catch (err) {
@@ -447,36 +586,134 @@ router.get('/session-roster', authenticateToken, async (req, res) => {
   }
 });
 
-// 7. ADMIN: CENTRALIZED ATTENDANCE DATA TABLE WITH FILTERS & SUMMARY
+// 7. ADMIN: CENTRALIZED INDIVIDUAL ATTENDANCE DATA TABLE WITH FILTERS & SUMMARY
 router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const { sessionId, teamName, search } = req.query;
-    let attendanceFilter = {};
+    const { sessionId, teamName, status, search } = req.query;
 
+    // Collect all 240 individual participants from AUTHORIZED_TEAMS or Participant model
+    let allParticipants = [];
+    AUTHORIZED_TEAMS.forEach(t => {
+      if (t.members && Array.isArray(t.members)) {
+        t.members.forEach(m => {
+          allParticipants.push({
+            registrationNumber: m.registrationNumber,
+            name: m.name,
+            teamName: t.teamName,
+            teamId: t.teamId,
+            role: m.role || 'MEMBER',
+            college: 'KARE'
+          });
+        });
+      }
+    });
+
+    if (allParticipants.length === 0) {
+      const dbParts = await Participant.find();
+      allParticipants = dbParts.map(p => ({
+        registrationNumber: p.registrationNumber,
+        name: p.name,
+        teamName: p.teamName,
+        teamId: 'ALPHA',
+        role: p.isTeamLead ? 'LEAD' : 'MEMBER',
+        college: p.college || 'KARE'
+      }));
+    }
+
+    let attendanceFilter = {};
     if (sessionId && sessionId !== 'ALL') {
       attendanceFilter.sessionId = sessionId;
     }
     if (teamName && teamName !== 'ALL') {
       attendanceFilter.teamName = teamName;
     }
-    if (search) {
-      attendanceFilter.$or = [
-        { participantName: { $regex: search, $options: 'i' } },
-        { participantRegNum: { $regex: search, $options: 'i' } },
-        { teamName: { $regex: search, $options: 'i' } }
-      ];
+
+    const attRecords = await Attendance.find(attendanceFilter).sort({ markedAt: -1 });
+    const recordsMap = {};
+    attRecords.forEach(r => {
+      recordsMap[r.participantRegNum] = r;
+    });
+
+    // Build individual attendance rows for requested view
+    let resultRows = [];
+    if (sessionId && sessionId !== 'ALL') {
+      const sessionDoc = await AttendanceSession.findOne({ sessionId });
+      const sName = sessionDoc ? sessionDoc.sessionName : sessionId;
+
+      resultRows = allParticipants.map(p => {
+        const att = recordsMap[p.registrationNumber];
+        return {
+          _id: att?._id || `temp-${p.registrationNumber}`,
+          participantRegNum: p.registrationNumber,
+          participantName: p.name,
+          teamName: p.teamName,
+          teamId: p.teamId,
+          sessionName: sName,
+          sessionId: sessionId,
+          status: att ? att.status : 'ABSENT',
+          markedByVolunteer: att ? att.markedByVolunteer : '—',
+          markedAt: att ? att.markedAt : null
+        };
+      });
+    } else {
+      // If ALL sessions selected, map existing attendance logs or expand
+      if (attRecords.length > 0) {
+        resultRows = attRecords.map(r => ({
+          _id: r._id,
+          participantRegNum: r.participantRegNum,
+          participantName: r.participantName,
+          teamName: r.teamName,
+          teamId: r.teamId || 'ALPHA',
+          sessionName: r.sessionName,
+          sessionId: r.sessionId,
+          status: r.status || 'PRESENT',
+          markedByVolunteer: r.markedByVolunteer,
+          markedAt: r.markedAt
+        }));
+      } else {
+        resultRows = allParticipants.map(p => ({
+          _id: `temp-${p.registrationNumber}`,
+          participantRegNum: p.registrationNumber,
+          participantName: p.name,
+          teamName: p.teamName,
+          teamId: p.teamId,
+          sessionName: 'No Session Selected',
+          sessionId: 'N/A',
+          status: 'ABSENT',
+          markedByVolunteer: '—',
+          markedAt: null
+        }));
+      }
     }
 
-    const attendanceRecords = await Attendance.find(attendanceFilter).sort({ markedAt: -1 });
+    // Apply Filter by Team Name
+    if (teamName && teamName !== 'ALL') {
+      resultRows = resultRows.filter(r => r.teamName === teamName || r.teamId === teamName);
+    }
 
-    // Fetch total registered participants
-    const totalRegistered = await Participant.countDocuments();
-    const totalPresentCount = attendanceRecords.length;
-    const totalAbsentCount = Math.max(0, totalRegistered - totalPresentCount);
+    // Apply Filter by Individual Status (PRESENT / ABSENT)
+    if (status && status !== 'ALL') {
+      resultRows = resultRows.filter(r => r.status === status);
+    }
+
+    // Apply Search Filter
+    if (search) {
+      const q = search.toLowerCase();
+      resultRows = resultRows.filter(r => 
+        (r.participantName && r.participantName.toLowerCase().includes(q)) ||
+        (r.participantRegNum && r.participantRegNum.toLowerCase().includes(q)) ||
+        (r.teamName && r.teamName.toLowerCase().includes(q)) ||
+        (r.teamId && r.teamId.toLowerCase().includes(q))
+      );
+    }
+
+    const totalRegistered = allParticipants.length;
+    const totalPresentCount = resultRows.filter(r => r.status === 'PRESENT').length;
+    const totalAbsentCount = resultRows.filter(r => r.status === 'ABSENT').length;
     const attendancePercentage = totalRegistered > 0 ? ((totalPresentCount / totalRegistered) * 100).toFixed(1) : 0;
 
     return res.json({
-      records: attendanceRecords,
+      records: resultRows,
       stats: {
         totalRegistered,
         present: totalPresentCount,
@@ -485,11 +722,12 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
       }
     });
   } catch (err) {
-    return res.status(500).json({ error: 'Failed to fetch attendance records.' });
+    console.error('Fetch admin records error:', err);
+    return res.status(500).json({ error: 'Failed to fetch individual attendance records.' });
   }
 });
 
-// 8. ADMIN: EXPORT ATTENDANCE TO CSV
+// 8. ADMIN: EXPORT INDIVIDUAL ATTENDANCE TO CSV
 router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
     const { sessionId } = req.query;
@@ -497,29 +735,57 @@ router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req,
     if (sessionId && sessionId !== 'ALL') filter.sessionId = sessionId;
 
     const records = await Attendance.find(filter).sort({ markedAt: -1 });
-    const participants = await Participant.find();
 
-    // Map combined present and absent participant list for complete hackathon report
-    const presentRegNums = new Set(records.map(r => r.participantRegNum));
+    let allParticipants = [];
+    AUTHORIZED_TEAMS.forEach(t => {
+      if (t.members && Array.isArray(t.members)) {
+        t.members.forEach(m => {
+          allParticipants.push({
+            registrationNumber: m.registrationNumber,
+            name: m.name,
+            teamName: t.teamName,
+            teamId: t.teamId,
+            role: m.role || 'MEMBER'
+          });
+        });
+      }
+    });
 
-    const exportRows = participants.map(p => {
-      const match = records.find(r => r.participantRegNum === p.registrationNumber);
+    if (allParticipants.length === 0) {
+      const dbParts = await Participant.find();
+      allParticipants = dbParts.map(p => ({
+        registrationNumber: p.registrationNumber,
+        name: p.name,
+        teamName: p.teamName,
+        teamId: 'ALPHA',
+        role: p.isTeamLead ? 'LEAD' : 'MEMBER'
+      }));
+    }
+
+    const recordsMap = {};
+    records.forEach(r => {
+      recordsMap[r.participantRegNum] = r;
+    });
+
+    const exportRows = allParticipants.map(p => {
+      const match = recordsMap[p.registrationNumber];
       return {
         'Registration Number': p.registrationNumber,
         'Student Name': p.name,
+        'Team ID': p.teamId,
         'Team Name': p.teamName,
-        'College': p.college || 'KARE',
-        'Department': p.department || 'CSE',
+        'Role': p.role,
+        'College': 'KARE',
         'Session': match ? match.sessionName : (sessionId !== 'ALL' ? sessionId : 'N/A'),
-        'Attendance Status': match ? 'Present' : 'Absent',
-        'Marked Time': match ? new Date(match.markedAt).toLocaleString() : '—',
+        'Attendance Status': match ? match.status : 'ABSENT',
+        'Marked Time': match?.markedAt ? new Date(match.markedAt).toLocaleString() : '—',
         'Marked By Volunteer': match ? match.markedByVolunteer : '—'
       };
     });
 
     const csvData = json2csv(exportRows);
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=Hackathon_Attendance_Report_${Date.now()}.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=Hackathon_Individual_Attendance_Report_${Date.now()}.csv`);
     return res.status(200).send(csvData);
   } catch (err) {
     console.error('Export error:', err);
@@ -528,3 +794,4 @@ router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req,
 });
 
 module.exports = router;
+

@@ -39,23 +39,29 @@ export const AuthProvider = ({ children }) => {
   const [sessionId, setSessionId] = useState(() => localStorage.getItem('alpha_session_id') || null);
   const [revokedMessage, setRevokedMessage] = useState(null);
 
-  const PRODUCTION_BACKEND_URL = 'https://problem-statements-w7wq.onrender.com';
-
-  // Configure Axios Base URL - prioritize production backend URL and eliminate any localhost fallbacks
-  useEffect(() => {
-    let rawUrl = import.meta.env.VITE_API_URL || PRODUCTION_BACKEND_URL;
-    if (rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1')) {
-      rawUrl = PRODUCTION_BACKEND_URL;
+  const resolveBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return '';
+      }
     }
-    axios.defaults.baseURL = getCleanBaseUrl(rawUrl);
+    const envUrl = import.meta.env.VITE_API_URL;
+    if (envUrl) {
+      const clean = getCleanBaseUrl(envUrl);
+      if (!clean.includes('localhost') && !clean.includes('127.0.0.1')) {
+        return clean;
+      }
+    }
+    return '';
+  };
+
+  // Configure Axios Base URL dynamically
+  useEffect(() => {
+    axios.defaults.baseURL = resolveBaseUrl();
   }, []);
   
-  // Set initial synchronous baseURL
-  let initialUrl = import.meta.env.VITE_API_URL || PRODUCTION_BACKEND_URL;
-  if (initialUrl.includes('localhost') || initialUrl.includes('127.0.0.1')) {
-    initialUrl = PRODUCTION_BACKEND_URL;
-  }
-  axios.defaults.baseURL = getCleanBaseUrl(initialUrl);
+  axios.defaults.baseURL = resolveBaseUrl();
 
   // Set default authorization header on axios
   useEffect(() => {
@@ -141,20 +147,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = async (callApi = true) => {
-    if (callApi && token) {
-      try {
-        await axios.post('/api/auth/logout');
-      } catch (e) {
-        // ignore logout errors
-      }
-    }
+  // Instant synchronous logout (0ms turnaround time)
+  const logout = (callApi = true) => {
+    const currentToken = token || localStorage.getItem('alpha_token');
+
     localStorage.removeItem('alpha_token');
     localStorage.removeItem('alpha_user');
     localStorage.removeItem('alpha_session_id');
     setToken(null);
     setUser(null);
     setSessionId(null);
+    delete axios.defaults.headers.common['Authorization'];
+
+    if (callApi && currentToken) {
+      axios.post('/api/auth/logout', {}, {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      }).catch(() => {});
+    }
   };
 
   const refreshUserSession = async () => {
