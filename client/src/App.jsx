@@ -28,12 +28,8 @@ export const getDashboardRoute = (role) => {
   }
 };
 
-// Smart Root Component: Redirects if logged in, renders LandingPage if unauthenticated
+// Smart Root Component: Renders LandingPage on root / route
 const RootRedirect = () => {
-  const { user, token } = useAuth();
-  if (token && user) {
-    return <Navigate to={getDashboardRoute(user.role)} replace />;
-  }
   return <LandingPage />;
 };
 

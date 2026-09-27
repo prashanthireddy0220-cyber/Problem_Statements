@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }) => {
   
   axios.defaults.baseURL = resolveBaseUrl();
 
-  // Set default authorization header on axios
+  // Set default authorization header on axios & verify active session on mount
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -71,6 +71,29 @@ export const AuthProvider = ({ children }) => {
       delete axios.defaults.headers.common['Authorization'];
     }
   }, [token]);
+
+  useEffect(() => {
+    const verifySessionOnMount = async () => {
+      const savedToken = localStorage.getItem('alpha_token');
+      if (savedToken) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+        try {
+          const res = await axios.get('/api/auth/me');
+          if (res.data && res.data.user) {
+            setUser(res.data.user);
+            localStorage.setItem('alpha_user', JSON.stringify(res.data.user));
+          } else {
+            logout(false);
+          }
+        } catch (err) {
+          if (err.response?.status === 401 || err.response?.status === 403) {
+            logout(false);
+          }
+        }
+      }
+    };
+    verifySessionOnMount();
+  }, []);
 
   // Global Axios Interceptor for Single-Device Lockout Detection
   useEffect(() => {
