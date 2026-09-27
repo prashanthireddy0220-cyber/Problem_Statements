@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Interactive3DBackground from './components/Interactive3DBackground';
+import ClubLogoIntro from './components/ClubLogoIntro';
 
 import TeamLeadLogin from './pages/TeamLeadLogin';
 import TeamLeadDashboard from './pages/TeamLeadDashboard';
@@ -97,8 +98,11 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 };
 
 export default function App() {
+  const [showIntro, setShowIntro] = useState(true);
+
   return (
     <AuthProvider>
+      {showIntro && <ClubLogoIntro onComplete={() => setShowIntro(false)} />}
       <Router>
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative' }}>
           <Interactive3DBackground />

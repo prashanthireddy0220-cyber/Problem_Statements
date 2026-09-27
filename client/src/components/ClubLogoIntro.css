@@ -1,0 +1,269 @@
+/* KARE IEEE Education Society Cinematic Intro Styles */
+
+.club-intro-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000000;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+  opacity: 1;
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), filter 0.6s ease;
+}
+
+.club-intro-overlay.exiting {
+  opacity: 0;
+  pointer-events: none;
+  filter: blur(8px);
+}
+
+/* Background particle canvas */
+.club-intro-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Core Content Container */
+.club-intro-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1.5rem;
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.club-intro-overlay.exiting .club-intro-content {
+  transform: scale(1.12);
+}
+
+/* Stage 1: Central Electric Spark / Point */
+.club-intro-spark {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 
+    0 0 15px #00f2fe, 
+    0 0 30px #00f2fe, 
+    0 0 60px #0066ff, 
+    0 0 90px #00f2fe;
+  opacity: 0;
+  transform: scale(0);
+  transition: opacity 0.35s ease-out, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 3;
+}
+
+.club-intro-spark.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.club-intro-spark.pulse {
+  transform: scale(2.5);
+  opacity: 0.8;
+  box-shadow: 
+    0 0 25px #00f2fe, 
+    0 0 50px #00f2fe, 
+    0 0 100px #0066ff, 
+    0 0 140px #00f2fe;
+}
+
+.club-intro-spark.fade-out {
+  opacity: 0;
+  transform: scale(4);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+
+/* Energy Shockwave Ring */
+.club-intro-shockwave {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 242, 254, 0.9);
+  box-shadow: 
+    0 0 20px rgba(0, 242, 254, 0.8), 
+    inset 0 0 20px rgba(0, 242, 254, 0.8),
+    0 0 40px rgba(0, 102, 255, 0.5);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.1);
+  z-index: 2;
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.8s ease-out;
+}
+
+.club-intro-shockwave.expanding {
+  opacity: 1;
+  transform: scale(3.5);
+}
+
+.club-intro-shockwave.fade {
+  opacity: 0;
+  transform: scale(5);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+/* Soft Volumetric Halo Backdrop behind Logo */
+.club-intro-halo {
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 242, 254, 0.45) 0%,
+    rgba(0, 102, 255, 0.25) 45%,
+    rgba(0, 0, 0, 0) 72%
+  );
+  filter: blur(25px);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.8s ease-out, transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1;
+}
+
+.club-intro-halo.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.club-intro-overlay.exiting .club-intro-halo {
+  transform: scale(1.6);
+  opacity: 0.9;
+}
+
+/* Logo Wrapper & Image */
+.club-intro-logo-wrapper {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  z-index: 4;
+}
+
+.club-intro-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  opacity: 0;
+  filter: blur(20px);
+  transform: scale(0.85);
+  mix-blend-mode: lighten;
+  box-shadow: 0 0 35px rgba(0, 242, 254, 0.5);
+  transition: 
+    filter 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.8s ease-out,
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.8s ease;
+}
+
+.club-intro-logo.emerging {
+  opacity: 0.6;
+  filter: blur(8px);
+  transform: scale(0.92);
+}
+
+.club-intro-logo.visible {
+  opacity: 1;
+  filter: blur(0px);
+  transform: scale(1);
+  box-shadow: 
+    0 0 30px rgba(0, 242, 254, 0.6),
+    0 0 60px rgba(0, 102, 255, 0.3);
+}
+
+/* Text Styling & Reveal */
+.club-intro-text-container {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  z-index: 4;
+}
+
+.club-intro-title {
+  font-family: 'Orbitron', 'Outfit', 'Inter', sans-serif;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: 5px;
+  color: #ffffff;
+  text-transform: uppercase;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(16px);
+  background: linear-gradient(135deg, #ffffff 0%, #00f2fe 55%, #4facfe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 14px rgba(0, 242, 254, 0.6));
+  transition: opacity 0.7s ease-out, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.club-intro-title.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.club-intro-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: rgba(0, 242, 254, 0.85);
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.7s ease-out, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.club-intro-subtitle.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Responsive Scaling */
+@media (max-width: 768px) {
+  .club-intro-logo-wrapper {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .club-intro-halo {
+    width: 270px;
+    height: 270px;
+  }
+  
+  .club-intro-title {
+    font-size: 1.1rem;
+    letter-spacing: 3px;
+    margin-top: 1.25rem;
+  }
+
+  .club-intro-subtitle {
+    font-size: 0.65rem;
+    letter-spacing: 2.5px;
+  }
+}
