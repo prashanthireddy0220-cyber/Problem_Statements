@@ -73,31 +73,13 @@ export default function LandingPage() {
               <Zap size={20} /> Go to My {user.role.replace('_', ' ')} Dashboard
             </Link>
           ) : (
-            <>
-              <Link 
-                to="/team-lead/login" 
-                className="btn-alpha-cyan" 
-                style={{ padding: '0.9rem 2rem', fontSize: '1rem', fontWeight: '800', borderRadius: '12px', boxShadow: '0 0 25px rgba(0, 242, 254, 0.3)' }}
-              >
-                Team Lead Login <ArrowRight size={18} />
-              </Link>
-              
-              <Link 
-                to="/volunteer/login" 
-                className="btn-alpha-gold" 
-                style={{ padding: '0.9rem 2rem', fontSize: '1rem', fontWeight: '800', borderRadius: '12px' }}
-              >
-                <QrCode size={18} /> Volunteer Scanner
-              </Link>
-
-              <Link 
-                to="/admin/login" 
-                className="btn-alpha-outline" 
-                style={{ padding: '0.9rem 1.75rem', fontSize: '1rem', borderRadius: '12px' }}
-              >
-                Admin Control
-              </Link>
-            </>
+            <Link 
+              to="/team-lead/login" 
+              className="btn-alpha-cyan" 
+              style={{ padding: '0.95rem 2.5rem', fontSize: '1.05rem', fontWeight: '800', borderRadius: '12px', boxShadow: '0 0 25px rgba(0, 242, 254, 0.4)' }}
+            >
+              Team Lead Login <ArrowRight size={18} />
+            </Link>
           )}
         </div>
       </div>
@@ -130,115 +112,49 @@ export default function LandingPage() {
         })}
       </div>
 
-      {/* 3. THREE PORTAL HUBS SECTION */}
+      {/* 3. TEAM LEAD PORTAL ACCESS SECTION */}
       <div style={{ marginBottom: '3rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.8rem', color: '#F8FAFC' }}>
-            HACKATHON PORTAL HUBS
+            HACKATHON PORTAL ACCESS
           </h2>
           <p style={{ color: '#94A3B8', fontSize: '0.95rem', marginTop: '0.35rem' }}>
-            Choose your role to access event dashboards and tools.
+            Enter your credentials to access your team dashboard and tools.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.75rem' }}>
+        <div style={{ maxWidth: '680px', margin: '0 auto' }}>
           
           {/* CARD 1: TEAM LEAD PORTAL */}
-          <div className="glass-panel" style={{ padding: '2rem', borderLeft: '4px solid #00F2FE', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div className="glass-panel" style={{ padding: '2.5rem', borderLeft: '5px solid #00F2FE', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 0 35px rgba(0, 242, 254, 0.12)' }}>
             <div>
-              <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'rgba(0, 242, 254, 0.15)', border: '1px solid var(--border-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
-                <Users size={26} color="#00F2FE" />
+              <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'rgba(0, 242, 254, 0.15)', border: '1px solid var(--border-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                <Users size={28} color="#00F2FE" />
               </div>
               
-              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.3rem', color: '#F8FAFC', marginBottom: '0.5rem' }}>
+              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.45rem', color: '#F8FAFC', marginBottom: '0.65rem' }}>
                 Team Lead Portal
               </h3>
               
-              <p style={{ color: '#CBD5E1', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.25rem' }}>
-                Access single-device protected dashboard using Team ID & Lead Reg Number. View problem statements, lock selection, and generate dynamic session Attendance QR codes.
+              <p style={{ color: '#CBD5E1', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                Access your single-device protected dashboard using your Team ID & Lead Registration Number. View problem statements, lock selection, and generate dynamic session Attendance QR codes.
               </p>
 
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.5rem', fontSize: '0.85rem', color: '#94A3B8', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CheckCircle2 size={15} color="#00F2FE" /> Single-Device Active Session Protection
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.75rem', fontSize: '0.9rem', color: '#94A3B8', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <CheckCircle2 size={17} color="#00F2FE" /> Single-Device Active Session Protection
                 </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CheckCircle2 size={15} color="#00F2FE" /> Live Synchronized Countdown Timer
+                <li style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <CheckCircle2 size={17} color="#00F2FE" /> Live Synchronized Problem Selection Timer
                 </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CheckCircle2 size={15} color="#00F2FE" /> Real-time Member Attendance Status View
+                <li style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <CheckCircle2 size={17} color="#00F2FE" /> Dynamic Session Attendance QR Code & Real-time Member Status View
                 </li>
               </ul>
             </div>
 
-            <Link to="/team-lead/login" className="btn-alpha-cyan" style={{ justifyContent: 'center', padding: '0.8rem', fontSize: '0.92rem' }}>
+            <Link to="/team-lead/login" className="btn-alpha-cyan" style={{ justifyContent: 'center', padding: '0.9rem', fontSize: '1rem', fontWeight: '800', borderRadius: '12px' }}>
               Team Lead Login <ChevronRight size={18} />
-            </Link>
-          </div>
-
-          {/* CARD 2: VOLUNTEER ATTENDANCE SCANNER */}
-          <div className="glass-panel" style={{ padding: '2rem', borderLeft: '4px solid #FFD700', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'rgba(255, 215, 0, 0.15)', border: '1px solid rgba(255, 215, 0, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
-                <QrCode size={26} color="#FFD700" />
-              </div>
-
-              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.3rem', color: '#F8FAFC', marginBottom: '0.5rem' }}>
-                Volunteer Attendance Portal
-              </h3>
-
-              <p style={{ color: '#CBD5E1', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.25rem' }}>
-                Authorized volunteer scanner app. Scan session QR codes, view team members, and toggle individual participant Present/Absent statuses.
-              </p>
-
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.5rem', fontSize: '0.85rem', color: '#94A3B8', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CheckCircle2 size={15} color="#FFD700" /> Rapid HTML5 Camera Scanner
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CheckCircle2 size={15} color="#FFD700" /> Interactive Present/Absent Toggles per Member
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CheckCircle2 size={15} color="#FFD700" /> Google Lens Unauthorized Scan Shield
-                </li>
-              </ul>
-            </div>
-
-            <Link to="/volunteer/login" className="btn-alpha-gold" style={{ justifyContent: 'center', padding: '0.8rem', fontSize: '0.92rem' }}>
-              Volunteer Scanner Login <ChevronRight size={18} />
-            </Link>
-          </div>
-
-          {/* CARD 3: ADMIN CONTROL CENTER */}
-          <div className="glass-panel" style={{ padding: '2rem', borderLeft: '4px solid #00E676', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'rgba(0, 230, 118, 0.15)', border: '1px solid rgba(0, 230, 118, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
-                <ShieldCheck size={26} color="#00E676" />
-              </div>
-
-              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.3rem', color: '#F8FAFC', marginBottom: '0.5rem' }}>
-                Admin Master Dashboard
-              </h3>
-
-              <p style={{ color: '#CBD5E1', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.25rem' }}>
-                Central command panel for event organizers. Monitor all 60 teams, release problem statements, manage attendance sessions, and export CSV reports.
-              </p>
-
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.5rem', fontSize: '0.85rem', color: '#94A3B8', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CheckCircle2 size={15} color="#00E676" /> Live Team Monitoring & Audit Log Matrix
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CheckCircle2 size={15} color="#00E676" /> Central Attendance Session Controller
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <CheckCircle2 size={15} color="#00E676" /> Individual Student Attendance Export (CSV)
-                </li>
-              </ul>
-            </div>
-
-            <Link to="/admin/login" className="btn-alpha-outline" style={{ justifyContent: 'center', padding: '0.8rem', fontSize: '0.92rem' }}>
-              Admin Portal Login <ChevronRight size={18} />
             </Link>
           </div>
 
