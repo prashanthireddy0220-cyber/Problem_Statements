@@ -620,12 +620,12 @@ export default function VolunteerScanner() {
         </div>
       )}
 
-      {/* 4. PRESENT ROSTER TABLE FOR SELECTED ATTENDANCE SESSION */}
+      {/* 4. ATTENDANCE ROSTER TABLE FOR SELECTED SESSION */}
       <div className="glass-panel" style={{ padding: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h3 style={{ fontSize: '1.15rem', color: '#F8FAFC', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Users color="#00F2FE" size={20} /> PRESENT ROSTER FOR {activeSession?.sessionName || 'Selected Session'} ({roster.length})
+              <Users color="#00F2FE" size={20} /> SESSION ATTENDANCE ROSTER ({activeSession?.sessionName || 'Selected Session'}) — {roster.length} Records
             </h3>
           </div>
 
@@ -658,7 +658,7 @@ export default function VolunteerScanner() {
                 <th style={{ width: '60px' }}>#</th>
                 <th>Student Name</th>
                 <th>Registration No</th>
-                <th>Team Name</th>
+                <th>Team ID & Name</th>
                 <th>Status</th>
                 <th>Time Marked</th>
               </tr>
@@ -671,22 +671,52 @@ export default function VolunteerScanner() {
                   </td>
                 </tr>
               ) : (
-                roster.map((item, idx) => (
-                  <tr key={item._id}>
-                    <td style={{ color: '#94A3B8', fontWeight: '700' }}>{idx + 1}</td>
-                    <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{item.participantName}</td>
-                    <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{item.participantRegNum}</td>
-                    <td style={{ color: '#FFD700', fontWeight: '600' }}>{item.teamName}</td>
-                    <td>
-                      <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(0,230,118,0.2)', color: '#00E676', border: '1px solid rgba(0,230,118,0.4)' }}>
-                        PRESENT
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>
-                      {new Date(item.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
-                    </td>
-                  </tr>
-                ))
+                roster.map((item, idx) => {
+                  const extractAlphaCode = (str) => {
+                    if (!str) return null;
+                    const m = String(str).match(/ALPHA-?(\d+)/i);
+                    return m ? `ALPHA-${m[1].padStart(3, '0')}` : null;
+                  };
+
+                  const cleanReg = String(item.participantRegNum || '').trim().toUpperCase();
+                  const targetTeamCode = extractAlphaCode(item.teamId) || extractAlphaCode(cleanReg) || extractAlphaCode(item.teamName) || extractAlphaCode(item.participantName);
+
+                  let authTeam = AUTHORIZED_TEAMS.find(t => t.teamId === targetTeamCode || t.regNum === cleanReg);
+                  if (!authTeam && cleanReg) {
+                    authTeam = AUTHORIZED_TEAMS.find(t => t.members && t.members.some(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg));
+                  }
+
+                  const authMember = authTeam?.members?.find(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg);
+
+                  const displayName = authMember?.name || (authTeam && (!item.participantName || item.participantName.includes('Team Lead ('))) ? authTeam.leadName : item.participantName;
+                  const displayTeamId = authTeam?.teamId || item.teamId || 'ALPHA';
+                  const displayTeamName = authTeam?.teamName || item.teamName || 'Team';
+                  const displayRegNum = authMember?.registrationNumber || (authTeam ? authTeam.regNum : item.participantRegNum);
+                  const isPresent = item.status === 'PRESENT';
+
+                  return (
+                    <tr key={item._id || idx}>
+                      <td style={{ color: '#94A3B8', fontWeight: '700' }}>{idx + 1}</td>
+                      <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{displayName}</td>
+                      <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{displayRegNum}</td>
+                      <td><span style={{ color: '#FFD700', fontWeight: '600' }}>{displayTeamId}</span> ({displayTeamName})</td>
+                      <td>
+                        {isPresent ? (
+                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(0,230,118,0.2)', color: '#00E676', border: '1px solid rgba(0,230,118,0.4)' }}>
+                            🟢 PRESENT
+                          </span>
+                        ) : (
+                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(255,75,75,0.2)', color: '#FF4B4B', border: '1px solid rgba(255,75,75,0.4)' }}>
+                            🔴 ABSENT
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>
+                        {item.markedAt ? new Date(item.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : '—'}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
