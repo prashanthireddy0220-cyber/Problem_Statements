@@ -621,43 +621,67 @@ router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async
 // 6B. VOLUNTEER: GET SESSION ROSTER AND STATS FOR SELECTED ATTENDANCE SESSION
 router.get('/session-roster', authenticateToken, async (req, res) => {
   try {
-    const { sessionId, search } = req.query;
+    const { sessionId, search, status } = req.query;
     if (!sessionId) {
       return res.status(400).json({ error: 'Session ID is required.' });
     }
 
     let filter = { sessionId };
-    if (search) {
-      filter.$or = [
-        { participantName: { $regex: search, $options: 'i' } },
-        { participantRegNum: { $regex: search, $options: 'i' } },
-        { teamName: { $regex: search, $options: 'i' } }
-      ];
+    const attRecords = await Attendance.find(filter).sort({ markedAt: -1 });
+
+    const recordsMap = {};
+    attRecords.forEach(r => {
+      const cleanKey = (r.participantRegNum || '').trim().toUpperCase();
+      if (cleanKey) recordsMap[cleanKey] = r;
+    });
+
+    // Build complete individual roster for all 240 members across 60 teams
+    let fullRoster = [];
+    AUTHORIZED_TEAMS.forEach(t => {
+      if (t.members && Array.isArray(t.members)) {
+        t.members.forEach(m => {
+          const cleanReg = (m.registrationNumber || '').trim().toUpperCase();
+          const att = recordsMap[cleanReg];
+          const details = resolveParticipantDetails(m.registrationNumber, m.name, t.teamId, t.teamName);
+          fullRoster.push({
+            _id: att?._id || `temp-${m.registrationNumber}`,
+            participantRegNum: details.registrationNumber,
+            participantName: details.name,
+            teamId: details.teamId,
+            teamName: details.teamName,
+            role: m.role || 'MEMBER',
+            status: att ? att.status : 'NOT_MARKED',
+            markedByVolunteer: att ? att.markedByVolunteer : '—',
+            markedAt: att ? att.markedAt : null
+          });
+        });
+      }
+    });
+
+    // Apply Filter by Status if provided
+    if (status && status !== 'ALL') {
+      fullRoster = fullRoster.filter(r => r.status === status);
     }
 
-    const rawRecords = await Attendance.find(filter).sort({ markedAt: -1 });
-    const records = rawRecords.map(r => {
-      const realName = getRealStudentName(r.participantRegNum, r.participantName);
-      return {
-        ...r.toObject(),
-        participantName: realName
-      };
-    });
-    
-    // Count total participants from authorized teams (60 teams x 4 = 240 members)
-    let totalRegistered = 240;
-    try {
-      const dbCount = await Participant.countDocuments();
-      if (dbCount > 0) totalRegistered = dbCount;
-    } catch (e) {}
+    // Apply Search Filter
+    if (search) {
+      const q = search.toLowerCase();
+      fullRoster = fullRoster.filter(r => 
+        (r.participantName && r.participantName.toLowerCase().includes(q)) ||
+        (r.participantRegNum && r.participantRegNum.toLowerCase().includes(q)) ||
+        (r.teamName && r.teamName.toLowerCase().includes(q)) ||
+        (r.teamId && r.teamId.toLowerCase().includes(q))
+      );
+    }
 
-    const presentCount = records.filter(r => r.status === 'PRESENT').length;
-    const absentCount = records.filter(r => r.status === 'ABSENT').length;
+    const presentCount = attRecords.filter(r => r.status === 'PRESENT').length;
+    const absentCount = attRecords.filter(r => r.status === 'ABSENT').length;
+    const totalRegistered = 240;
 
     return res.json({
       sessionId,
-      records,
-      markedCount: records.length,
+      records: fullRoster,
+      markedCount: attRecords.length,
       presentCount,
       absentCount,
       totalRegistered

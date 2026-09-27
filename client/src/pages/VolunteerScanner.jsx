@@ -25,8 +25,9 @@ export default function VolunteerScanner() {
 
   // Present Roster State
   const [roster, setRoster] = useState([]);
-  const [rosterStats, setRosterStats] = useState({ markedCount: 0, totalRegistered: 0 });
+  const [rosterStats, setRosterStats] = useState({ markedCount: 0, presentCount: 0, absentCount: 0, totalRegistered: 240 });
   const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterStatusFilter, setRosterStatusFilter] = useState('ALL');
   
   const scannerRef = useRef(null);
 
@@ -58,23 +59,29 @@ export default function VolunteerScanner() {
     }
   };
 
-  // Fetch roster whenever selectedSessionId or rosterSearch changes
+  // Fetch roster whenever selectedSessionId, rosterSearch, or rosterStatusFilter changes
   useEffect(() => {
     if (selectedSessionId) {
       fetchRoster();
     }
-  }, [selectedSessionId, rosterSearch]);
+  }, [selectedSessionId, rosterSearch, rosterStatusFilter]);
 
   const fetchRoster = async () => {
     if (!selectedSessionId) return;
     try {
       const res = await axios.get('/api/attendance/session-roster', {
-        params: { sessionId: selectedSessionId, search: rosterSearch }
+        params: {
+          sessionId: selectedSessionId,
+          search: rosterSearch,
+          status: rosterStatusFilter
+        }
       });
       setRoster(res.data.records || []);
       setRosterStats({
         markedCount: res.data.markedCount || 0,
-        totalRegistered: res.data.totalRegistered || 0
+        presentCount: res.data.presentCount || 0,
+        absentCount: res.data.absentCount || 0,
+        totalRegistered: res.data.totalRegistered || 240
       });
     } catch (e) {
       // ignore
@@ -625,29 +632,54 @@ export default function VolunteerScanner() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h3 style={{ fontSize: '1.15rem', color: '#F8FAFC', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Users color="#00F2FE" size={20} /> SESSION ATTENDANCE ROSTER ({activeSession?.sessionName || 'Selected Session'}) — {roster.length} Records
+              <Users color="#00F2FE" size={20} /> ALL INDIVIDUAL PARTICIPANTS ROSTER ({activeSession?.sessionName || 'Selected Session'})
             </h3>
+            <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.2rem' }}>
+              Showing {roster.length} participants • Marked: {rosterStats.markedCount} (Present: {rosterStats.presentCount || 0}, Absent: {rosterStats.absentCount || 0})
+            </div>
           </div>
 
-          {/* Roster Search Bar */}
-          <div style={{ position: 'relative', width: '280px' }}>
-            <input
-              type="text"
-              placeholder="Search roster..."
-              value={rosterSearch}
-              onChange={(e) => setRosterSearch(e.target.value)}
+          {/* Roster Controls: Status Filter & Search */}
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <select
+              value={rosterStatusFilter}
+              onChange={(e) => setRosterStatusFilter(e.target.value)}
               style={{
-                width: '100%',
-                padding: '0.6rem 0.85rem 0.6rem 2.2rem',
-                background: 'rgba(15, 23, 42, 0.8)',
+                padding: '0.6rem 0.85rem',
+                background: 'rgba(15, 23, 42, 0.95)',
                 border: '1px solid var(--border-cyan)',
                 borderRadius: '8px',
                 color: '#FFF',
-                fontSize: '0.85rem',
-                outline: 'none'
+                fontSize: '0.82rem',
+                outline: 'none',
+                cursor: 'pointer'
               }}
-            />
-            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+            >
+              <option value="ALL">All Statuses (Global 240 Matrix)</option>
+              <option value="PRESENT">🟢 Present Only</option>
+              <option value="ABSENT">🔴 Absent Only</option>
+              <option value="NOT_MARKED">⏳ Pending Only</option>
+            </select>
+
+            <div style={{ position: 'relative', width: '240px' }}>
+              <input
+                type="text"
+                placeholder="Search student, reg, team..."
+                value={rosterSearch}
+                onChange={(e) => setRosterSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 0.85rem 0.6rem 2.2rem',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  border: '1px solid var(--border-cyan)',
+                  borderRadius: '8px',
+                  color: '#FFF',
+                  fontSize: '0.85rem',
+                  outline: 'none'
+                }}
+              />
+              <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
           </div>
         </div>
 
@@ -655,19 +687,20 @@ export default function VolunteerScanner() {
           <table className="alpha-table">
             <thead>
               <tr>
-                <th style={{ width: '60px' }}>#</th>
+                <th style={{ width: '50px' }}>#</th>
                 <th>Student Name</th>
                 <th>Registration No</th>
                 <th>Team ID & Name</th>
-                <th>Status</th>
+                <th>Role</th>
+                <th>Individual Status</th>
                 <th>Time Marked</th>
               </tr>
             </thead>
             <tbody>
               {roster.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: '#94A3B8' }}>
-                    No attendance records marked yet for this session.
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#94A3B8' }}>
+                    No participant records found for the selected filters.
                   </td>
                 </tr>
               ) : (
@@ -692,7 +725,10 @@ export default function VolunteerScanner() {
                   const displayTeamId = authTeam?.teamId || item.teamId || 'ALPHA';
                   const displayTeamName = authTeam?.teamName || item.teamName || 'Team';
                   const displayRegNum = authMember?.registrationNumber || (authTeam ? authTeam.regNum : item.participantRegNum);
+                  const role = item.role || authMember?.role || (authTeam?.regNum === displayRegNum ? 'LEAD' : 'MEMBER');
+
                   const isPresent = item.status === 'PRESENT';
+                  const isAbsent = item.status === 'ABSENT';
 
                   return (
                     <tr key={item._id || idx}>
@@ -701,13 +737,22 @@ export default function VolunteerScanner() {
                       <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE' }}>{displayRegNum}</td>
                       <td><span style={{ color: '#FFD700', fontWeight: '600' }}>{displayTeamId}</span> ({displayTeamName})</td>
                       <td>
+                        <span style={{ fontSize: '0.75rem', color: role === 'LEAD' ? '#FFD700' : '#CBD5E1', fontWeight: '600' }}>
+                          {role === 'LEAD' ? '👑 LEAD' : 'MEMBER'}
+                        </span>
+                      </td>
+                      <td>
                         {isPresent ? (
                           <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(0,230,118,0.2)', color: '#00E676', border: '1px solid rgba(0,230,118,0.4)' }}>
                             🟢 PRESENT
                           </span>
-                        ) : (
+                        ) : isAbsent ? (
                           <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', background: 'rgba(255,75,75,0.2)', color: '#FF4B4B', border: '1px solid rgba(255,75,75,0.4)' }}>
                             🔴 ABSENT
+                          </span>
+                        ) : (
+                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '600', background: 'rgba(255,255,255,0.06)', color: '#94A3B8' }}>
+                            ⏳ PENDING
                           </span>
                         )}
                       </td>
