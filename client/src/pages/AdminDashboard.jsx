@@ -857,11 +857,11 @@ export default function AdminDashboard() {
             
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button
-                onClick={() => window.open(`/api/attendance/admin/export?sessionId=${attSessionFilter}`, '_blank')}
-                className="btn-alpha-outline"
-                style={{ fontSize: '0.85rem' }}
+                onClick={() => window.open(`/api/attendance/admin/export?sessionId=${attSessionFilter}&status=${attStatusFilter}`, '_blank')}
+                className="btn-alpha-cyan"
+                style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
-                <Download size={15} /> Export Individual CSV
+                <Download size={15} /> Export Attendance CSV
               </button>
               
               <button onClick={() => setShowCreateSessModal(true)} className="btn-alpha-gold" style={{ fontSize: '0.85rem' }}>
@@ -1054,7 +1054,16 @@ export default function AdminDashboard() {
       {/* TAB 6: ANALYTICS & REPORTS */}
       {activeTab === 'analytics' && (
         <div className="glass-panel" style={{ padding: '2rem' }}>
-          <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC', marginBottom: '1.5rem' }}>VISUAL ANALYTICS & ATTENDANCE CHARTS</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC' }}>VISUAL ANALYTICS & ATTENDANCE CHARTS</h2>
+            <button
+              onClick={() => window.open('/api/attendance/admin/export?sessionId=ALL', '_blank')}
+              className="btn-alpha-cyan"
+              style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Download size={15} /> Export Attendance Report (CSV)
+            </button>
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
             <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>

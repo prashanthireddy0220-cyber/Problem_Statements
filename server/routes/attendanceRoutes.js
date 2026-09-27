@@ -105,6 +105,31 @@ router.delete('/sessions/:id', authenticateToken, requireRole('ADMIN'), async (r
 
 const AUTHORIZED_TEAMS = require('../data/teamsData');
 
+// Helper to resolve real student name from registration number
+function getRealStudentName(regNum, fallbackName) {
+  if (!regNum) return fallbackName || 'Student';
+  const clean = String(regNum).trim().toUpperCase();
+
+  // Search across all AUTHORIZED_TEAMS members
+  for (const t of AUTHORIZED_TEAMS) {
+    if (t.members && Array.isArray(t.members)) {
+      const match = t.members.find(m => String(m.registrationNumber).trim().toUpperCase() === clean);
+      if (match && match.name && !match.name.includes('Team Lead (')) {
+        return match.name;
+      }
+    }
+    if (t.regNum && String(t.regNum).trim().toUpperCase() === clean && t.leadName && !t.leadName.includes('Team Lead (')) {
+      return t.leadName;
+    }
+  }
+
+  if (fallbackName && !fallbackName.includes('Team Lead (') && !fallbackName.startsWith('Student')) {
+    return fallbackName;
+  }
+
+  return clean;
+}
+
 // Helper to extract registration number or Team ID from raw QR payloads / URLs
 function extractCleanId(rawInput) {
   if (!rawInput || typeof rawInput !== 'string') return '';
@@ -203,12 +228,13 @@ async function resolveParticipant(rawInput) {
   });
 
   if (dbTeam) {
+    const leadRealName = getRealStudentName(dbTeam.teamLeadRegNum, dbTeam.teamName || dbTeam.name);
     return {
       registrationNumber: dbTeam.teamLeadRegNum || 'LEAD',
-      name: dbTeam.teamName || dbTeam.name,
+      name: leadRealName,
       teamName: dbTeam.teamName || dbTeam.name,
       teamId: dbTeam.teamId || dbTeam.name,
-      leadName: dbTeam.teamName || dbTeam.name,
+      leadName: leadRealName,
       leadRegNum: dbTeam.teamLeadRegNum || 'LEAD',
       college: 'KARE',
       department: 'CSE',
@@ -230,12 +256,13 @@ async function resolveParticipant(rawInput) {
 
   if (participant) {
     const teamDoc = await Team.findOne({ name: participant.teamName });
+    const pRealName = getRealStudentName(participant.registrationNumber, participant.name);
     return {
       registrationNumber: participant.registrationNumber,
-      name: participant.name,
+      name: pRealName,
       teamName: teamDoc?.teamName || participant.teamName,
       teamId: teamDoc?.teamId || 'ALPHA',
-      leadName: participant.name,
+      leadName: pRealName,
       leadRegNum: participant.registrationNumber,
       college: participant.college || 'KARE',
       department: participant.department || 'CSE',
@@ -287,18 +314,20 @@ router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async 
     const authItem = AUTHORIZED_TEAMS.find(t => 
       (t.teamId && formatKey(t.teamId) === teamKey) ||
       (t.regNum && t.regNum === cleanRegNum) ||
-      (t.members && t.members.some(m => m.registrationNumber === cleanRegNum))
+      (t.members && t.members.some(m => String(m.registrationNumber).trim().toUpperCase() === cleanRegNum))
     );
 
-    const teamId = authItem?.teamId || displayTeamId || 'ALPHA-001';
+    const teamId = authItem?.teamId || teamKey || 'ALPHA-001';
     const teamName = authItem?.teamName || 'Team';
     const members = authItem?.members || [
-      { name: req.user.name || 'Team Lead', registrationNumber: cleanRegNum, role: 'LEAD' }
+      { name: getRealStudentName(cleanRegNum, req.user.name), registrationNumber: cleanRegNum, role: 'LEAD' }
     ];
 
     const allSessions = await AttendanceSession.find().sort({ createdAt: -1 });
     const markedSessions = {};
     const sessionDetailsList = [];
+
+    const memberRegNums = members.map(m => String(m.registrationNumber).trim().toUpperCase());
 
     for (const sess of allSessions) {
       const records = await Attendance.find({
@@ -306,17 +335,21 @@ router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async 
         $or: [
           { teamId: teamId },
           { teamName: teamName },
-          { participantRegNum: { $in: members.map(m => m.registrationNumber) } }
+          { participantRegNum: { $in: memberRegNums } }
         ]
       });
 
       const memberStatusMap = {};
       records.forEach(r => {
-        memberStatusMap[r.participantRegNum] = {
-          status: r.status || 'PRESENT',
-          markedAt: r.markedAt,
-          markedByVolunteer: r.markedByVolunteer
-        };
+        const cleanKey = (r.participantRegNum || '').trim().toUpperCase();
+        if (cleanKey) {
+          memberStatusMap[cleanKey] = {
+            status: r.status || 'PRESENT',
+            markedAt: r.markedAt,
+            markedByVolunteer: r.markedByVolunteer,
+            participantName: getRealStudentName(cleanKey, r.participantName)
+          };
+        }
       });
 
       let presentCount = 0;
@@ -324,7 +357,8 @@ router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async 
       let notMarkedCount = 0;
 
       const memberDetails = members.map(m => {
-        const rec = memberStatusMap[m.registrationNumber];
+        const cleanReg = String(m.registrationNumber).trim().toUpperCase();
+        const rec = memberStatusMap[cleanReg];
         let status = 'NOT_MARKED';
         if (rec) {
           status = rec.status;
@@ -334,7 +368,7 @@ router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async 
           notMarkedCount++;
         }
         return {
-          name: m.name,
+          name: getRealStudentName(cleanReg, m.name),
           registrationNumber: m.registrationNumber,
           role: m.role || 'MEMBER',
           status,
@@ -344,7 +378,7 @@ router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async 
       });
 
       let overallStatus = 'NOT_MARKED';
-      if (records.length > 0) {
+      if (presentCount + absentCount > 0) {
         if (presentCount === members.length) {
           overallStatus = 'ALL_PRESENT';
         } else if (absentCount === members.length) {
@@ -353,12 +387,13 @@ router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async 
           overallStatus = 'SOME_ABSENT';
         }
         markedSessions[sess.sessionId] = {
-          markedAt: records[0].markedAt,
-          markedByVolunteer: records[0].markedByVolunteer,
+          markedAt: records[0]?.markedAt || new Date(),
+          markedByVolunteer: records[0]?.markedByVolunteer || 'Volunteer',
           sessionName: sess.sessionName,
           overallStatus,
           presentCount,
           absentCount,
+          notMarkedCount,
           totalMembers: members.length
         };
       }
@@ -383,7 +418,7 @@ router.get('/my-attendance', authenticateToken, requireRole('TEAM_LEAD'), async 
       team: {
         teamId,
         teamName,
-        leadName: authItem?.leadName || req.user.name,
+        leadName: authItem?.leadName || getRealStudentName(cleanRegNum, req.user.name),
         leadRegNum: authItem?.regNum || cleanRegNum,
         members
       },
@@ -428,7 +463,7 @@ router.post('/mark-team-attendance', authenticateToken, requireRole('VOLUNTEER',
     for (const item of attendanceList) {
       const regNum = (item.registrationNumber || '').trim().toUpperCase();
       const status = item.status === 'ABSENT' ? 'ABSENT' : 'PRESENT';
-      const name = item.name || 'Student';
+      const realName = getRealStudentName(regNum, item.name);
 
       const rec = await Attendance.findOneAndUpdate(
         { sessionId: session.sessionId, participantRegNum: regNum },
@@ -436,7 +471,7 @@ router.post('/mark-team-attendance', authenticateToken, requireRole('VOLUNTEER',
           sessionId: session.sessionId,
           sessionName: session.sessionName,
           participantRegNum: regNum,
-          participantName: name,
+          participantName: realName,
           teamName: teamName,
           teamId: cleanTeamId,
           status: status,
@@ -499,6 +534,7 @@ router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async
 
     const attendanceStatus = status === 'ABSENT' ? 'ABSENT' : 'PRESENT';
     const volunteerName = req.user.username || req.user.name || 'Volunteer';
+    const realName = getRealStudentName(participant.registrationNumber, participant.name);
 
     const attendanceRecord = await Attendance.findOneAndUpdate(
       { sessionId: session.sessionId, participantRegNum: participant.registrationNumber },
@@ -506,7 +542,7 @@ router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async
         sessionId: session.sessionId,
         sessionName: session.sessionName,
         participantRegNum: participant.registrationNumber,
-        participantName: participant.name,
+        participantName: realName,
         teamName: participant.teamName,
         teamId: participant.teamId,
         college: participant.college || 'KARE',
@@ -521,7 +557,7 @@ router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async
       actor: volunteerName,
       role: req.user.role,
       action: 'MARK_ATTENDANCE',
-      target: `${participant.name} (${participant.registrationNumber}) -> ${attendanceStatus}`,
+      target: `${realName} (${participant.registrationNumber}) -> ${attendanceStatus}`,
       metadata: { session: session.sessionName }
     });
 
@@ -531,7 +567,7 @@ router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async
       message: `Attendance marked as ${attendanceStatus} ✅`,
       record: {
         registrationNumber: participant.registrationNumber,
-        name: participant.name,
+        name: realName,
         teamName: participant.teamName,
         status: attendanceStatus,
         sessionName: session.sessionName,
@@ -561,7 +597,14 @@ router.get('/session-roster', authenticateToken, async (req, res) => {
       ];
     }
 
-    const records = await Attendance.find(filter).sort({ markedAt: -1 });
+    const rawRecords = await Attendance.find(filter).sort({ markedAt: -1 });
+    const records = rawRecords.map(r => {
+      const realName = getRealStudentName(r.participantRegNum, r.participantName);
+      return {
+        ...r.toObject(),
+        participantName: realName
+      };
+    });
     
     // Count total participants from authorized teams (60 teams x 4 = 240 members)
     let totalRegistered = 240;
@@ -598,7 +641,7 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
         t.members.forEach(m => {
           allParticipants.push({
             registrationNumber: m.registrationNumber,
-            name: m.name,
+            name: getRealStudentName(m.registrationNumber, m.name),
             teamName: t.teamName,
             teamId: t.teamId,
             role: m.role || 'MEMBER',
@@ -612,7 +655,7 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
       const dbParts = await Participant.find();
       allParticipants = dbParts.map(p => ({
         registrationNumber: p.registrationNumber,
-        name: p.name,
+        name: getRealStudentName(p.registrationNumber, p.name),
         teamName: p.teamName,
         teamId: 'ALPHA',
         role: p.isTeamLead ? 'LEAD' : 'MEMBER',
@@ -631,7 +674,8 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
     const attRecords = await Attendance.find(attendanceFilter).sort({ markedAt: -1 });
     const recordsMap = {};
     attRecords.forEach(r => {
-      recordsMap[r.participantRegNum] = r;
+      const cleanKey = (r.participantRegNum || '').trim().toUpperCase();
+      if (cleanKey) recordsMap[cleanKey] = r;
     });
 
     // Build individual attendance rows for requested view
@@ -641,11 +685,13 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
       const sName = sessionDoc ? sessionDoc.sessionName : sessionId;
 
       resultRows = allParticipants.map(p => {
-        const att = recordsMap[p.registrationNumber];
+        const cleanReg = (p.registrationNumber || '').trim().toUpperCase();
+        const att = recordsMap[cleanReg];
+        const realName = getRealStudentName(p.registrationNumber, p.name);
         return {
           _id: att?._id || `temp-${p.registrationNumber}`,
           participantRegNum: p.registrationNumber,
-          participantName: p.name,
+          participantName: realName,
           teamName: p.teamName,
           teamId: p.teamId,
           sessionName: sName,
@@ -658,31 +704,37 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
     } else {
       // If ALL sessions selected, map existing attendance logs or expand
       if (attRecords.length > 0) {
-        resultRows = attRecords.map(r => ({
-          _id: r._id,
-          participantRegNum: r.participantRegNum,
-          participantName: r.participantName,
-          teamName: r.teamName,
-          teamId: r.teamId || 'ALPHA',
-          sessionName: r.sessionName,
-          sessionId: r.sessionId,
-          status: r.status || 'PRESENT',
-          markedByVolunteer: r.markedByVolunteer,
-          markedAt: r.markedAt
-        }));
+        resultRows = attRecords.map(r => {
+          const realName = getRealStudentName(r.participantRegNum, r.participantName);
+          return {
+            _id: r._id,
+            participantRegNum: r.participantRegNum,
+            participantName: realName,
+            teamName: r.teamName,
+            teamId: r.teamId || 'ALPHA',
+            sessionName: r.sessionName,
+            sessionId: r.sessionId,
+            status: r.status || 'PRESENT',
+            markedByVolunteer: r.markedByVolunteer,
+            markedAt: r.markedAt
+          };
+        });
       } else {
-        resultRows = allParticipants.map(p => ({
-          _id: `temp-${p.registrationNumber}`,
-          participantRegNum: p.registrationNumber,
-          participantName: p.name,
-          teamName: p.teamName,
-          teamId: p.teamId,
-          sessionName: 'No Session Selected',
-          sessionId: 'N/A',
-          status: 'ABSENT',
-          markedByVolunteer: '—',
-          markedAt: null
-        }));
+        resultRows = allParticipants.map(p => {
+          const realName = getRealStudentName(p.registrationNumber, p.name);
+          return {
+            _id: `temp-${p.registrationNumber}`,
+            participantRegNum: p.registrationNumber,
+            participantName: realName,
+            teamName: p.teamName,
+            teamId: p.teamId,
+            sessionName: 'No Session Selected',
+            sessionId: 'N/A',
+            status: 'ABSENT',
+            markedByVolunteer: '—',
+            markedAt: null
+          };
+        });
       }
     }
 
@@ -707,6 +759,12 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
       );
     }
 
+    // Always ensure participantName is real full student name
+    resultRows = resultRows.map(r => ({
+      ...r,
+      participantName: getRealStudentName(r.participantRegNum, r.participantName)
+    }));
+
     const totalRegistered = allParticipants.length;
     const totalPresentCount = resultRows.filter(r => r.status === 'PRESENT').length;
     const totalAbsentCount = resultRows.filter(r => r.status === 'ABSENT').length;
@@ -730,9 +788,10 @@ router.get('/admin/records', authenticateToken, requireRole('ADMIN'), async (req
 // 8. ADMIN: EXPORT INDIVIDUAL ATTENDANCE TO CSV
 router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const { sessionId } = req.query;
+    const { sessionId, status } = req.query;
     let filter = {};
     if (sessionId && sessionId !== 'ALL') filter.sessionId = sessionId;
+    if (status && status !== 'ALL') filter.status = status;
 
     const records = await Attendance.find(filter).sort({ markedAt: -1 });
 
@@ -742,7 +801,7 @@ router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req,
         t.members.forEach(m => {
           allParticipants.push({
             registrationNumber: m.registrationNumber,
-            name: m.name,
+            name: getRealStudentName(m.registrationNumber, m.name),
             teamName: t.teamName,
             teamId: t.teamId,
             role: m.role || 'MEMBER'
@@ -755,7 +814,7 @@ router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req,
       const dbParts = await Participant.find();
       allParticipants = dbParts.map(p => ({
         registrationNumber: p.registrationNumber,
-        name: p.name,
+        name: getRealStudentName(p.registrationNumber, p.name),
         teamName: p.teamName,
         teamId: 'ALPHA',
         role: p.isTeamLead ? 'LEAD' : 'MEMBER'
@@ -764,19 +823,22 @@ router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req,
 
     const recordsMap = {};
     records.forEach(r => {
-      recordsMap[r.participantRegNum] = r;
+      const cleanKey = (r.participantRegNum || '').trim().toUpperCase();
+      if (cleanKey) recordsMap[cleanKey] = r;
     });
 
     const exportRows = allParticipants.map(p => {
-      const match = recordsMap[p.registrationNumber];
+      const cleanReg = (p.registrationNumber || '').trim().toUpperCase();
+      const match = recordsMap[cleanReg];
+      const realName = getRealStudentName(cleanReg, p.name);
       return {
         'Registration Number': p.registrationNumber,
-        'Student Name': p.name,
+        'Student Name': realName,
         'Team ID': p.teamId,
         'Team Name': p.teamName,
         'Role': p.role,
         'College': 'KARE',
-        'Session': match ? match.sessionName : (sessionId !== 'ALL' ? sessionId : 'N/A'),
+        'Session': match ? match.sessionName : (sessionId && sessionId !== 'ALL' ? sessionId : 'N/A'),
         'Attendance Status': match ? match.status : 'ABSENT',
         'Marked Time': match?.markedAt ? new Date(match.markedAt).toLocaleString() : '—',
         'Marked By Volunteer': match ? match.markedByVolunteer : '—'
@@ -794,4 +856,5 @@ router.get('/admin/export', authenticateToken, requireRole('ADMIN'), async (req,
 });
 
 module.exports = router;
+
 
