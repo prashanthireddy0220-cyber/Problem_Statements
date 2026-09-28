@@ -110,7 +110,7 @@ router.get('/rounds', authenticateToken, requireRole('REVIEWER', 'ADMIN'), async
 });
 
 // 3. GET EVALUATIONS FOR SPECIFIC ROUND (SUBMITTED BY LOGGED-IN REVIEWER)
-router.get('/evaluations/:round', authenticateToken, requireRole('REVIEWER', 'ADMIN'), async (req, res) => {
+const handleGetEvaluations = async (req, res) => {
   try {
     const roundParam = req.params.round;
     const query = { reviewerId: req.user.id };
@@ -128,10 +128,14 @@ router.get('/evaluations/:round', authenticateToken, requireRole('REVIEWER', 'AD
     console.error('Reviewer get evaluations error:', err);
     return res.status(500).json({ error: 'Failed to fetch evaluations.' });
   }
-});
+};
+
+router.get('/evaluations/:round', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleGetEvaluations);
+router.get('/evaluations', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleGetEvaluations);
+router.get('/:round', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleGetEvaluations);
 
 // 4. ENTER / SUBMIT EVALUATION FOR A TEAM
-router.post('/evaluations', authenticateToken, requireRole('REVIEWER', 'ADMIN'), async (req, res) => {
+const handleSubmitEvaluation = async (req, res) => {
   try {
     const { teamId, teamCode, roundNumber, criteriaMarks, comments, status } = req.body;
 
@@ -153,8 +157,8 @@ router.post('/evaluations', authenticateToken, requireRole('REVIEWER', 'ADMIN'),
 
     // Verify & Match Team
     const cleanTeamCode = teamCode.trim().toUpperCase();
-    const authTeam = AUTHORIZED_TEAMS.find(t => t.teamId === cleanTeamCode);
-    let dbTeam = await Team.findOne({ $or: [{ teamId: cleanTeamCode }, { name: cleanTeamCode }] });
+    const authTeam = AUTHORIZED_TEAMS.find(t => t.teamId === cleanTeamCode || t.teamName.toUpperCase() === cleanTeamCode);
+    let dbTeam = await Team.findOne({ $or: [{ teamId: cleanTeamCode }, { name: cleanTeamCode }, { teamName: cleanTeamCode }] });
 
     if (!dbTeam && !authTeam) {
       return res.status(404).json({ error: `Team ${cleanTeamCode} not found in database.` });
@@ -262,10 +266,13 @@ router.post('/evaluations', authenticateToken, requireRole('REVIEWER', 'ADMIN'),
     console.error('Submit evaluation error:', err);
     return res.status(500).json({ error: 'Failed to submit evaluation marks.' });
   }
-});
+};
+
+router.post('/evaluations', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleSubmitEvaluation);
+router.post('/', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleSubmitEvaluation);
 
 // 5. UPDATE EXISTING EVALUATION BY ID (Admin only or draft update)
-router.put('/evaluations/:id', authenticateToken, requireRole('REVIEWER', 'ADMIN'), async (req, res) => {
+const handleUpdateEvaluation = async (req, res) => {
   try {
     const { criteriaMarks, comments, status } = req.body;
     const evaluationDoc = await Evaluation.findById(req.params.id);
@@ -329,6 +336,9 @@ router.put('/evaluations/:id', authenticateToken, requireRole('REVIEWER', 'ADMIN
     console.error('Update evaluation error:', err);
     return res.status(500).json({ error: 'Failed to update evaluation.' });
   }
-});
+};
+
+router.put('/evaluations/:id', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleUpdateEvaluation);
+router.put('/:id', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleUpdateEvaluation);
 
 module.exports = router;
