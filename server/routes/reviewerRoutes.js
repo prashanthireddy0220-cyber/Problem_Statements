@@ -213,7 +213,15 @@ router.post('/evaluations', authenticateToken, requireRole('REVIEWER', 'ADMIN'),
     });
 
     if (evaluationDoc) {
-      // Update existing evaluation
+      // Lock submitted evaluations for Reviewers (Only ADMIN can edit submitted marks)
+      if (req.user.role === 'REVIEWER' && evaluationDoc.status === 'SUBMITTED') {
+        return res.status(403).json({
+          error: 'Evaluation marks have already been submitted for this team and cannot be modified by reviewers. Only an Administrator can edit submitted marks.',
+          code: 'EVALUATION_LOCKED'
+        });
+      }
+
+      // Update existing evaluation (Admin edit)
       evaluationDoc.criteriaMarks = validatedCriteriaMarks;
       evaluationDoc.totalMarks = calculatedTotal;
       evaluationDoc.comments = comments || evaluationDoc.comments || '';
@@ -256,7 +264,7 @@ router.post('/evaluations', authenticateToken, requireRole('REVIEWER', 'ADMIN'),
   }
 });
 
-// 5. UPDATE EXISTING EVALUATION BY ID
+// 5. UPDATE EXISTING EVALUATION BY ID (Admin only or draft update)
 router.put('/evaluations/:id', authenticateToken, requireRole('REVIEWER', 'ADMIN'), async (req, res) => {
   try {
     const { criteriaMarks, comments, status } = req.body;
@@ -264,6 +272,14 @@ router.put('/evaluations/:id', authenticateToken, requireRole('REVIEWER', 'ADMIN
 
     if (!evaluationDoc) {
       return res.status(404).json({ error: 'Evaluation record not found.' });
+    }
+
+    // Reviewers cannot edit submitted evaluations
+    if (req.user.role === 'REVIEWER' && evaluationDoc.status === 'SUBMITTED') {
+      return res.status(403).json({
+        error: 'Submitted evaluation marks are locked and cannot be edited by reviewers. Contact Administrator.',
+        code: 'EVALUATION_LOCKED'
+      });
     }
 
     // Verify reviewer ownership unless admin

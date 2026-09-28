@@ -65,11 +65,112 @@ export default function AdminDashboard() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [actionMsg, setActionMsg] = useState('');
 
-  // State for Reviewer Evaluations (Admin View-Only)
+  // State for Reviewer Evaluations (Admin View & Edit)
   const [evalData, setEvalData] = useState({ summary: {}, evaluations: [], rounds: [], reviewers: [] });
   const [evalSearchTerm, setEvalSearchTerm] = useState('');
   const [evalRoundFilter, setEvalRoundFilter] = useState('ALL');
   const [evalViewMode, setEvalViewMode] = useState('team'); // 'team' or 'reviewer'
+  
+  // Admin Evaluation Edit Modal State
+  const [adminEditEvModal, setAdminEditEvModal] = useState(null);
+  const [adminCriteriaInputs, setAdminCriteriaInputs] = useState({});
+  const [adminCommentsInput, setAdminCommentsInput] = useState('');
+  const [adminSubmittingEv, setAdminSubmittingEv] = useState(false);
+
+  const ADMIN_ROUNDS_CONFIG = {
+    1: [
+      { key: 'innovation', name: 'Innovation & Originality', maxMarks: 20 },
+      { key: 'tech_approach', name: 'Technical Approach & Architecture', maxMarks: 20 },
+      { key: 'problem_understanding', name: 'Problem Understanding', maxMarks: 20 },
+      { key: 'feasibility', name: 'Feasibility & Practicality', maxMarks: 15 },
+      { key: 'presentation', name: 'Presentation & Defense', maxMarks: 15 },
+      { key: 'overall_impact', name: 'Overall Impact & Scalability', maxMarks: 10 }
+    ],
+    2: [
+      { key: 'code_quality', name: 'Code Quality & Structure', maxMarks: 25 },
+      { key: 'tech_complexity', name: 'Technical Complexity & Depth', maxMarks: 25 },
+      { key: 'functionality', name: 'Functionality & Working Demo', maxMarks: 25 },
+      { key: 'ui_ux', name: 'UI/UX & User Interface', maxMarks: 25 }
+    ],
+    3: [
+      { key: 'completeness', name: 'Project Completeness & Stability', maxMarks: 35 },
+      { key: 'business_value', name: 'Business Value & Viability', maxMarks: 35 },
+      { key: 'final_pitch', name: 'Final Presentation & Q/A Defense', maxMarks: 30 }
+    ]
+  };
+
+  const openAdminEditEv = (ev, teamObj, roundNum) => {
+    const rNum = roundNum || ev?.roundNumber || 1;
+    const roundCriteria = ADMIN_ROUNDS_CONFIG[rNum] || ADMIN_ROUNDS_CONFIG[1];
+    const initialInputs = {};
+    
+    roundCriteria.forEach(crit => {
+      const found = ev?.criteriaMarks?.find(c => c.criteriaKey === crit.key || c.name === crit.name);
+      initialInputs[crit.key] = (found !== undefined && found !== null) ? found.mark : '';
+    });
+
+    setAdminCriteriaInputs(initialInputs);
+    setAdminCommentsInput(ev?.comments || '');
+    setAdminEditEvModal({
+      evDoc: ev || null,
+      teamCode: teamObj?.teamId || ev?.teamCode,
+      teamName: teamObj?.teamName || ev?.teamName,
+      teamId: teamObj?._id || ev?.teamId,
+      roundNumber: rNum
+    });
+  };
+
+  const handleAdminSaveEv = async (e) => {
+    e.preventDefault();
+    if (!adminEditEvModal) return;
+
+    const roundNum = adminEditEvModal.roundNumber;
+    const roundCriteria = ADMIN_ROUNDS_CONFIG[roundNum] || ADMIN_ROUNDS_CONFIG[1];
+    const formattedMarks = [];
+
+    for (const crit of roundCriteria) {
+      const val = adminCriteriaInputs[crit.key];
+      if (val === '' || val === undefined || val === null) {
+        alert(`Please enter a valid mark for '${crit.name}'.`);
+        return;
+      }
+      formattedMarks.push({
+        criteriaKey: crit.key,
+        name: crit.name,
+        mark: Number(val),
+        maxMark: crit.maxMarks
+      });
+    }
+
+    setAdminSubmittingEv(true);
+    try {
+      const payload = {
+        teamId: adminEditEvModal.teamId,
+        teamCode: adminEditEvModal.teamCode,
+        teamName: adminEditEvModal.teamName,
+        roundNumber: roundNum,
+        criteriaMarks: formattedMarks,
+        comments: adminCommentsInput,
+        status: 'SUBMITTED'
+      };
+
+      if (adminEditEvModal.evDoc?._id) {
+        await axios.put(`/api/reviewer/evaluations/${adminEditEvModal.evDoc._id}`, payload);
+      } else {
+        await axios.post('/api/reviewer/evaluations', payload);
+      }
+
+      setActionMsg(`Marks saved/updated successfully for Team ${adminEditEvModal.teamCode} (Round ${roundNum})!`);
+      setTimeout(() => setActionMsg(''), 4000);
+
+      setAdminEditEvModal(null);
+      fetchAllData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to save evaluation marks.');
+    } finally {
+      setAdminSubmittingEv(false);
+    }
+  };
 
   // Auto-refresh interval
   useEffect(() => {
@@ -810,10 +911,10 @@ export default function AdminDashboard() {
             <div className="glass-panel" style={{ borderRadius: '12px', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ fontSize: '1rem', color: '#00F2FE', fontFamily: 'var(--font-heading)', margin: 0 }}>
-                  ALL 60 TEAMS EVALUATION MATRIX (VIEW-ONLY)
+                  ALL 60 TEAMS EVALUATION MATRIX
                 </h3>
-                <span style={{ fontSize: '0.78rem', color: '#94A3B8', background: 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: '4px' }}>
-                  Admin is View-Only for Marks
+                <span style={{ fontSize: '0.78rem', color: '#FFD700', background: 'rgba(255, 215, 0, 0.1)', border: '1px solid rgba(255, 215, 0, 0.3)', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                  Admin Edit Privileges
                 </span>
               </div>
 
@@ -827,6 +928,7 @@ export default function AdminDashboard() {
                       <th style={{ textAlign: 'center' }}>Round 2 (Max 100)</th>
                       <th style={{ textAlign: 'center' }}>Round 3 (Max 100)</th>
                       <th style={{ textAlign: 'center' }}>Combined Total (Max 300)</th>
+                      <th style={{ textAlign: 'center' }}>Admin Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -851,17 +953,84 @@ export default function AdminDashboard() {
                           <tr key={t.teamId}>
                             <td style={{ fontWeight: '700', color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>{t.teamId}</td>
                             <td style={{ fontWeight: '600', color: '#F8FAFC' }}>{t.teamName}</td>
-                            <td style={{ textAlign: 'center', color: r1Score !== null ? '#10B981' : '#64748B', fontWeight: r1Score !== null ? 800 : 400 }}>
-                              {r1Score !== null ? `${r1Score} / 100` : '--'}
+                            
+                            {/* Round 1 */}
+                            <td style={{ textAlign: 'center' }}>
+                              {r1Ev ? (
+                                <button 
+                                  onClick={() => openAdminEditEv(r1Ev, t, 1)}
+                                  style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#10B981', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  title="Click to Edit Round 1 Marks"
+                                >
+                                  {r1Score} / 100 <Edit size={12} />
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => openAdminEditEv(null, t, 1)}
+                                  style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                                  title="Click to Enter Round 1 Marks as Admin"
+                                >
+                                  + Enter R1
+                                </button>
+                              )}
                             </td>
-                            <td style={{ textAlign: 'center', color: r2Score !== null ? '#10B981' : '#64748B', fontWeight: r2Score !== null ? 800 : 400 }}>
-                              {r2Score !== null ? `${r2Score} / 100` : '--'}
+
+                            {/* Round 2 */}
+                            <td style={{ textAlign: 'center' }}>
+                              {r2Ev ? (
+                                <button 
+                                  onClick={() => openAdminEditEv(r2Ev, t, 2)}
+                                  style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#10B981', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  title="Click to Edit Round 2 Marks"
+                                >
+                                  {r2Score} / 100 <Edit size={12} />
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => openAdminEditEv(null, t, 2)}
+                                  style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                                  title="Click to Enter Round 2 Marks as Admin"
+                                >
+                                  + Enter R2
+                                </button>
+                              )}
                             </td>
-                            <td style={{ textAlign: 'center', color: r3Score !== null ? '#10B981' : '#64748B', fontWeight: r3Score !== null ? 800 : 400 }}>
-                              {r3Score !== null ? `${r3Score} / 100` : '--'}
+
+                            {/* Round 3 */}
+                            <td style={{ textAlign: 'center' }}>
+                              {r3Ev ? (
+                                <button 
+                                  onClick={() => openAdminEditEv(r3Ev, t, 3)}
+                                  style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#10B981', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  title="Click to Edit Round 3 Marks"
+                                >
+                                  {r3Score} / 100 <Edit size={12} />
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => openAdminEditEv(null, t, 3)}
+                                  style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                                  title="Click to Enter Round 3 Marks as Admin"
+                                >
+                                  + Enter R3
+                                </button>
+                              )}
                             </td>
+
+                            {/* Combined Total */}
                             <td style={{ textAlign: 'center', fontWeight: '800', color: '#FFD700', fontSize: '0.95rem' }}>
                               {totalCombined > 0 ? `${totalCombined} Marks` : '--'}
+                            </td>
+
+                            {/* Admin Quick Action */}
+                            <td style={{ textAlign: 'center' }}>
+                              <button 
+                                onClick={() => openAdminEditEv(r1Ev || r2Ev || r3Ev, t, r1Ev ? 1 : (r2Ev ? 2 : 3))}
+                                className="btn-alpha-cyan"
+                                style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Edit size={13} /> Edit Marks
+                              </button>
                             </td>
                           </tr>
                         );
@@ -887,6 +1056,7 @@ export default function AdminDashboard() {
                       <th style={{ textAlign: 'center' }}>Total Score</th>
                       <th>Status</th>
                       <th>Submitted At</th>
+                      <th style={{ textAlign: 'center' }}>Admin Edit</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -909,6 +1079,15 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td style={{ color: '#94A3B8', fontSize: '0.8rem' }}>{new Date(ev.submittedAt || ev.createdAt).toLocaleString()}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              onClick={() => openAdminEditEv(ev, { teamId: ev.teamCode, teamName: ev.teamName, _id: ev.teamId }, ev.roundNumber)}
+                              className="btn-alpha-cyan"
+                              style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <Edit size={13} /> Edit Marks
+                            </button>
+                          </td>
                         </tr>
                       ))}
                   </tbody>
@@ -916,6 +1095,161 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {/* ADMIN EVALUATION EDIT MODAL */}
+          {adminEditEvModal && (() => {
+            const roundNum = adminEditEvModal.roundNumber;
+            const roundCriteria = ADMIN_ROUNDS_CONFIG[roundNum] || ADMIN_ROUNDS_CONFIG[1];
+
+            const calculatedScore = Object.values(adminCriteriaInputs).reduce((acc, curr) => {
+              const val = Number(curr);
+              return acc + (isNaN(val) ? 0 : val);
+            }, 0);
+
+            return (
+              <div className="modal-overlay">
+                <div className="modal-content" style={{ maxWidth: '640px', padding: '2rem', border: '1px solid #FFD700', boxShadow: '0 0 30px rgba(255, 215, 0, 0.25)' }}>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#FFD700', textTransform: 'uppercase', fontWeight: 700 }}>
+                        Admin Override Edit • Round {roundNum}
+                      </div>
+                      <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', fontWeight: 800, color: '#F8FAFC', margin: '2px 0 0' }}>
+                        {adminEditEvModal.teamCode} — {adminEditEvModal.teamName}
+                      </h2>
+                    </div>
+                    <button 
+                      onClick={() => setAdminEditEvModal(null)} 
+                      style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '0.3rem' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleAdminSaveEv}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.5rem', marginBottom: '1.5rem' }}>
+                      {roundCriteria.map((crit) => {
+                        const val = adminCriteriaInputs[crit.key] ?? '';
+                        return (
+                          <div 
+                            key={crit.key} 
+                            style={{ 
+                              background: 'rgba(15, 23, 42, 0.8)', 
+                              padding: '0.9rem 1.1rem', 
+                              borderRadius: '10px', 
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justify: 'space-between',
+                              gap: '1rem'
+                            }}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 700, color: '#F8FAFC', fontSize: '0.9rem' }}>
+                                {crit.name}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <input
+                                type="number"
+                                min="0"
+                                max={crit.maxMarks}
+                                step="1"
+                                placeholder="0"
+                                value={val}
+                                onChange={(e) => {
+                                  const inputVal = e.target.value;
+                                  if (inputVal === '') {
+                                    setAdminCriteriaInputs(prev => ({ ...prev, [crit.key]: '' }));
+                                    return;
+                                  }
+                                  const n = Number(inputVal);
+                                  if (!isNaN(n) && n >= 0 && n <= crit.maxMarks) {
+                                    setAdminCriteriaInputs(prev => ({ ...prev, [crit.key]: n }));
+                                  }
+                                }}
+                                style={{
+                                  width: '75px',
+                                  padding: '0.5rem',
+                                  textAlign: 'center',
+                                  background: 'rgba(30, 41, 59, 0.9)',
+                                  border: '1px solid #FFD700',
+                                  borderRadius: '8px',
+                                  color: '#FFD700',
+                                  fontWeight: 800,
+                                  fontSize: '1rem',
+                                  outline: 'none'
+                                }}
+                              />
+                              <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 600 }}>
+                                / {crit.maxMarks}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
+                        Admin Notes / Remarks
+                      </label>
+                      <textarea
+                        rows="2"
+                        placeholder="Add admin notes or reason for mark modification..."
+                        value={adminCommentsInput}
+                        onChange={(e) => setAdminCommentsInput(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.85rem',
+                          background: 'rgba(15, 23, 42, 0.8)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '8px',
+                          color: '#FFFFFF',
+                          fontSize: '0.85rem',
+                          outline: 'none',
+                          resize: 'none'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255, 215, 0, 0.08)', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid rgba(255, 215, 0, 0.2)', marginBottom: '1.5rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Score</div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFD700', fontFamily: 'var(--font-heading)' }}>
+                          {calculatedScore} / 100 Marks
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#FFD700', fontWeight: 600 }}>
+                        ⚡ Admin Edit Mode
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={() => setAdminEditEvModal(null)}
+                        className="btn-alpha-outline"
+                        style={{ padding: '0.7rem 1.25rem', fontSize: '0.88rem' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={adminSubmittingEv}
+                        className="btn-alpha-gold"
+                        style={{ padding: '0.7rem 1.5rem', fontSize: '0.88rem' }}
+                      >
+                        {adminSubmittingEv ? 'Saving...' : 'Save & Override Marks'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            );
+          })()}
 
         </div>
       )}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   Award, CheckCircle2, Clock, Search, Filter, Edit3, Eye, 
-  Save, AlertCircle, RefreshCw, X, ChevronRight, CheckCircle, Info
+  Save, AlertCircle, RefreshCw, X, ChevronRight, CheckCircle, Info, Lock
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -527,13 +527,19 @@ export default function ReviewerDashboard() {
                       <td style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>
                         <button
                           onClick={() => openEvaluationModal(team)}
-                          className={isSubmitted ? 'btn-alpha-outline' : 'btn-alpha-cyan'}
+                          className={isSubmitted ? (user?.role === 'REVIEWER' ? 'btn-alpha-outline' : 'btn-alpha-cyan') : 'btn-alpha-cyan'}
                           style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', borderRadius: '8px' }}
                         >
                           {isSubmitted ? (
-                            <>
-                              <Edit3 size={14} /> Edit Marks
-                            </>
+                            user?.role === 'REVIEWER' ? (
+                              <>
+                                <Eye size={14} /> View Marks
+                              </>
+                            ) : (
+                              <>
+                                <Edit3 size={14} /> Edit Marks
+                              </>
+                            )
                           ) : (
                             <>
                               <Edit3 size={14} /> Enter Marks
@@ -551,162 +557,194 @@ export default function ReviewerDashboard() {
       </div>
 
       {/* 5. MARK ENTRY MODAL */}
-      {activeModalTeam && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '640px', padding: '2rem', border: '1px solid #00F2FE', boxShadow: '0 0 30px rgba(0, 242, 254, 0.25)' }}>
-            
-            {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: 700 }}>
-                  Mark Entry • Round {selectedRoundNum}
-                </div>
-                <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', fontWeight: 800, color: '#F8FAFC', margin: '2px 0 0' }}>
-                  {activeModalTeam.teamCode} — {activeModalTeam.teamName}
-                </h2>
-              </div>
-              <button 
-                onClick={() => setActiveModalTeam(null)} 
-                style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '0.3rem' }}
-              >
-                <X size={22} />
-              </button>
-            </div>
+      {activeModalTeam && (() => {
+        const modalEv = evaluationMap[activeModalTeam.teamCode] || evaluationMap[activeModalTeam._id];
+        const isEvSubmitted = Boolean(modalEv && modalEv.status === 'SUBMITTED');
+        const isLocked = isEvSubmitted && user?.role === 'REVIEWER';
 
-            {/* Modal Error Alert */}
-            {errorMsg && (
-              <div style={{ background: 'rgba(255, 75, 75, 0.15)', border: '1px solid #FF4B4B', color: '#FF4B4B', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <AlertCircle size={18} />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmitEvaluation}>
-              {/* Criteria Inputs List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.5rem', marginBottom: '1.5rem' }}>
-                {(currentRoundDoc.criteria || []).map((crit) => {
-                  const val = criteriaInputs[crit.key] ?? '';
-
-                  return (
-                    <div 
-                      key={crit.key} 
-                      style={{ 
-                        background: 'rgba(15, 23, 42, 0.8)', 
-                        padding: '0.9rem 1.1rem', 
-                        borderRadius: '10px', 
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justify: 'space-between',
-                        gap: '1rem'
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, color: '#F8FAFC', fontSize: '0.9rem' }}>
-                          {crit.name}
-                        </div>
-                        {crit.description && (
-                          <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '2px' }}>
-                            {crit.description}
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        <input
-                          type="number"
-                          min="0"
-                          max={crit.maxMarks}
-                          step="1"
-                          placeholder="0"
-                          value={val}
-                          onChange={(e) => handleCriterionChange(crit.key, e.target.value, crit.maxMarks)}
-                          style={{
-                            width: '75px',
-                            padding: '0.5rem',
-                            textAlign: 'center',
-                            background: 'rgba(30, 41, 59, 0.9)',
-                            border: '1px solid var(--border-cyan)',
-                            borderRadius: '8px',
-                            color: '#00F2FE',
-                            fontWeight: 800,
-                            fontSize: '1rem',
-                            outline: 'none'
-                          }}
-                        />
-                        <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 600 }}>
-                          / {crit.maxMarks}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Optional Comments */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                  Reviewer Notes / Feedback (Optional)
-                </label>
-                <textarea
-                  rows="2"
-                  placeholder="Add feedback or key observations for this team..."
-                  value={commentsInput}
-                  onChange={(e) => setCommentsInput(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    color: '#FFFFFF',
-                    fontSize: '0.85rem',
-                    outline: 'none',
-                    resize: 'none'
-                  }}
-                />
-              </div>
-
-              {/* Total Summary Footer */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0, 242, 254, 0.08)', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid rgba(0, 242, 254, 0.2)', marginBottom: '1.5rem' }}>
+        return (
+          <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: '640px', padding: '2rem', border: '1px solid #00F2FE', boxShadow: '0 0 30px rgba(0, 242, 254, 0.25)' }}>
+              
+              {/* Modal Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Calculated Marks</div>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>
-                    {calculatedTotalScore} / {currentRoundDoc.maximumMarks}
+                  <div style={{ fontSize: '0.75rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: 700 }}>
+                    {isLocked ? 'View Marks (Locked)' : 'Mark Entry'} • Round {selectedRoundNum}
+                  </div>
+                  <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', fontWeight: 800, color: '#F8FAFC', margin: '2px 0 0' }}>
+                    {activeModalTeam.teamCode} — {activeModalTeam.teamName}
+                  </h2>
+                </div>
+                <button 
+                  onClick={() => setActiveModalTeam(null)} 
+                  style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '0.3rem' }}
+                >
+                  <X size={22} />
+                </button>
+              </div>
+
+              {/* Modal Locked Alert for Reviewers */}
+              {isLocked && (
+                <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #F59E0B', color: '#F59E0B', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <Lock size={20} />
+                  <span>Evaluation submitted & locked. Reviewers cannot edit marks after submission. Only Admin can edit submitted marks.</span>
+                </div>
+              )}
+
+              {/* Modal Error Alert */}
+              {errorMsg && (
+                <div style={{ background: 'rgba(255, 75, 75, 0.15)', border: '1px solid #FF4B4B', color: '#FF4B4B', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertCircle size={18} />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmitEvaluation}>
+                {/* Criteria Inputs List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.5rem', marginBottom: '1.5rem' }}>
+                  {(currentRoundDoc.criteria || []).map((crit) => {
+                    const val = criteriaInputs[crit.key] ?? '';
+
+                    return (
+                      <div 
+                        key={crit.key} 
+                        style={{ 
+                          background: 'rgba(15, 23, 42, 0.8)', 
+                          padding: '0.9rem 1.1rem', 
+                          borderRadius: '10px', 
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justify: 'space-between',
+                          gap: '1rem'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, color: '#F8FAFC', fontSize: '0.9rem' }}>
+                            {crit.name}
+                          </div>
+                          {crit.description && (
+                            <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '2px' }}>
+                              {crit.description}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            max={crit.maxMarks}
+                            step="1"
+                            placeholder="0"
+                            disabled={isLocked}
+                            value={val}
+                            onChange={(e) => handleCriterionChange(crit.key, e.target.value, crit.maxMarks)}
+                            style={{
+                              width: '75px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              background: isLocked ? 'rgba(30, 41, 59, 0.5)' : 'rgba(30, 41, 59, 0.9)',
+                              border: '1px solid var(--border-cyan)',
+                              borderRadius: '8px',
+                              color: isLocked ? '#94A3B8' : '#00F2FE',
+                              fontWeight: 800,
+                              fontSize: '1rem',
+                              outline: 'none',
+                              cursor: isLocked ? 'not-allowed' : 'text'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 600 }}>
+                            / {crit.maxMarks}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Optional Comments */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
+                    Reviewer Notes / Feedback (Optional)
+                  </label>
+                  <textarea
+                    rows="2"
+                    placeholder="Add feedback or key observations for this team..."
+                    disabled={isLocked}
+                    value={commentsInput}
+                    onChange={(e) => setCommentsInput(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      background: isLocked ? 'rgba(15, 23, 42, 0.5)' : 'rgba(15, 23, 42, 0.8)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '8px',
+                      color: isLocked ? '#94A3B8' : '#FFFFFF',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      resize: 'none',
+                      cursor: isLocked ? 'not-allowed' : 'text'
+                    }}
+                  />
+                </div>
+
+                {/* Total Summary Footer */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0, 242, 254, 0.08)', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid rgba(0, 242, 254, 0.2)', marginBottom: '1.5rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Calculated Marks</div>
+                    <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>
+                      {calculatedTotalScore} / {currentRoundDoc.maximumMarks}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: isLocked ? '#F59E0B' : '#10B981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {isLocked ? <Lock size={16} /> : <CheckCircle2 size={16} />} 
+                    {isLocked ? 'Locked for Reviewer' : 'Backend Validated'}
                   </div>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#10B981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <CheckCircle2 size={16} /> Backend Validated
-                </div>
-              </div>
 
-              {/* Submit Buttons */}
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveModalTeam(null)}
-                  className="btn-alpha-outline"
-                  style={{ padding: '0.7rem 1.25rem', fontSize: '0.88rem' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="btn-alpha-cyan"
-                  style={{ padding: '0.7rem 1.5rem', fontSize: '0.88rem' }}
-                >
-                  {submitting ? 'Saving Marks...' : (
+                {/* Submit Buttons */}
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  {isLocked ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveModalTeam(null)}
+                      className="btn-alpha-cyan"
+                      style={{ padding: '0.7rem 1.5rem', fontSize: '0.88rem' }}
+                    >
+                      Close (View Only)
+                    </button>
+                  ) : (
                     <>
-                      <Save size={16} /> Save / Submit Marks
+                      <button
+                        type="button"
+                        onClick={() => setActiveModalTeam(null)}
+                        className="btn-alpha-outline"
+                        style={{ padding: '0.7rem 1.25rem', fontSize: '0.88rem' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="btn-alpha-cyan"
+                        style={{ padding: '0.7rem 1.5rem', fontSize: '0.88rem' }}
+                      >
+                        {submitting ? 'Saving Marks...' : (
+                          <>
+                            <Save size={16} /> Save / Submit Marks
+                          </>
+                        )}
+                      </button>
                     </>
                   )}
-                </button>
-              </div>
-            </form>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );
