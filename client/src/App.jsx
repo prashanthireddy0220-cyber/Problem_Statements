@@ -113,6 +113,8 @@ export default function App() {
           <Routes>
             {/* Public & Root Routes */}
             <Route path="/" element={<RootRedirect />} />
+            <Route path="/home" element={<LandingPage />} />
+            <Route path="/landing" element={<LandingPage />} />
             <Route path="/login" element={<Navigate to="/team-lead/login" replace />} />
             <Route path="/team-lead" element={<Navigate to="/team-lead/login" replace />} />
             <Route path="/team/:tokenOrId" element={<PublicTeamPage />} />
