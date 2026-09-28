@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
+import AUTHORIZED_TEAMS from '../data/teamsData';
+
 const DEFAULT_FRONTEND_ROUNDS = [
   {
     roundNumber: 1,
@@ -43,17 +45,32 @@ const DEFAULT_FRONTEND_ROUNDS = [
   }
 ];
 
+const INITIAL_TEAMS_DATA = AUTHORIZED_TEAMS.map(item => ({
+  _id: item.teamId,
+  teamId: item.teamId,
+  teamCode: item.teamId,
+  teamName: item.teamName || item.teamId,
+  teamLeadRegNum: item.regNum,
+  teamLeadName: item.leadName || `Team Lead (${item.teamId})`,
+  college: 'KARE',
+  department: 'CSE',
+  selectedProblemCode: 'Not Selected',
+  selectedProblemTitle: '',
+  membersCount: item.members ? item.members.length : 4,
+  registrationStatus: 'CONFIRMED'
+}));
+
 export default function ReviewerDashboard() {
   const { user } = useAuth();
   
-  const [teams, setTeams] = useState([]);
-  const [rounds, setRounds] = useState([]);
+  const [teams, setTeams] = useState(INITIAL_TEAMS_DATA);
+  const [rounds, setRounds] = useState(DEFAULT_FRONTEND_ROUNDS);
   const [evaluations, setEvaluations] = useState([]);
   const [selectedRoundNum, setSelectedRoundNum] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, SUBMITTED, PENDING
   
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -74,15 +91,14 @@ export default function ReviewerDashboard() {
     }
   }, [selectedRoundNum, user]);
 
-  const fetchInitialData = async () => {
-    setLoading(true);
+  const fetchInitialData = async (retryCount = 0) => {
     try {
       const [teamsRes, roundsRes] = await Promise.all([
         axios.get('/api/reviewer/teams'),
         axios.get('/api/reviewer/rounds')
       ]);
 
-      if (teamsRes.data && teamsRes.data.teams) {
+      if (teamsRes.data && teamsRes.data.teams && teamsRes.data.teams.length > 0) {
         setTeams(teamsRes.data.teams);
       }
       if (roundsRes.data && roundsRes.data.rounds) {
@@ -90,9 +106,15 @@ export default function ReviewerDashboard() {
       }
       
       await fetchEvaluations(selectedRoundNum);
+      setErrorMsg('');
     } catch (err) {
       console.error('Failed to load reviewer dashboard data:', err);
-      setErrorMsg('Failed to connect to backend server.');
+      if (retryCount < 2) {
+        setErrorMsg('Connecting to backend server (waking up server engine)... Retrying...');
+        setTimeout(() => fetchInitialData(retryCount + 1), 3000);
+      } else {
+        setErrorMsg(err.response?.data?.error || err.message || 'Backend server connection delayed. Click Sync Data to retry.');
+      }
     } finally {
       setLoading(false);
     }

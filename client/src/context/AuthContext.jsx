@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
         return clean;
       }
     }
-    return '';
+    return 'https://problem-statements-w7wq.onrender.com';
   };
 
   // Configure Axios Base URL dynamically
@@ -63,13 +63,17 @@ export const AuthProvider = ({ children }) => {
   
   axios.defaults.baseURL = resolveBaseUrl();
 
-  // Set default authorization header on axios & verify active session on mount
+  // Axios Request Interceptor: Ensure Authorization header is ALWAYS present on outgoing requests
   useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-    }
+    const reqInterceptor = axios.interceptors.request.use((config) => {
+      const storedToken = localStorage.getItem('alpha_token');
+      if (storedToken) {
+        config.headers['Authorization'] = `Bearer ${storedToken}`;
+      }
+      return config;
+    }, (error) => Promise.reject(error));
+
+    return () => axios.interceptors.request.eject(reqInterceptor);
   }, [token]);
 
   useEffect(() => {
