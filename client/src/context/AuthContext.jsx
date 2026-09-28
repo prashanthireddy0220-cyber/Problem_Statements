@@ -179,7 +179,24 @@ export const AuthProvider = ({ children }) => {
 
   const loginReviewer = async (username, password) => {
     try {
-      const res = await axios.post('/api/auth/reviewer/login', { username, password });
+      let res;
+      try {
+        res = await axios.post('/api/auth/reviewer/login', { username, password });
+      } catch (firstErr) {
+        if (firstErr.response?.status === 404) {
+          try {
+            res = await axios.post('/api/reviewer/login', { username, password });
+          } catch (secondErr) {
+            if (secondErr.response?.status === 404) {
+              res = await axios.post('/api/auth/reviewer-login', { username, password });
+            } else {
+              throw secondErr;
+            }
+          }
+        } else {
+          throw firstErr;
+        }
+      }
       const { token, user, sessionId } = res.data;
       
       localStorage.setItem('alpha_token', token);
@@ -192,7 +209,7 @@ export const AuthProvider = ({ children }) => {
       setRevokedMessage(null);
       return { success: true, user };
     } catch (err) {
-      return { success: false, error: extractErrorMessage(err, 'Reviewer login failed.') };
+      return { success: false, error: extractErrorMessage(err, 'Reviewer login failed. Invalid reviewer credentials or server error.') };
     }
   };
 
