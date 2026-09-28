@@ -39,16 +39,18 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/assets', express.static(path.join(__dirname, '../client/public')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
-// Mount API Routes
-app.use('/api/auth', authRoutes);
+// Mount API Routes (Specific path prefixes registered first)
+app.use('/api/reviewer', reviewerRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/problems', problemRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api', reviewerRoutes);
+app.use('/api', adminRoutes);
 app.use('/api', teamRoutes);
 app.use('/api', authRoutes);
-app.use('/api/problems', problemRoutes);
-app.use('/api/attendance', attendanceRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/reviewer', reviewerRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

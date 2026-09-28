@@ -258,7 +258,14 @@ export default function ReviewerDashboard() {
       setActiveModalTeam(null);
       await fetchEvaluations(selectedRoundNum);
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Failed to submit marks.';
+      let msg = 'Failed to submit marks.';
+      if (err.response?.data?.error) {
+        msg = err.response.data.error;
+      } else if (err.response?.status === 404) {
+        msg = 'Backend server deployment in progress (HTTP 404). Retrying in progress... Please click Save / Submit Marks again.';
+      } else if (err.message) {
+        msg = err.message;
+      }
       setErrorMsg(msg);
     } finally {
       setSubmitting(false);
