@@ -3,7 +3,8 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { 
   SystemSettings, Team, TeamLead, ProblemStatement, ProblemSelection, 
-  Participant, Volunteer, Admin, ActiveSession, AuditLog, AttendanceSession 
+  Participant, Volunteer, Admin, ActiveSession, AuditLog, AttendanceSession,
+  Evaluation, EvaluationRound, Reviewer
 } = require('../models/Schema');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
@@ -503,6 +504,71 @@ router.post('/seed', async (req, res) => {
   } catch (err) {
     console.error('Seed error:', err);
     return res.status(500).json({ error: 'Failed to seed demo data.' });
+  }
+});
+
+// 8. ADMIN: GET ALL REVIEWER EVALUATIONS & PROGRESS STATS
+router.get('/evaluations', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const evaluations = await Evaluation.find().sort({ roundNumber: 1, teamCode: 1 });
+    const rounds = await EvaluationRound.find().sort({ roundNumber: 1 });
+    const reviewers = await Reviewer.find({}, { passwordHash: 0 });
+    const authorizedTeams = require('../data/teamsData');
+
+    // Round Completion Statistics
+    const round1Count = new Set(evaluations.filter(e => e.roundNumber === 1).map(e => e.teamCode)).size;
+    const round2Count = new Set(evaluations.filter(e => e.roundNumber === 2).map(e => e.teamCode)).size;
+    const round3Count = new Set(evaluations.filter(e => e.roundNumber === 3).map(e => e.teamCode)).size;
+    const totalTeamsCount = authorizedTeams.length;
+
+    const summary = {
+      totalTeams: totalTeamsCount,
+      totalEvaluations: evaluations.length,
+      round1Completed: round1Count,
+      round2Completed: round2Count,
+      round3Completed: round3Count,
+      round1Total: totalTeamsCount,
+      round2Total: totalTeamsCount,
+      round3Total: totalTeamsCount
+    };
+
+    return res.json({
+      summary,
+      evaluations,
+      rounds,
+      reviewers
+    });
+  } catch (err) {
+    console.error('Admin fetch evaluations error:', err);
+    return res.status(500).json({ error: 'Failed to fetch reviewer evaluations.' });
+  }
+});
+
+// 9. ADMIN: GET EVALUATIONS BY ROUND
+router.get('/evaluations/round/:roundNumber', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const roundNum = Number(req.params.roundNumber);
+    const evaluations = await Evaluation.find({ roundNumber: roundNum }).sort({ teamCode: 1 });
+    return res.json({ roundNumber: roundNum, evaluations });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch round evaluations.' });
+  }
+});
+
+// 10. ADMIN: GET EVALUATIONS BY TEAM
+router.get('/evaluations/team/:teamId', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const teamParam = req.params.teamId.toUpperCase();
+    const evaluations = await Evaluation.find({
+      $or: [
+        { teamCode: teamParam },
+        { teamName: teamParam },
+        { teamId: req.params.teamId }
+      ]
+    }).sort({ roundNumber: 1 });
+    return res.json({ teamId: req.params.teamId, evaluations });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch team evaluations.' });
   }
 });
 

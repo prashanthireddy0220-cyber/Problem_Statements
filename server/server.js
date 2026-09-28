@@ -9,6 +9,7 @@ const problemRoutes = require('./routes/problemRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const teamRoutes = require('./routes/teamRoutes');
+const reviewerRoutes = require('./routes/reviewerRoutes');
 
 const app = express();
 const PORT = config.PORT;
@@ -47,6 +48,7 @@ app.use('/api', authRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/reviewer', reviewerRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -85,10 +87,10 @@ app.get('*', (req, res) => {
 // Seed helper
 async function triggerAutoSeed() {
   try {
-    const { Admin, Volunteer, SystemSettings, ProblemStatement, Team, TeamLead, Participant, AttendanceSession } = require('./models/Schema');
+    const { Admin, Volunteer, Reviewer, EvaluationRound, SystemSettings, ProblemStatement, Team, TeamLead, Participant, AttendanceSession } = require('./models/Schema');
     const bcrypt = require('bcryptjs');
 
-    // Clean up all legacy indexes on teams collection (e.g. payment.utr_1, teamId_1) except _id_ and name_1
+    // Clean up all legacy indexes on teams collection
     try {
       const indexes = await Team.collection.indexes();
       for (const idx of indexes) {
@@ -97,9 +99,7 @@ async function triggerAutoSeed() {
           console.log(`🧹 Dropped legacy index '${idx.name}' from teams collection.`);
         }
       }
-    } catch (e) {
-      // Ignore if collection does not exist yet
-    }
+    } catch (e) {}
 
     const adminExists = await Admin.findOne({ username: 'admin' });
     if (!adminExists) {
@@ -113,8 +113,66 @@ async function triggerAutoSeed() {
       console.log('🌱 Seeding default Volunteer (volunteer1 / vol123)...');
       const volPassHash = await bcrypt.hash('vol123', 10);
       await Volunteer.create({ username: 'volunteer1', passwordHash: volPassHash, name: 'Event Volunteer', phone: '+91 9876543210' });
-    } else {
-      await Volunteer.updateMany({ $or: [{ name: /Sarah/i }, { name: 'Sarah Connor (Volunteer)' }] }, { $set: { name: 'Event Volunteer' } });
+    }
+
+    // Seed Default Reviewers (reviewer1, reviewer2, reviewer3 / rev123)
+    const revCount = await Reviewer.countDocuments();
+    if (revCount === 0) {
+      console.log('🌱 Seeding default Reviewers (reviewer1, reviewer2, reviewer3 / rev123)...');
+      const revPassHash = await bcrypt.hash('rev123', 10);
+      await Reviewer.create([
+        { username: 'reviewer1', passwordHash: revPassHash, name: 'Dr. Alan Turing', email: 'reviewer1@hackathon.edu', role: 'REVIEWER' },
+        { username: 'reviewer2', passwordHash: revPassHash, name: 'Prof. Ada Lovelace', email: 'reviewer2@hackathon.edu', role: 'REVIEWER' },
+        { username: 'reviewer3', passwordHash: revPassHash, name: 'Dr. Grace Hopper', email: 'reviewer3@hackathon.edu', role: 'REVIEWER' }
+      ]);
+    }
+
+    // Seed Evaluation Rounds
+    const roundCount = await EvaluationRound.countDocuments();
+    if (roundCount === 0) {
+      console.log('🌱 Seeding default Evaluation Rounds (Round 1, Round 2, Round 3)...');
+      await EvaluationRound.create([
+        {
+          roundNumber: 1,
+          roundName: 'Round 1 - Ideation & Architecture',
+          description: 'Evaluation of team problem understanding, innovation, feasibility, and presentation.',
+          maximumMarks: 60,
+          active: true,
+          criteria: [
+            { key: 'innovation', name: 'Innovation', maxMarks: 10, description: 'Novelty & originality' },
+            { key: 'tech_approach', name: 'Technical Approach', maxMarks: 10, description: 'System design' },
+            { key: 'problem_understanding', name: 'Problem Understanding', maxMarks: 10, description: 'Clarity on problem' },
+            { key: 'feasibility', name: 'Feasibility', maxMarks: 10, description: 'Practicality within limits' },
+            { key: 'presentation', name: 'Presentation', maxMarks: 10, description: 'Communication' },
+            { key: 'overall_impact', name: 'Overall Impact', maxMarks: 10, description: 'Scalability & value' }
+          ]
+        },
+        {
+          roundNumber: 2,
+          roundName: 'Round 2 - Implementation & Coding',
+          description: 'Evaluation of codebase quality, complexity, and working demo.',
+          maximumMarks: 60,
+          active: true,
+          criteria: [
+            { key: 'code_quality', name: 'Code Quality & Architecture', maxMarks: 15, description: 'Clean code' },
+            { key: 'tech_complexity', name: 'Technical Complexity', maxMarks: 15, description: 'Depth of solution' },
+            { key: 'functionality', name: 'Functionality & Working Demo', maxMarks: 15, description: 'Feature execution' },
+            { key: 'ui_ux', name: 'UI/UX & Design', maxMarks: 15, description: 'User interface' }
+          ]
+        },
+        {
+          roundNumber: 3,
+          roundName: 'Round 3 - Final Demo & Pitch',
+          description: 'Evaluation of project completeness, business viability, and live pitch.',
+          maximumMarks: 60,
+          active: true,
+          criteria: [
+            { key: 'completeness', name: 'Project Completeness', maxMarks: 20, description: 'Finished product' },
+            { key: 'business_value', name: 'Business Value & Viability', maxMarks: 20, description: 'Market utility' },
+            { key: 'final_pitch', name: 'Final Presentation & Q/A', maxMarks: 20, description: 'Pitch defense' }
+          ]
+        }
+      ]);
     }
 
     let settings = await SystemSettings.findOne();

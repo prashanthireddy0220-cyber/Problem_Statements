@@ -170,6 +170,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginReviewer = async (username, password) => {
+    try {
+      const res = await axios.post('/api/auth/reviewer/login', { username, password });
+      const { token, user, sessionId } = res.data;
+      
+      localStorage.setItem('alpha_token', token);
+      localStorage.setItem('alpha_user', JSON.stringify(user));
+      localStorage.setItem('alpha_session_id', sessionId);
+      
+      setToken(token);
+      setUser(user);
+      setSessionId(sessionId);
+      setRevokedMessage(null);
+      return { success: true, user };
+    } catch (err) {
+      return { success: false, error: extractErrorMessage(err, 'Reviewer login failed.') };
+    }
+  };
+
   // Instant synchronous logout (0ms turnaround time)
   const logout = (callApi = true) => {
     const currentToken = token || localStorage.getItem('alpha_token');
@@ -212,6 +231,7 @@ export const AuthProvider = ({ children }) => {
       loginTeamLead,
       loginAdmin,
       loginVolunteer,
+      loginReviewer,
       logout,
       refreshUserSession
     }}>

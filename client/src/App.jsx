@@ -11,6 +11,8 @@ import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import VolunteerLogin from './pages/VolunteerLogin';
 import VolunteerScanner from './pages/VolunteerScanner';
+import ReviewerLogin from './pages/ReviewerLogin';
+import ReviewerDashboard from './pages/ReviewerDashboard';
 import PublicTeamPage from './pages/PublicTeamPage';
 import LandingPage from './pages/LandingPage';
 import { LogOut, ArrowLeft, ShieldAlert } from 'lucide-react';
@@ -20,6 +22,8 @@ export const getDashboardRoute = (role) => {
   switch (role) {
     case 'ADMIN':
       return '/admin/dashboard';
+    case 'REVIEWER':
+      return '/reviewer';
     case 'VOLUNTEER':
       return '/volunteer/dashboard';
     case 'TEAM_LEAD':
@@ -49,6 +53,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   
   if (!token || !user) {
     const loginRoute = (allowedRoles && allowedRoles.includes('ADMIN')) ? '/admin/login' : 
+                       (allowedRoles && allowedRoles.includes('REVIEWER')) ? '/reviewer/login' :
                        (allowedRoles && allowedRoles.includes('VOLUNTEER')) ? '/volunteer/login' : '/team-lead/login';
     return <Navigate to={loginRoute} replace />;
   }
@@ -59,7 +64,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
     const handleSwitchAccount = async () => {
       await logout();
-      const loginRoute = allowedRoles.includes('ADMIN') ? '/admin/login' : allowedRoles.includes('VOLUNTEER') ? '/volunteer/login' : '/team-lead/login';
+      const loginRoute = allowedRoles.includes('ADMIN') ? '/admin/login' : allowedRoles.includes('REVIEWER') ? '/reviewer/login' : allowedRoles.includes('VOLUNTEER') ? '/volunteer/login' : '/team-lead/login';
       navigate(loginRoute);
     };
 
@@ -129,7 +134,19 @@ export default function App() {
               </PublicLoginRoute>
             } />
 
+            <Route path="/reviewer/login" element={
+              <PublicLoginRoute targetRole="REVIEWER">
+                <ReviewerLogin />
+              </PublicLoginRoute>
+            } />
+
             {/* Protected Role Routes */}
+            <Route path="/reviewer" element={
+              <ProtectedRoute allowedRoles={['REVIEWER', 'ADMIN']}>
+                <ReviewerDashboard />
+              </ProtectedRoute>
+            } />
+
             <Route path="/team-lead/dashboard" element={
               <ProtectedRoute allowedRoles={['TEAM_LEAD']}>
                 <TeamLeadDashboard />

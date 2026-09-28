@@ -4,7 +4,7 @@ import {
   ShieldCheck, Clock, Users, BookOpen, ToggleLeft, ToggleRight, 
   Download, Plus, Edit, Trash2, RefreshCw, AlertTriangle, CheckCircle2, 
   PieChart as PieIcon, BarChart3, Activity, Lock, Unlock, Zap, Database,
-  QrCode, Eye, Search, Printer, FileText, UserCheck, CheckCircle, Ticket
+  QrCode, Eye, Search, Printer, FileText, UserCheck, CheckCircle, Ticket, Award
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import axios from 'axios';
@@ -65,6 +65,12 @@ export default function AdminDashboard() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [actionMsg, setActionMsg] = useState('');
 
+  // State for Reviewer Evaluations (Admin View-Only)
+  const [evalData, setEvalData] = useState({ summary: {}, evaluations: [], rounds: [], reviewers: [] });
+  const [evalSearchTerm, setEvalSearchTerm] = useState('');
+  const [evalRoundFilter, setEvalRoundFilter] = useState('ALL');
+  const [evalViewMode, setEvalViewMode] = useState('team'); // 'team' or 'reviewer'
+
   // Auto-refresh interval
   useEffect(() => {
     fetchAllData();
@@ -90,13 +96,20 @@ export default function AdminDashboard() {
 
   const fetchAllData = async () => {
     try {
-      if (activeTab === 'live' || activeTab === 'teams') {
+      if (activeTab === 'live' || activeTab === 'teams' || activeTab === 'evaluations') {
         const res = await axios.get('/api/admin/live-activity');
         if (res.data) {
           setLiveData(res.data);
           if (res.data.teams && res.data.teams.length > 0) {
             setAllTeams(res.data.teams);
           }
+        }
+      }
+
+      if (activeTab === 'evaluations') {
+        const evalRes = await axios.get('/api/admin/evaluations');
+        if (evalRes.data) {
+          setEvalData(evalRes.data);
         }
       }
 
@@ -383,6 +396,7 @@ export default function AdminDashboard() {
         {[
           { id: 'live', label: 'Live Session Control', icon: Activity },
           { id: 'teams', label: 'Teams Management (60 Teams)', icon: Users },
+          { id: 'evaluations', label: 'Reviewer Evaluations', icon: Award },
           { id: 'problems', label: 'Problem Statements', icon: BookOpen },
           { id: 'timers', label: 'Timer & Access Controls', icon: Clock },
           { id: 'attendance', label: 'Attendance Manager', icon: Ticket },
@@ -673,6 +687,232 @@ export default function AdminDashboard() {
                     <Eye size={14} /> Open Public Page
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* TAB: REVIEWER EVALUATIONS DASHBOARD (VIEW-ONLY FOR ADMIN) */}
+      {activeTab === 'evaluations' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* Round Progress Statistics Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
+            
+            {/* Round 1 Stats */}
+            <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(0, 242, 254, 0.35)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)' }}>
+              <div style={{ fontSize: '0.75rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
+                Round 1 Evaluation
+              </div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0.3rem 0', fontFamily: 'var(--font-heading)' }}>
+                {evalData.summary?.round1Completed || 0} / {evalData.summary?.totalTeams || 60} <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 500 }}>Completed</span>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem' }}>
+                <div style={{ width: `${Math.round(((evalData.summary?.round1Completed || 0) / (evalData.summary?.totalTeams || 60)) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #00F2FE, #4FACFE)' }} />
+              </div>
+            </div>
+
+            {/* Round 2 Stats */}
+            <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(255, 215, 0, 0.35)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)' }}>
+              <div style={{ fontSize: '0.75rem', color: '#FFD700', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
+                Round 2 Evaluation
+              </div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0.3rem 0', fontFamily: 'var(--font-heading)' }}>
+                {evalData.summary?.round2Completed || 0} / {evalData.summary?.totalTeams || 60} <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 500 }}>Completed</span>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem' }}>
+                <div style={{ width: `${Math.round(((evalData.summary?.round2Completed || 0) / (evalData.summary?.totalTeams || 60)) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #FFD700, #FFA500)' }} />
+              </div>
+            </div>
+
+            {/* Round 3 Stats */}
+            <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(16, 185, 129, 0.35)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)' }}>
+              <div style={{ fontSize: '0.75rem', color: '#10B981', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
+                Round 3 Evaluation
+              </div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0.3rem 0', fontFamily: 'var(--font-heading)' }}>
+                {evalData.summary?.round3Completed || 0} / {evalData.summary?.totalTeams || 60} <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 500 }}>Completed</span>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem' }}>
+                <div style={{ width: `${Math.round(((evalData.summary?.round3Completed || 0) / (evalData.summary?.totalTeams || 60)) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
+              </div>
+            </div>
+
+          </div>
+
+          {/* Controls Bar & View Switcher */}
+          <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={() => setEvalViewMode('team')}
+                className={evalViewMode === 'team' ? 'btn-alpha-cyan' : 'btn-alpha-outline'}
+                style={{ fontSize: '0.82rem', padding: '0.5rem 1rem' }}
+              >
+                Team-wise Leaderboard
+              </button>
+              <button
+                onClick={() => setEvalViewMode('reviewer')}
+                className={evalViewMode === 'reviewer' ? 'btn-alpha-cyan' : 'btn-alpha-outline'}
+                style={{ fontSize: '0.82rem', padding: '0.5rem 1rem' }}
+              >
+                Reviewer Submissions Log
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  placeholder="Search Team ID / Name..."
+                  value={evalSearchTerm}
+                  onChange={(e) => setEvalSearchTerm(e.target.value)}
+                  style={{
+                    padding: '0.45rem 0.85rem 0.45rem 2.25rem',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    border: '1px solid var(--border-cyan)',
+                    borderRadius: '6px',
+                    color: '#FFF',
+                    fontSize: '0.82rem',
+                    outline: 'none',
+                    width: '210px'
+                  }}
+                />
+              </div>
+
+              {evalViewMode === 'reviewer' && (
+                <select
+                  value={evalRoundFilter}
+                  onChange={(e) => setEvalRoundFilter(e.target.value)}
+                  style={{
+                    padding: '0.45rem 0.85rem',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    border: '1px solid var(--border-cyan)',
+                    borderRadius: '6px',
+                    color: '#FFF',
+                    fontSize: '0.82rem',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="ALL">All Rounds</option>
+                  <option value="1">Round 1</option>
+                  <option value="2">Round 2</option>
+                  <option value="3">Round 3</option>
+                </select>
+              )}
+            </div>
+          </div>
+
+          {/* VIEW 1: TEAM-WISE LEADERBOARD / MATRIX */}
+          {evalViewMode === 'team' ? (
+            <div className="glass-panel" style={{ borderRadius: '12px', padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '1rem', color: '#00F2FE', fontFamily: 'var(--font-heading)', margin: 0 }}>
+                  ALL 60 TEAMS EVALUATION MATRIX (VIEW-ONLY)
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#94A3B8', background: 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: '4px' }}>
+                  Admin is View-Only for Marks
+                </span>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table className="alpha-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Team ID</th>
+                      <th>Team Name</th>
+                      <th style={{ textAlign: 'center' }}>Round 1 (Max 60)</th>
+                      <th style={{ textAlign: 'center' }}>Round 2 (Max 60)</th>
+                      <th style={{ textAlign: 'center' }}>Round 3 (Max 60)</th>
+                      <th style={{ textAlign: 'center' }}>Combined Total Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamsToDisplay
+                      .filter(t => !evalSearchTerm || t.teamId.toLowerCase().includes(evalSearchTerm.toLowerCase()) || t.teamName.toLowerCase().includes(evalSearchTerm.toLowerCase()))
+                      .map((t) => {
+                        const evs = (evalData.evaluations || []).filter(e => e.teamCode === t.teamId || e.teamId === t._id);
+                        const r1Ev = evs.find(e => e.roundNumber === 1);
+                        const r2Ev = evs.find(e => e.roundNumber === 2);
+                        const r3Ev = evs.find(e => e.roundNumber === 3);
+
+                        const r1Score = r1Ev ? r1Ev.totalMarks : null;
+                        const r2Score = r2Ev ? r2Ev.totalMarks : null;
+                        const r3Score = r3Ev ? r3Ev.totalMarks : null;
+
+                        let totalCombined = 0;
+                        if (r1Score !== null) totalCombined += r1Score;
+                        if (r2Score !== null) totalCombined += r2Score;
+                        if (r3Score !== null) totalCombined += r3Score;
+
+                        return (
+                          <tr key={t.teamId}>
+                            <td style={{ fontWeight: '700', color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>{t.teamId}</td>
+                            <td style={{ fontWeight: '600', color: '#F8FAFC' }}>{t.teamName}</td>
+                            <td style={{ textAlign: 'center', color: r1Score !== null ? '#10B981' : '#64748B', fontWeight: r1Score !== null ? 800 : 400 }}>
+                              {r1Score !== null ? `${r1Score} / 60` : '--'}
+                            </td>
+                            <td style={{ textAlign: 'center', color: r2Score !== null ? '#10B981' : '#64748B', fontWeight: r2Score !== null ? 800 : 400 }}>
+                              {r2Score !== null ? `${r2Score} / 60` : '--'}
+                            </td>
+                            <td style={{ textAlign: 'center', color: r3Score !== null ? '#10B981' : '#64748B', fontWeight: r3Score !== null ? 800 : 400 }}>
+                              {r3Score !== null ? `${r3Score} / 60` : '--'}
+                            </td>
+                            <td style={{ textAlign: 'center', fontWeight: '800', color: '#FFD700', fontSize: '0.95rem' }}>
+                              {totalCombined > 0 ? `${totalCombined} Marks` : '--'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            /* VIEW 2: REVIEWER SUBMISSION LOGS */
+            <div className="glass-panel" style={{ borderRadius: '12px', padding: '1.25rem' }}>
+              <h3 style={{ fontSize: '1rem', color: '#FFD700', marginBottom: '1rem', fontFamily: 'var(--font-heading)' }}>
+                INDIVIDUAL REVIEWER SUBMISSION LOGS
+              </h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="alpha-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Team ID</th>
+                      <th>Team Name</th>
+                      <th>Round</th>
+                      <th>Reviewer</th>
+                      <th style={{ textAlign: 'center' }}>Total Score</th>
+                      <th>Status</th>
+                      <th>Submitted At</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(evalData.evaluations || [])
+                      .filter(ev => {
+                        if (evalRoundFilter !== 'ALL' && ev.roundNumber !== Number(evalRoundFilter)) return false;
+                        if (evalSearchTerm && !ev.teamCode.toLowerCase().includes(evalSearchTerm.toLowerCase()) && !ev.teamName.toLowerCase().includes(evalSearchTerm.toLowerCase())) return false;
+                        return true;
+                      })
+                      .map(ev => (
+                        <tr key={ev._id}>
+                          <td style={{ fontWeight: '700', color: '#00F2FE' }}>{ev.teamCode}</td>
+                          <td style={{ fontWeight: '600', color: '#F8FAFC' }}>{ev.teamName}</td>
+                          <td style={{ color: '#FFD700', fontWeight: '700' }}>Round {ev.roundNumber}</td>
+                          <td style={{ color: '#E2E8F0' }}>{ev.reviewerName} (<span style={{ color: '#94A3B8' }}>{ev.reviewerUsername}</span>)</td>
+                          <td style={{ textAlign: 'center', fontWeight: '800', color: '#10B981' }}>{ev.totalMarks} Marks</td>
+                          <td>
+                            <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                              {ev.status || 'SUBMITTED'}
+                            </span>
+                          </td>
+                          <td style={{ color: '#94A3B8', fontSize: '0.8rem' }}>{new Date(ev.submittedAt || ev.createdAt).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

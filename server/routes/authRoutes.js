@@ -3,7 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
-const { TeamLead, Admin, Volunteer, ActiveSession, Team, AuditLog } = require('../models/Schema');
+const { TeamLead, Admin, Volunteer, Reviewer, ActiveSession, Team, AuditLog } = require('../models/Schema');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const AUTHORIZED_TEAMS = require('../data/teamsData');
 
@@ -303,6 +303,67 @@ router.post('/volunteer/login', async (req, res) => {
   } catch (err) {
     console.error('Volunteer login error:', err);
     return res.status(500).json({ error: 'Server error during volunteer authentication.' });
+  }
+});
+
+// 3b. REVIEWER LOGIN
+router.post('/reviewer/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required.' });
+    }
+
+    const cleanUsername = username.trim().toLowerCase();
+    const reviewer = await Reviewer.findOne({ username: cleanUsername });
+    if (!reviewer) {
+      return res.status(401).json({ error: 'Invalid reviewer credentials.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, reviewer.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid reviewer credentials.' });
+    }
+
+    const newSessionId = uuidv4();
+    await ActiveSession.create({
+      userId: reviewer._id.toString(),
+      registrationNumber: reviewer.username,
+      role: 'REVIEWER',
+      sessionId: newSessionId,
+      loginTime: new Date()
+    });
+
+    const token = jwt.sign({
+      id: reviewer._id.toString(),
+      username: reviewer.username,
+      name: reviewer.name,
+      role: 'REVIEWER',
+      sessionId: newSessionId
+    }, JWT_SECRET, { expiresIn: '24h' });
+
+    await AuditLog.create({
+      actor: reviewer.username,
+      role: 'REVIEWER',
+      action: 'LOGIN',
+      target: 'Reviewer Dashboard'
+    });
+
+    return res.json({
+      message: 'Reviewer login successful',
+      token,
+      sessionId: newSessionId,
+      user: {
+        id: reviewer._id,
+        username: reviewer.username,
+        name: reviewer.name,
+        email: reviewer.email || `${reviewer.username}@hackathon.edu`,
+        role: 'REVIEWER'
+      }
+    });
+  } catch (err) {
+    console.error('Reviewer login error:', err);
+    return res.status(500).json({ error: 'Server error during reviewer authentication.' });
   }
 });
 

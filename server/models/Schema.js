@@ -160,6 +160,54 @@ const AuditLogSchema = new mongoose.Schema({
   metadata: { type: Object, default: {} }
 }, { timestamps: true });
 
+// 13. Reviewer Schema
+const ReviewerSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true, index: true },
+  passwordHash: { type: String, required: true },
+  name: { type: String, required: true },
+  email: { type: String },
+  phone: { type: String },
+  role: { type: String, default: 'REVIEWER' }
+}, { timestamps: true });
+
+// 14. Evaluation Round Schema (Configurable Evaluation Criteria per Round)
+const EvaluationRoundSchema = new mongoose.Schema({
+  roundNumber: { type: Number, required: true, unique: true, index: true }, // 1, 2, 3
+  roundName: { type: String, required: true },
+  description: { type: String, default: '' },
+  criteria: [{
+    key: { type: String, required: true },
+    name: { type: String, required: true },
+    maxMarks: { type: Number, required: true, default: 10 },
+    description: { type: String, default: '' }
+  }],
+  maximumMarks: { type: Number, required: true, default: 60 },
+  active: { type: Boolean, default: true }
+}, { timestamps: true });
+
+// 15. Evaluation Schema (Team Marks entered by Reviewers)
+const EvaluationSchema = new mongoose.Schema({
+  teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true, index: true },
+  teamCode: { type: String, required: true, index: true },
+  teamName: { type: String, required: true },
+  roundNumber: { type: Number, required: true, index: true },
+  reviewerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Reviewer', required: true, index: true },
+  reviewerUsername: { type: String, required: true },
+  reviewerName: { type: String, required: true },
+  criteriaMarks: [{
+    criteriaKey: { type: String, required: true },
+    name: { type: String, required: true },
+    mark: { type: Number, required: true },
+    maxMark: { type: Number, required: true }
+  }],
+  totalMarks: { type: Number, required: true },
+  comments: { type: String, default: '' },
+  status: { type: String, enum: ['DRAFT', 'SUBMITTED'], default: 'SUBMITTED' },
+  submittedAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+EvaluationSchema.index({ teamId: 1, roundNumber: 1, reviewerId: 1 }, { unique: true });
+
 module.exports = {
   Admin: mongoose.model('Admin', AdminSchema),
   TeamLead: mongoose.model('TeamLead', TeamLeadSchema),
@@ -172,5 +220,9 @@ module.exports = {
   Volunteer: mongoose.model('Volunteer', VolunteerSchema),
   ActiveSession: mongoose.model('ActiveSession', ActiveSessionSchema),
   SystemSettings: mongoose.model('SystemSettings', SystemSettingsSchema),
-  AuditLog: mongoose.model('AuditLog', AuditLogSchema)
+  AuditLog: mongoose.model('AuditLog', AuditLogSchema),
+  Reviewer: mongoose.model('Reviewer', ReviewerSchema),
+  EvaluationRound: mongoose.model('EvaluationRound', EvaluationRoundSchema),
+  Evaluation: mongoose.model('Evaluation', EvaluationSchema)
 };
+
