@@ -52,9 +52,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const navigate = useNavigate();
   
   if (!token || !user) {
-    const loginRoute = (allowedRoles && allowedRoles.includes('ADMIN')) ? '/admin/login' : 
-                       (allowedRoles && allowedRoles.includes('REVIEWER')) ? '/reviewer/login' :
-                       (allowedRoles && allowedRoles.includes('VOLUNTEER')) ? '/volunteer/login' : '/team-lead/login';
+    const primaryRole = (allowedRoles && allowedRoles.length > 0) ? allowedRoles[0] : 'TEAM_LEAD';
+    const loginRoute = primaryRole === 'REVIEWER' ? '/reviewer/login' : 
+                       primaryRole === 'ADMIN' ? '/admin/login' : 
+                       primaryRole === 'VOLUNTEER' ? '/volunteer/login' : '/team-lead/login';
     return <Navigate to={loginRoute} replace />;
   }
 
@@ -140,12 +141,17 @@ export default function App() {
               </PublicLoginRoute>
             } />
 
-            {/* Protected Role Routes */}
             <Route path="/reviewer" element={
               <ProtectedRoute allowedRoles={['REVIEWER', 'ADMIN']}>
                 <ReviewerDashboard />
               </ProtectedRoute>
             } />
+            <Route path="/reviewer/dashboard" element={
+              <ProtectedRoute allowedRoles={['REVIEWER', 'ADMIN']}>
+                <ReviewerDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/reviewer-login" element={<Navigate to="/reviewer/login" replace />} />
 
             <Route path="/team-lead/dashboard" element={
               <ProtectedRoute allowedRoles={['TEAM_LEAD']}>
