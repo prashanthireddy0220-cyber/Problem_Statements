@@ -32,10 +32,13 @@ export default function Header() {
   ) : null;
 
   const isVolunteer = user?.role === 'VOLUNTEER';
+  const isReviewer = user?.role === 'REVIEWER';
   const headerLeadName = isVolunteer 
     ? (user?.name && !user.name.includes('Sarah') ? user.name : 'Event Volunteer')
+    : isReviewer
+    ? (user?.name || user?.username || 'Official Reviewer')
     : (authItem?.leadName || (user?.name && !user.name.includes('Team Lead') ? user.name : null) || user?.registrationNumber || user?.name || 'User');
-  const headerTeamDisplay = isVolunteer ? '' : (authItem ? `${authItem.teamId} (${authItem.teamName})` : (user?.team?.name || user?.teamId || ''));
+  const headerTeamDisplay = (isVolunteer || isReviewer) ? '' : (authItem ? `${authItem.teamId} (${authItem.teamName})` : (user?.team?.name || user?.teamId || ''));
 
   return (
     <>

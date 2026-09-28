@@ -6,6 +6,43 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
+const DEFAULT_FRONTEND_ROUNDS = [
+  {
+    roundNumber: 1,
+    roundName: 'Round 1 - Ideation & Architecture',
+    maximumMarks: 60,
+    criteria: [
+      { key: 'innovation', name: 'Innovation', maxMarks: 10, description: 'Novelty & originality of solution' },
+      { key: 'tech_approach', name: 'Technical Approach', maxMarks: 10, description: 'System design & architecture' },
+      { key: 'problem_understanding', name: 'Problem Understanding', maxMarks: 10, description: 'Clarity on problem domain' },
+      { key: 'feasibility', name: 'Feasibility', maxMarks: 10, description: 'Practicality within time limits' },
+      { key: 'presentation', name: 'Presentation', maxMarks: 10, description: 'Team communication & clarity' },
+      { key: 'overall_impact', name: 'Overall Impact', maxMarks: 10, description: 'Potential value & scalability' }
+    ]
+  },
+  {
+    roundNumber: 2,
+    roundName: 'Round 2 - Implementation & Coding',
+    maximumMarks: 60,
+    criteria: [
+      { key: 'code_quality', name: 'Code Quality & Architecture', maxMarks: 15, description: 'Clean code & structure' },
+      { key: 'tech_complexity', name: 'Technical Complexity', maxMarks: 15, description: 'Depth of implementation' },
+      { key: 'functionality', name: 'Functionality & Working Demo', maxMarks: 15, description: 'Features working as intended' },
+      { key: 'ui_ux', name: 'UI/UX & Design', maxMarks: 15, description: 'User interface & interaction' }
+    ]
+  },
+  {
+    roundNumber: 3,
+    roundName: 'Round 3 - Final Pitch & Demo',
+    maximumMarks: 60,
+    criteria: [
+      { key: 'completeness', name: 'Project Completeness', maxMarks: 20, description: 'Finished features & stability' },
+      { key: 'business_value', name: 'Business Value & Viability', maxMarks: 20, description: 'Real-world utility' },
+      { key: 'final_pitch', name: 'Final Presentation & Q/A', maxMarks: 20, description: 'Live demonstration & responses' }
+    ]
+  }
+];
+
 export default function ReviewerDashboard() {
   const { user } = useAuth();
   
@@ -78,13 +115,12 @@ export default function ReviewerDashboard() {
     setRefreshing(false);
   };
 
-  // Find current selected round doc
-  const currentRoundDoc = rounds.find(r => r.roundNumber === selectedRoundNum) || rounds[0] || {
-    roundNumber: selectedRoundNum,
-    roundName: `Round ${selectedRoundNum}`,
-    maximumMarks: 60,
-    criteria: []
-  };
+  // Find current selected round doc with clean fallback per round
+  const fallbackRoundDoc = DEFAULT_FRONTEND_ROUNDS.find(r => r.roundNumber === selectedRoundNum) || DEFAULT_FRONTEND_ROUNDS[0];
+  const matchedDbRound = rounds.find(r => r.roundNumber === selectedRoundNum);
+  const currentRoundDoc = (matchedDbRound && matchedDbRound.criteria && matchedDbRound.criteria.length > 0)
+    ? matchedDbRound
+    : fallbackRoundDoc;
 
   // Map team evaluations for quick lookup
   const evaluationMap = {};
@@ -121,20 +157,13 @@ export default function ReviewerDashboard() {
     const existingEv = evaluationMap[team.teamCode] || evaluationMap[team._id];
     const initialInputs = {};
 
-    const activeCriteria = currentRoundDoc.criteria && currentRoundDoc.criteria.length > 0 
+    const activeCriteria = (currentRoundDoc.criteria && currentRoundDoc.criteria.length > 0) 
       ? currentRoundDoc.criteria 
-      : [
-          { key: 'innovation', name: 'Innovation', maxMarks: 10 },
-          { key: 'tech_approach', name: 'Technical Approach', maxMarks: 10 },
-          { key: 'problem_understanding', name: 'Problem Understanding', maxMarks: 10 },
-          { key: 'feasibility', name: 'Feasibility', maxMarks: 10 },
-          { key: 'presentation', name: 'Presentation', maxMarks: 10 },
-          { key: 'overall_impact', name: 'Overall Impact', maxMarks: 10 }
-        ];
+      : fallbackRoundDoc.criteria;
 
     activeCriteria.forEach(crit => {
       const existingMarkObj = existingEv?.criteriaMarks?.find(c => c.criteriaKey === crit.key || c.name === crit.name);
-      initialInputs[crit.key] = existingMarkObj ? existingMarkObj.mark : '';
+      initialInputs[crit.key] = (existingMarkObj !== undefined && existingMarkObj !== null) ? existingMarkObj.mark : '';
     });
 
     setCriteriaInputs(initialInputs);
@@ -166,7 +195,9 @@ export default function ReviewerDashboard() {
     e.preventDefault();
     if (!activeModalTeam) return;
 
-    const activeCriteria = currentRoundDoc.criteria || [];
+    const activeCriteria = (currentRoundDoc.criteria && currentRoundDoc.criteria.length > 0) 
+      ? currentRoundDoc.criteria 
+      : fallbackRoundDoc.criteria;
     const formattedMarks = [];
 
     for (const crit of activeCriteria) {
