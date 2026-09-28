@@ -91,9 +91,6 @@ export default function Header() {
               <Link to="/team-lead/login" className="btn-alpha-cyan" style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}>
                 Team Lead Portal
               </Link>
-              <Link to="/reviewer/login" className="btn-alpha-outline" style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem', borderColor: 'rgba(0, 242, 254, 0.4)', color: '#00F2FE' }}>
-                Reviewer Portal
-              </Link>
             </div>
           )}
         </div>
