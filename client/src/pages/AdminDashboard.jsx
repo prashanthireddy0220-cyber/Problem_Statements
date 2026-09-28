@@ -823,10 +823,10 @@ export default function AdminDashboard() {
                     <tr>
                       <th>Team ID</th>
                       <th>Team Name</th>
-                      <th style={{ textAlign: 'center' }}>Round 1 (Max 60)</th>
-                      <th style={{ textAlign: 'center' }}>Round 2 (Max 60)</th>
-                      <th style={{ textAlign: 'center' }}>Round 3 (Max 60)</th>
-                      <th style={{ textAlign: 'center' }}>Combined Total Score</th>
+                      <th style={{ textAlign: 'center' }}>Round 1 (Max 100)</th>
+                      <th style={{ textAlign: 'center' }}>Round 2 (Max 100)</th>
+                      <th style={{ textAlign: 'center' }}>Round 3 (Max 100)</th>
+                      <th style={{ textAlign: 'center' }}>Combined Total (Max 300)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -852,13 +852,13 @@ export default function AdminDashboard() {
                             <td style={{ fontWeight: '700', color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>{t.teamId}</td>
                             <td style={{ fontWeight: '600', color: '#F8FAFC' }}>{t.teamName}</td>
                             <td style={{ textAlign: 'center', color: r1Score !== null ? '#10B981' : '#64748B', fontWeight: r1Score !== null ? 800 : 400 }}>
-                              {r1Score !== null ? `${r1Score} / 60` : '--'}
+                              {r1Score !== null ? `${r1Score} / 100` : '--'}
                             </td>
                             <td style={{ textAlign: 'center', color: r2Score !== null ? '#10B981' : '#64748B', fontWeight: r2Score !== null ? 800 : 400 }}>
-                              {r2Score !== null ? `${r2Score} / 60` : '--'}
+                              {r2Score !== null ? `${r2Score} / 100` : '--'}
                             </td>
                             <td style={{ textAlign: 'center', color: r3Score !== null ? '#10B981' : '#64748B', fontWeight: r3Score !== null ? 800 : 400 }}>
-                              {r3Score !== null ? `${r3Score} / 60` : '--'}
+                              {r3Score !== null ? `${r3Score} / 100` : '--'}
                             </td>
                             <td style={{ textAlign: 'center', fontWeight: '800', color: '#FFD700', fontSize: '0.95rem' }}>
                               {totalCombined > 0 ? `${totalCombined} Marks` : '--'}

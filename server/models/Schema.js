@@ -181,7 +181,7 @@ const EvaluationRoundSchema = new mongoose.Schema({
     maxMarks: { type: Number, required: true, default: 10 },
     description: { type: String, default: '' }
   }],
-  maximumMarks: { type: Number, required: true, default: 60 },
+  maximumMarks: { type: Number, required: true, default: 100 },
   active: { type: Boolean, default: true }
 }, { timestamps: true });
 

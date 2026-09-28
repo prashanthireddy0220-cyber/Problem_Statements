@@ -127,52 +127,60 @@ async function triggerAutoSeed() {
       ]);
     }
 
-    // Seed Evaluation Rounds
-    const roundCount = await EvaluationRound.countDocuments();
-    if (roundCount === 0) {
-      console.log('🌱 Seeding default Evaluation Rounds (Round 1, Round 2, Round 3)...');
-      await EvaluationRound.create([
-        {
-          roundNumber: 1,
-          roundName: 'Round 1 - Ideation & Architecture',
-          description: 'Evaluation of team problem understanding, innovation, feasibility, and presentation.',
-          maximumMarks: 60,
-          active: true,
-          criteria: [
-            { key: 'innovation', name: 'Innovation', maxMarks: 10, description: 'Novelty & originality' },
-            { key: 'tech_approach', name: 'Technical Approach', maxMarks: 10, description: 'System design' },
-            { key: 'problem_understanding', name: 'Problem Understanding', maxMarks: 10, description: 'Clarity on problem' },
-            { key: 'feasibility', name: 'Feasibility', maxMarks: 10, description: 'Practicality within limits' },
-            { key: 'presentation', name: 'Presentation', maxMarks: 10, description: 'Communication' },
-            { key: 'overall_impact', name: 'Overall Impact', maxMarks: 10, description: 'Scalability & value' }
-          ]
-        },
-        {
-          roundNumber: 2,
-          roundName: 'Round 2 - Implementation & Coding',
-          description: 'Evaluation of codebase quality, complexity, and working demo.',
-          maximumMarks: 60,
-          active: true,
-          criteria: [
-            { key: 'code_quality', name: 'Code Quality & Architecture', maxMarks: 15, description: 'Clean code' },
-            { key: 'tech_complexity', name: 'Technical Complexity', maxMarks: 15, description: 'Depth of solution' },
-            { key: 'functionality', name: 'Functionality & Working Demo', maxMarks: 15, description: 'Feature execution' },
-            { key: 'ui_ux', name: 'UI/UX & Design', maxMarks: 15, description: 'User interface' }
-          ]
-        },
-        {
-          roundNumber: 3,
-          roundName: 'Round 3 - Final Demo & Pitch',
-          description: 'Evaluation of project completeness, business viability, and live pitch.',
-          maximumMarks: 60,
-          active: true,
-          criteria: [
-            { key: 'completeness', name: 'Project Completeness', maxMarks: 20, description: 'Finished product' },
-            { key: 'business_value', name: 'Business Value & Viability', maxMarks: 20, description: 'Market utility' },
-            { key: 'final_pitch', name: 'Final Presentation & Q/A', maxMarks: 20, description: 'Pitch defense' }
-          ]
-        }
-      ]);
+    // Seed / Update Evaluation Rounds (100 Marks per round)
+    const defaultRoundsConfig = [
+      {
+        roundNumber: 1,
+        roundName: 'Round 1 - Ideation & Architecture',
+        description: 'Evaluation of team problem understanding, innovation, feasibility, and presentation.',
+        maximumMarks: 100,
+        active: true,
+        criteria: [
+          { key: 'innovation', name: 'Innovation & Originality', maxMarks: 20, description: 'Novelty & uniqueness of solution' },
+          { key: 'tech_approach', name: 'Technical Approach & Architecture', maxMarks: 20, description: 'System design & technical planning' },
+          { key: 'problem_understanding', name: 'Problem Understanding', maxMarks: 20, description: 'Clarity on problem domain & scope' },
+          { key: 'feasibility', name: 'Feasibility & Practicality', maxMarks: 15, description: 'Practical execution capability' },
+          { key: 'presentation', name: 'Presentation & Defense', maxMarks: 15, description: 'Team communication & clarity' },
+          { key: 'overall_impact', name: 'Overall Impact & Scalability', maxMarks: 10, description: 'Potential value & scalability' }
+        ]
+      },
+      {
+        roundNumber: 2,
+        roundName: 'Round 2 - Implementation & Coding',
+        description: 'Evaluation of codebase quality, complexity, and working demo.',
+        maximumMarks: 100,
+        active: true,
+        criteria: [
+          { key: 'code_quality', name: 'Code Quality & Structure', maxMarks: 25, description: 'Clean code & architectural standards' },
+          { key: 'tech_complexity', name: 'Technical Complexity & Depth', maxMarks: 25, description: 'Algorithmic & engineering complexity' },
+          { key: 'functionality', name: 'Functionality & Working Demo', maxMarks: 25, description: 'Working features & execution' },
+          { key: 'ui_ux', name: 'UI/UX & User Interface', maxMarks: 25, description: 'Design quality & user experience' }
+        ]
+      },
+      {
+        roundNumber: 3,
+        roundName: 'Round 3 - Final Demo & Pitch',
+        description: 'Evaluation of project completeness, business viability, and live pitch.',
+        maximumMarks: 100,
+        active: true,
+        criteria: [
+          { key: 'completeness', name: 'Project Completeness & Stability', maxMarks: 35, description: 'Finished product & system stability' },
+          { key: 'business_value', name: 'Business Value & Viability', maxMarks: 35, description: 'Market utility & real-world value' },
+          { key: 'final_pitch', name: 'Final Presentation & Q/A Defense', maxMarks: 30, description: 'Pitch defense & Q/A answers' }
+        ]
+      }
+    ];
+
+    for (const rd of defaultRoundsConfig) {
+      let rDoc = await EvaluationRound.findOne({ roundNumber: rd.roundNumber });
+      if (!rDoc) {
+        await EvaluationRound.create(rd);
+      } else {
+        rDoc.maximumMarks = 100;
+        rDoc.criteria = rd.criteria;
+        rDoc.roundName = rd.roundName;
+        await rDoc.save();
+      }
     }
 
     let settings = await SystemSettings.findOne();

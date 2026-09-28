@@ -12,35 +12,35 @@ const DEFAULT_FRONTEND_ROUNDS = [
   {
     roundNumber: 1,
     roundName: 'Round 1 - Ideation & Architecture',
-    maximumMarks: 60,
+    maximumMarks: 100,
     criteria: [
-      { key: 'innovation', name: 'Innovation', maxMarks: 10, description: 'Novelty & originality of solution' },
-      { key: 'tech_approach', name: 'Technical Approach', maxMarks: 10, description: 'System design & architecture' },
-      { key: 'problem_understanding', name: 'Problem Understanding', maxMarks: 10, description: 'Clarity on problem domain' },
-      { key: 'feasibility', name: 'Feasibility', maxMarks: 10, description: 'Practicality within time limits' },
-      { key: 'presentation', name: 'Presentation', maxMarks: 10, description: 'Team communication & clarity' },
-      { key: 'overall_impact', name: 'Overall Impact', maxMarks: 10, description: 'Potential value & scalability' }
+      { key: 'innovation', name: 'Innovation & Originality', maxMarks: 20, description: 'Novelty & uniqueness of solution' },
+      { key: 'tech_approach', name: 'Technical Approach & Architecture', maxMarks: 20, description: 'System design & technical planning' },
+      { key: 'problem_understanding', name: 'Problem Understanding', maxMarks: 20, description: 'Clarity on problem domain & scope' },
+      { key: 'feasibility', name: 'Feasibility & Practicality', maxMarks: 15, description: 'Practical execution capability' },
+      { key: 'presentation', name: 'Presentation & Defense', maxMarks: 15, description: 'Team communication & clarity' },
+      { key: 'overall_impact', name: 'Overall Impact & Scalability', maxMarks: 10, description: 'Potential value & scalability' }
     ]
   },
   {
     roundNumber: 2,
     roundName: 'Round 2 - Implementation & Coding',
-    maximumMarks: 60,
+    maximumMarks: 100,
     criteria: [
-      { key: 'code_quality', name: 'Code Quality & Architecture', maxMarks: 15, description: 'Clean code & structure' },
-      { key: 'tech_complexity', name: 'Technical Complexity', maxMarks: 15, description: 'Depth of implementation' },
-      { key: 'functionality', name: 'Functionality & Working Demo', maxMarks: 15, description: 'Features working as intended' },
-      { key: 'ui_ux', name: 'UI/UX & Design', maxMarks: 15, description: 'User interface & interaction' }
+      { key: 'code_quality', name: 'Code Quality & Structure', maxMarks: 25, description: 'Clean code & architectural standards' },
+      { key: 'tech_complexity', name: 'Technical Complexity & Depth', maxMarks: 25, description: 'Algorithmic & engineering complexity' },
+      { key: 'functionality', name: 'Functionality & Working Demo', maxMarks: 25, description: 'Working features & execution' },
+      { key: 'ui_ux', name: 'UI/UX & User Interface', maxMarks: 25, description: 'Design quality & user experience' }
     ]
   },
   {
     roundNumber: 3,
     roundName: 'Round 3 - Final Pitch & Demo',
-    maximumMarks: 60,
+    maximumMarks: 100,
     criteria: [
-      { key: 'completeness', name: 'Project Completeness', maxMarks: 20, description: 'Finished features & stability' },
-      { key: 'business_value', name: 'Business Value & Viability', maxMarks: 20, description: 'Real-world utility' },
-      { key: 'final_pitch', name: 'Final Presentation & Q/A', maxMarks: 20, description: 'Live demonstration & responses' }
+      { key: 'completeness', name: 'Project Completeness & Stability', maxMarks: 35, description: 'Finished product & system stability' },
+      { key: 'business_value', name: 'Business Value & Viability', maxMarks: 35, description: 'Market utility & real-world value' },
+      { key: 'final_pitch', name: 'Final Presentation & Q/A Defense', maxMarks: 30, description: 'Pitch defense & Q/A answers' }
     ]
   }
 ];
