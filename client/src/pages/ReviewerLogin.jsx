@@ -111,11 +111,7 @@ export default function ReviewerLogin() {
           </button>
         </form>
 
-        <div style={{ marginTop: '1.5rem', textAlign: 'center', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: 0 }}>
-            Default login credentials: <code style={{ color: '#00F2FE' }}>reviewer1</code> / <code style={{ color: '#00F2FE' }}>rev123</code>
-          </p>
-        </div>
+
 
       </div>
     </div>

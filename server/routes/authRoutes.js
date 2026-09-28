@@ -307,7 +307,7 @@ router.post('/volunteer/login', async (req, res) => {
 });
 
 // 3b. REVIEWER LOGIN
-router.post('/reviewer/login', async (req, res) => {
+const handleReviewerLogin = async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -365,6 +365,14 @@ router.post('/reviewer/login', async (req, res) => {
     console.error('Reviewer login error:', err);
     return res.status(500).json({ error: 'Server error during reviewer authentication.' });
   }
+};
+
+router.post('/reviewer/login', handleReviewerLogin);
+router.post('/reviewer-login', handleReviewerLogin);
+router.post('/reviewer', handleReviewerLogin);
+
+router.get('/reviewer/login', (req, res) => {
+  return res.json({ status: 'ACTIVE', message: 'Reviewer Login endpoint is active.' });
 });
 
 // 4. VERIFY ACTIVE SESSION / ME ENDPOINT

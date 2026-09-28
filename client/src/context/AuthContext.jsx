@@ -5,15 +5,18 @@ const AuthContext = createContext();
 
 const extractErrorMessage = (err, fallback) => {
   if (!err) return fallback;
-  if (typeof err === 'string') return err;
+  const isHtml = (str) => typeof str === 'string' && (str.includes('<html') || str.includes('<!DOCTYPE') || str.includes('<body') || str.includes('<pre>') || str.includes('Cannot POST') || str.includes('Cannot GET'));
+
+  if (typeof err === 'string') return isHtml(err) ? fallback : err;
   const data = err.response?.data;
-  if (typeof data === 'string') return data;
-  if (data && typeof data.error === 'string') return data.error;
-  if (data && typeof data.message === 'string') return data.message;
+  if (typeof data === 'string') return isHtml(data) ? fallback : data;
+  if (data && typeof data.error === 'string') return isHtml(data.error) ? fallback : data.error;
+  if (data && typeof data.message === 'string') return isHtml(data.message) ? fallback : data.message;
   if (data && typeof data.error === 'object' && data.error !== null) {
-    return data.error.message || data.error.error || JSON.stringify(data.error);
+    const msg = data.error.message || data.error.error || JSON.stringify(data.error);
+    return isHtml(msg) ? fallback : msg;
   }
-  if (err.message && typeof err.message === 'string') return err.message;
+  if (err.message && typeof err.message === 'string') return isHtml(err.message) ? fallback : err.message;
   return fallback;
 };
 
