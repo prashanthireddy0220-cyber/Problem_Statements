@@ -69,6 +69,16 @@ const handleTeamLeadLogin = async (req, res) => {
       });
     }
 
+    if (team) {
+      team.teamId = cleanTeamId;
+      team.name = cleanTeamId;
+      if (authItem.teamName) team.teamName = authItem.teamName;
+      if (authItem.members && Array.isArray(authItem.members) && authItem.members.length > 0) {
+        team.members = authItem.members;
+      }
+      await team.save();
+    }
+
     // 3. Lookup TeamLead document in Database
     let teamLead = await TeamLead.findOne({ 
       $or: [
@@ -98,10 +108,21 @@ const handleTeamLeadLogin = async (req, res) => {
     }
 
     // 4. Ensure Team Lead's associated Team ID matches the submitted Team ID
-    const isTeamMatch = teamLead && teamLead.teamId && (
-      teamLead.teamId.name === cleanTeamId ||
-      teamLead.teamId.teamId === cleanTeamId ||
-      teamLead.teamId.teamName === cleanTeamId
+    const matchTeamKey = (val) => {
+      if (!val) return '';
+      const m = String(val).match(/^(?:ALPHA-?)?(\d+)$/i);
+      return m ? `ALPHA-${m[1].padStart(3, '0')}` : String(val).trim().toUpperCase();
+    };
+
+    const targetKey = matchTeamKey(cleanTeamId);
+
+    const isTeamMatch = teamLead && (
+      Boolean(authItem) ||
+      (teamLead.teamId && (
+        matchTeamKey(teamLead.teamId.name) === targetKey ||
+        matchTeamKey(teamLead.teamId.teamId) === targetKey ||
+        matchTeamKey(teamLead.teamId.teamName) === targetKey
+      ))
     );
 
     if (!isTeamMatch) {
