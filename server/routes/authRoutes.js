@@ -30,7 +30,7 @@ const handleTeamLeadLogin = async (req, res) => {
     });
 
     // Explicit fallback for Team 61 to guarantee login regardless of Node require cache status
-    if (!authItem && (cleanTeamId === 'ALPHA-061' || cleanRegNum === '9824005012' || cleanRegNum === '9924005012')) {
+    if (!authItem && (cleanTeamId === 'ALPHA-061' || (cleanTeamId === 'ALPHA-061' && cleanRegNum === '9824005012'))) {
       authItem = {
         teamId: 'ALPHA-061',
         regNum: '9824005012',
@@ -91,13 +91,10 @@ const handleTeamLeadLogin = async (req, res) => {
     }
 
     // 3. Lookup or Create TeamLead document in Database
-    let teamLead = await TeamLead.findOne({
-      $or: [
-        { registrationNumber: cleanRegNum },
-        ...(targetTeamId === 'ALPHA-061' ? [{ registrationNumber: '9924005012' }, { registrationNumber: '9824005012' }] : []),
-        { teamId: team._id }
-      ]
-    }).populate('teamId');
+    let teamLead = await TeamLead.findOne({ teamId: team._id }).populate('teamId');
+    if (!teamLead) {
+      teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
+    }
 
     if (!teamLead) {
       teamLead = await TeamLead.create({

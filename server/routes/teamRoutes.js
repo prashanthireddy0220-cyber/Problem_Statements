@@ -51,10 +51,21 @@ function sanitizeTeamMembers(team, authItem) {
 router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, res) => {
   try {
     const cleanRegNum = (req.user.registrationNumber || '').trim().toUpperCase();
-    
+    const normalizeTeamCode = (raw) => raw ? String(raw).trim().toUpperCase().replace(/^(?:ALPHA-?)?(\d+)$/i, (_, num) => 'ALPHA-' + num.padStart(3, '0')) : '';
+    const userTeamId = normalizeTeamCode(req.user.teamId || req.user.team?.teamId);
+
     // Find matching authorized team from data list
-    let authItem = AUTHORIZED_TEAMS.find(t => t.regNum === cleanRegNum || t.teamId === req.user.teamId || t.teamId === req.user.team?.teamId);
-    if (!authItem && (cleanRegNum === '9924005012' || cleanRegNum === '9824005012' || req.user.teamId === 'ALPHA-061' || req.user.team?.teamId === 'ALPHA-061')) {
+    // PRIORITY 1: Match by user's JWT teamId
+    let authItem = null;
+    if (userTeamId) {
+      authItem = AUTHORIZED_TEAMS.find(t => normalizeTeamCode(t.teamId) === userTeamId);
+    }
+    // PRIORITY 2: Match by regNum if userTeamId match failed
+    if (!authItem) {
+      authItem = AUTHORIZED_TEAMS.find(t => t.regNum === cleanRegNum || (t.members && t.members.some(m => m.registrationNumber === cleanRegNum)));
+    }
+
+    if (!authItem && (cleanRegNum === '9924005012' || cleanRegNum === '9824005012' || userTeamId === 'ALPHA-061')) {
       authItem = {
         teamId: 'ALPHA-061',
         regNum: '9824005012',
@@ -69,18 +80,31 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
       };
     }
 
-    // 1. Lookup Team Lead & Team
-    let teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
-    let team = teamLead?.teamId;
+    const targetTeamId = authItem?.teamId || userTeamId;
 
+    // 1. Lookup Team Lead & Team
+    let team = null;
+    if (targetTeamId) {
+      team = await Team.findOne({
+        $or: [
+          { teamId: targetTeamId },
+          { name: targetTeamId }
+        ]
+      });
+    }
+
+    let teamLead = null;
+    if (team) {
+      teamLead = await TeamLead.findOne({ teamId: team._id }).populate('teamId');
+    }
+    if (!teamLead) {
+      teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
+    }
     if (!team) {
-      // Lookup team directly by teamLeadRegNum or teamId/name
-      const searchConditions = [{ teamLeadRegNum: cleanRegNum }];
-      if (authItem) {
-        searchConditions.push({ name: authItem.teamId });
-        searchConditions.push({ teamId: authItem.teamId });
-      }
-      team = await Team.findOne({ $or: searchConditions });
+      team = teamLead?.teamId;
+    }
+    if (!team && cleanRegNum) {
+      team = await Team.findOne({ teamLeadRegNum: cleanRegNum });
     }
 
     // Auto-heal / Seed team if missing from DB
