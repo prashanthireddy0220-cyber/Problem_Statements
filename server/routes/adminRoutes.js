@@ -131,12 +131,18 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
     const activeSessions = await ActiveSession.find({ role: 'TEAM_LEAD' });
     const problemStatements = await ProblemStatement.find();
 
-    const activeRegNums = new Set(activeSessions.map(s => s.registrationNumber));
+    let attendanceRecords = [];
+    try {
+      if (typeof Attendance !== 'undefined' && Attendance && typeof Attendance.find === 'function') {
+        attendanceRecords = await Attendance.find();
+      }
+    } catch (e) {
+      attendanceRecords = [];
+    }
 
-    const attendanceRecords = await Attendance.find().catch(() => []);
     const attendanceByTeam = {};
-    attendanceRecords.forEach(r => {
-      if (r.teamName) {
+    (attendanceRecords || []).forEach(r => {
+      if (r && r.teamName) {
         attendanceByTeam[r.teamName] = (attendanceByTeam[r.teamName] || 0) + 1;
       }
     });
@@ -279,16 +285,22 @@ router.post('/team-leads/:regNum/revoke', authenticateToken, requireRole('ADMIN'
 // 5b. GET ALL TEAMS FOR ADMIN MANAGEMENT (Alias Endpoint)
 router.get('/teams', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const teams = await Team.find();
-    const teamLeads = await TeamLead.find();
-    const attendanceRecords = await Attendance.find();
+    let attendanceRecords = [];
+    try {
+      if (typeof Attendance !== 'undefined' && Attendance && typeof Attendance.find === 'function') {
+        attendanceRecords = await Attendance.find();
+      }
+    } catch (e) {
+      attendanceRecords = [];
+    }
+
     const config = require('../config/env');
     const appBaseUrl = config.FRONTEND_URL || 'http://localhost:5173';
     const AUTHORIZED_TEAMS = require('../data/teamsData');
 
     const attendanceByTeam = {};
-    attendanceRecords.forEach(r => {
-      if (r.teamName) {
+    (attendanceRecords || []).forEach(r => {
+      if (r && r.teamName) {
         attendanceByTeam[r.teamName] = (attendanceByTeam[r.teamName] || 0) + 1;
       }
     });
