@@ -39,23 +39,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/assets', express.static(path.join(__dirname, '../client/public')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
+// Health check endpoint (Registered BEFORE any route handlers)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', version: '1.0.4-alpha-team61-fix', message: 'College Hackathon ALPHA Server Running', time: new Date() });
+});
+
 // Mount API Routes (Specific path prefixes registered first)
+app.use('/api/auth', authRoutes);
 app.use('/api/reviewer', reviewerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/team', teamRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api', reviewerRoutes);
-app.use('/api', adminRoutes);
-app.use('/api', teamRoutes);
-app.use('/api', authRoutes);
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', version: '1.0.3-reviewer-login-prod', message: 'College Hackathon ALPHA Server Running', time: new Date() });
-});
 
 const fs = require('fs');
 
