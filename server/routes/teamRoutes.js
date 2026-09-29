@@ -51,7 +51,15 @@ function sanitizeTeamMembers(team, authItem) {
 router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, res) => {
   try {
     const cleanRegNum = (req.user.registrationNumber || '').trim().toUpperCase();
-    const normalizeTeamCode = (raw) => raw ? String(raw).trim().toUpperCase().replace(/^(?:ALPHA-?)?(\d+)$/i, (_, num) => 'ALPHA-' + num.padStart(3, '0')) : '';
+    const normalizeTeamCode = (raw) => {
+      if (!raw) return '';
+      const cleaned = String(raw).trim().toUpperCase().replace(/[\s\-_]+/g, '');
+      const match = cleaned.match(/^(?:ALPHA)?(\d+)$/i);
+      if (match) {
+        return 'ALPHA-' + match[1].padStart(3, '0');
+      }
+      return cleaned;
+    };
     const userTeamId = normalizeTeamCode(req.user.teamId || req.user.team?.teamId);
 
     // Find matching authorized team from data list
@@ -63,6 +71,21 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
     // PRIORITY 2: Match by regNum if userTeamId match failed
     if (!authItem) {
       authItem = AUTHORIZED_TEAMS.find(t => t.regNum === cleanRegNum || (t.members && t.members.some(m => m.registrationNumber === cleanRegNum)));
+    }
+
+    if (!authItem && (cleanRegNum === '9824005007' || userTeamId === 'ALPHA-050')) {
+      authItem = {
+        teamId: 'ALPHA-050',
+        regNum: '9824005007',
+        teamName: 'STRANGER THINGS',
+        leadName: 'BOPADALA NAGA SANJAY',
+        members: [
+          { name: 'BOPADALA NAGA SANJAY', registrationNumber: '9824005007', role: 'LEAD' },
+          { name: 'MORUMPALLI BHANUPRAKASH REDDY', registrationNumber: '9824005010', role: 'MEMBER' },
+          { name: 'CHEMBETI VINAY HARSHA', registrationNumber: '9923005067', role: 'MEMBER' },
+          { name: 'Y.PATHIV', registrationNumber: '9923005315', role: 'MEMBER' }
+        ]
+      };
     }
 
     if (!authItem && (cleanRegNum === '9824005012' || userTeamId === 'ALPHA-061')) {
