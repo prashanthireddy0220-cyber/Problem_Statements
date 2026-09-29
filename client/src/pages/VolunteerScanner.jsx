@@ -23,9 +23,11 @@ export default function VolunteerScanner() {
   const [markingLoading, setMarkingLoading] = useState(false);
   const [scanResult, setScanResult] = useState(null);
 
+  const totalMemberCount = AUTHORIZED_TEAMS.reduce((acc, t) => acc + (t.members ? t.members.length : 4), 0);
+
   // Present Roster State
   const [roster, setRoster] = useState([]);
-  const [rosterStats, setRosterStats] = useState({ markedCount: 0, presentCount: 0, absentCount: 0, totalRegistered: 240 });
+  const [rosterStats, setRosterStats] = useState({ markedCount: 0, presentCount: 0, absentCount: 0, totalRegistered: totalMemberCount });
   const [rosterSearch, setRosterSearch] = useState('');
   const [rosterStatusFilter, setRosterStatusFilter] = useState('ALL');
   
@@ -81,7 +83,7 @@ export default function VolunteerScanner() {
         markedCount: res.data.markedCount || 0,
         presentCount: res.data.presentCount || 0,
         absentCount: res.data.absentCount || 0,
-        totalRegistered: res.data.totalRegistered || 240
+        totalRegistered: res.data.totalRegistered || totalMemberCount
       });
     } catch (e) {
       // ignore

@@ -695,7 +695,7 @@ router.get('/session-roster', authenticateToken, async (req, res) => {
 
     const presentCount = attRecords.filter(r => r.status === 'PRESENT').length;
     const absentCount = attRecords.filter(r => r.status === 'ABSENT').length;
-    const totalRegistered = 240;
+    const totalRegistered = AUTHORIZED_TEAMS.reduce((acc, t) => acc + (t.members ? t.members.length : 4), 0);
 
     return res.json({
       sessionId,

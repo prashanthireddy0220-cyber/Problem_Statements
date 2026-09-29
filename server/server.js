@@ -214,7 +214,7 @@ async function triggerAutoSeed() {
     await TeamLead.deleteMany({});
     await Participant.deleteMany({});
 
-    console.log(`🌱 Ensuring all ${authorizedTeams.length} authorized Teams & Team Leads exist (ALPHA-001 to ALPHA-060)...`);
+    console.log(`🌱 Ensuring all ${authorizedTeams.length} authorized Teams & Team Leads exist (ALPHA-001 to ALPHA-061)...`);
 
     for (const item of authorizedTeams) {
       let teamDoc = await Team.findOne({ $or: [{ name: item.teamId }, { teamId: item.teamId }, { teamLeadRegNum: item.regNum }] });

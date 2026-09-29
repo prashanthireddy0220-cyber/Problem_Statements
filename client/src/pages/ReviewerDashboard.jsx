@@ -154,7 +154,7 @@ export default function ReviewerDashboard() {
   });
 
   const evaluatedCount = teams.filter(t => Boolean(evaluationMap[t.teamCode] || evaluationMap[t._id])).length;
-  const totalTeamsCount = teams.length || 60;
+  const totalTeamsCount = teams.length || AUTHORIZED_TEAMS.length;
   const progressPercent = totalTeamsCount > 0 ? Math.round((evaluatedCount / totalTeamsCount) * 100) : 0;
 
   // Filter teams by search and evaluation status

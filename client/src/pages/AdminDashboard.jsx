@@ -498,13 +498,13 @@ export default function AdminDashboard() {
             <ShieldCheck color="#00F2FE" size={28} /> MASTER ADMIN CONTROL DASHBOARD
           </h1>
           <p style={{ color: '#94A3B8', fontSize: '0.88rem' }}>
-            Event ALPHA • Manage all 60 Teams, Team QR codes, problem selections, live monitoring & attendance.
+            Event ALPHA • Manage all {teamsToDisplay.length} Teams, Team QR codes, problem selections, live monitoring & attendance.
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button onClick={handleSeed} className="btn-alpha-outline" style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}>
-            <Database size={15} /> Populate All 60 Teams Data
+            <Database size={15} /> Populate All {AUTHORIZED_TEAMS.length} Teams Data
           </button>
           <button onClick={handleExportCSV} className="btn-alpha-cyan" style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}>
             <Download size={15} /> Export Attendance CSV
@@ -523,7 +523,7 @@ export default function AdminDashboard() {
       <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', pb: '0.5rem' }}>
         {[
           { id: 'live', label: 'Live Session Control', icon: Activity },
-          { id: 'teams', label: 'Teams Management (60 Teams)', icon: Users },
+          { id: 'teams', label: `Teams Management (${teamsToDisplay.length} Teams)`, icon: Users },
           { id: 'evaluations', label: 'Reviewer Evaluations', icon: Award },
           { id: 'problems', label: 'Problem Statements', icon: BookOpen },
           { id: 'timers', label: 'Timer & Access Controls', icon: Clock },
@@ -682,18 +682,17 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ==================================================== */}
-      {/* TAB 2: ADMIN TEAMS MANAGEMENT (ALL 60 TEAMS) */}
+      {/* TAB 2: ADMIN TEAMS MANAGEMENT */}
       {/* ==================================================== */}
       {activeTab === 'teams' && (
         <div className="glass-panel" style={{ padding: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
             <div>
               <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Users size={24} color="#00F2FE" /> ALL REGISTERED TEAMS MANAGEMENT (Target: 60 Teams)
+                <Users size={24} color="#00F2FE" /> ALL REGISTERED TEAMS MANAGEMENT ({teamsToDisplay.length} Teams)
               </h2>
               <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                View, manage, inspect member details, and generate unique Team QR codes for Team 1 to Team 60.
+                View, manage, inspect member details, and generate unique Team QR codes for all registered teams.
               </p>
             </div>
 
