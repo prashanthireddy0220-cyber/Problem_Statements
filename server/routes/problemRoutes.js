@@ -79,8 +79,8 @@ async function getOrUpdateSystemState() {
       }
     }
   } else {
-    // Round is IDLE and not released
-    if (settings.problemStatementsReleased) {
+    // Round is IDLE (Default initial state)
+    if (settings.releaseManualState === 'RELEASED') {
       isReleased = true;
       computedPhase = settings.selectionManualState === 'OPEN' ? 'SELECTION_OPEN' : 'RELEASED_LOCKED';
     } else {
@@ -248,7 +248,7 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
       return res.status(400).json({ error: 'Problem statements have not been released by the admin yet.', code: 'NOT_RELEASED' });
     }
 
-    if (state.currentPhase === 'RELEASED_LOCKED' || state.currentPhase === 'NOT_STARTED' || state.currentPhase === 'READING') {
+    if (state.currentPhase === 'RELEASED_LOCKED' || state.currentPhase === 'NOT_STARTED' || state.currentPhase === 'READING' || state.currentPhase === 'ROUND_STARTED_UNRELEASED') {
       return res.status(400).json({
         error: 'Problem selection has not opened yet. Please wait until the selection period starts.',
         code: 'SELECTION_LOCKED'
