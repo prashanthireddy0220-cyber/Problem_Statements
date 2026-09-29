@@ -105,6 +105,25 @@ router.delete('/sessions/:id', authenticateToken, requireRole('ADMIN'), async (r
 
 const AUTHORIZED_TEAMS = require('../data/teamsData');
 
+// Helper to look up official student name from AUTHORIZED_TEAMS dataset by registration number
+function getRealStudentName(regNum, fallbackName = '') {
+  if (!regNum) return fallbackName || 'Participant';
+  const cleanReg = String(regNum).trim().toUpperCase();
+
+  for (const team of AUTHORIZED_TEAMS) {
+    if (team.regNum === cleanReg && team.leadName) {
+      return team.leadName;
+    }
+    if (team.members && Array.isArray(team.members)) {
+      const match = team.members.find(m => String(m.registrationNumber || '').trim().toUpperCase() === cleanReg);
+      if (match && match.name) {
+        return match.name;
+      }
+    }
+  }
+  return fallbackName || cleanReg;
+}
+
 // Helper to resolve real student name, official teamId, and official teamName from any combination of input fields
 function resolveParticipantDetails(rawRegNum, rawName, rawTeamId, rawTeamName) {
   const cleanReg = String(rawRegNum || '').trim().toUpperCase();

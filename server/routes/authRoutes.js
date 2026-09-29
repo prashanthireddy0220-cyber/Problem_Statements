@@ -30,14 +30,14 @@ const handleTeamLeadLogin = async (req, res) => {
     });
 
     // Explicit fallback for Team 61 to guarantee login regardless of Node require cache status
-    if (!authItem && (cleanTeamId === 'ALPHA-061' || cleanRegNum === '9924005012' || cleanRegNum === '9824005012')) {
+    if (!authItem && (cleanTeamId === 'ALPHA-061' || cleanRegNum === '9824005012' || cleanRegNum === '9924005012')) {
       authItem = {
         teamId: 'ALPHA-061',
-        regNum: '9924005012',
+        regNum: '9824005012',
         teamName: 'TEAM 61',
         leadName: 'VUTAKANTI SREEKANTH REDDY',
         members: [
-          { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9924005012', role: 'LEAD' },
+          { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9824005012', role: 'LEAD' },
           { name: 'RAAVULA VINAY', registrationNumber: '9923005124', role: 'MEMBER' },
           { name: 'KOLA ADARSH', registrationNumber: '9923005097', role: 'MEMBER' },
           { name: 'GORLA UPENDRA', registrationNumber: '9923005005', role: 'MEMBER' }

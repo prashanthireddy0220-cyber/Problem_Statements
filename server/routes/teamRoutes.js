@@ -57,11 +57,11 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
     if (!authItem && (cleanRegNum === '9924005012' || cleanRegNum === '9824005012' || req.user.teamId === 'ALPHA-061' || req.user.team?.teamId === 'ALPHA-061')) {
       authItem = {
         teamId: 'ALPHA-061',
-        regNum: '9924005012',
+        regNum: '9824005012',
         teamName: 'TEAM 61',
         leadName: 'VUTAKANTI SREEKANTH REDDY',
         members: [
-          { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9924005012', role: 'LEAD' },
+          { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9824005012', role: 'LEAD' },
           { name: 'RAAVULA VINAY', registrationNumber: '9923005124', role: 'MEMBER' },
           { name: 'KOLA ADARSH', registrationNumber: '9923005097', role: 'MEMBER' },
           { name: 'GORLA UPENDRA', registrationNumber: '9923005005', role: 'MEMBER' }
