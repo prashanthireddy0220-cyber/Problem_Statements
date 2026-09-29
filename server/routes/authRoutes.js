@@ -41,7 +41,35 @@ const handleTeamLeadLogin = async (req, res) => {
       });
     }
 
-    // 2. Lookup Team Lead & Team in Database
+    // 2. Ensure target Team document exists in database
+    let team = await Team.findOne({
+      $or: [
+        { name: cleanTeamId },
+        { teamId: cleanTeamId },
+        { teamName: authItem.teamName }
+      ]
+    });
+
+    if (!team && authItem) {
+      const qrToken = `TQ-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
+      const passToken = `EP-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
+
+      team = await Team.create({
+        name: authItem.teamId,
+        teamId: authItem.teamId,
+        teamName: authItem.teamName || authItem.teamId,
+        teamLeadRegNum: cleanRegNum,
+        college: 'KARE',
+        department: 'CSE',
+        members: authItem.members || [],
+        teamQrToken: qrToken,
+        eventPassQrToken: passToken,
+        registrationStatus: 'CONFIRMED',
+        eventPassStatus: 'ISSUED'
+      });
+    }
+
+    // 3. Lookup TeamLead document in Database
     let teamLead = await TeamLead.findOne({ 
       $or: [
         { registrationNumber: cleanRegNum },
@@ -49,52 +77,27 @@ const handleTeamLeadLogin = async (req, res) => {
       ]
     }).populate('teamId');
 
-    // Auto-heal / Seed on the fly if DB record is missing for this authorized pair
-    if (!teamLead || !teamLead.teamId) {
-      let team = await Team.findOne({
-        $or: [
-          { name: cleanTeamId },
-          { teamId: cleanTeamId },
-          { teamLeadRegNum: cleanRegNum }
-        ]
+    // Auto-heal / Seed / Re-link TeamLead to the correct Team document
+    if (!teamLead) {
+      teamLead = await TeamLead.create({
+        registrationNumber: cleanRegNum,
+        name: authItem?.leadName || `Team Lead (${cleanTeamId})`,
+        teamId: team ? team._id : null,
+        phone: '9876543210',
+        email: `${cleanRegNum}@klu.ac.in`
       });
-
-      if (!team && authItem) {
-        const qrToken = `TQ-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
-        const passToken = `EP-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
-
-        team = await Team.create({
-          name: authItem.teamId,
-          teamId: authItem.teamId,
-          teamName: authItem.teamName || authItem.teamId,
-          teamLeadRegNum: cleanRegNum,
-          college: 'KARE',
-          department: 'CSE',
-          members: authItem.members || [],
-          teamQrToken: qrToken,
-          eventPassQrToken: passToken,
-          registrationStatus: 'CONFIRMED',
-          eventPassStatus: 'ISSUED'
-        });
-      }
-
-      if (!teamLead && team) {
-        teamLead = await TeamLead.create({
-          registrationNumber: cleanRegNum,
-          name: authItem?.leadName || `Team Lead (${cleanTeamId})`,
-          teamId: team._id,
-          phone: '9876543210',
-          email: `${cleanRegNum}@klu.ac.in`
-        });
-      } else if (teamLead && team) {
-        teamLead.teamId = team._id;
-        teamLead.registrationNumber = cleanRegNum;
-        await teamLead.save();
-      }
-      if (teamLead) teamLead.teamId = team;
+    } else if (team) {
+      teamLead.teamId = team._id;
+      teamLead.registrationNumber = cleanRegNum;
+      if (authItem?.leadName) teamLead.name = authItem.leadName;
+      await teamLead.save();
     }
 
-    // 3. Ensure Team Lead's associated Team ID matches the submitted Team ID
+    if (teamLead && team) {
+      teamLead.teamId = team;
+    }
+
+    // 4. Ensure Team Lead's associated Team ID matches the submitted Team ID
     const isTeamMatch = teamLead && teamLead.teamId && (
       teamLead.teamId.name === cleanTeamId ||
       teamLead.teamId.teamId === cleanTeamId ||
