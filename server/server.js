@@ -54,7 +54,7 @@ app.use('/api', authRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', version: '1.0.2-reviewer-login-v2', message: 'College Hackathon ALPHA Server Running', time: new Date() });
+  res.json({ status: 'OK', version: '1.0.3-reviewer-login-prod', message: 'College Hackathon ALPHA Server Running', time: new Date() });
 });
 
 const fs = require('fs');

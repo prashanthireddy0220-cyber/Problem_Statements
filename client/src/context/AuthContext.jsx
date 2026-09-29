@@ -209,6 +209,12 @@ export const AuthProvider = ({ children }) => {
       setRevokedMessage(null);
       return { success: true, user };
     } catch (err) {
+      if (err.response?.status === 404) {
+        return { 
+          success: false, 
+          error: 'Reviewer API service is deploying on Render server. Please trigger/wait 1-2 mins for Render build completion.' 
+        };
+      }
       return { success: false, error: extractErrorMessage(err, 'Reviewer login failed. Invalid reviewer credentials or server error.') };
     }
   };
