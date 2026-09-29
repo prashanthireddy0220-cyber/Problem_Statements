@@ -306,6 +306,8 @@ router.post('/team-leads/:regNum/revoke', authenticateToken, requireRole('ADMIN'
 // 5b. GET ALL TEAMS FOR ADMIN MANAGEMENT (Alias Endpoint)
 router.get('/teams', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
+    const teams = await Team.find();
+    const teamLeads = await TeamLead.find();
     let attendanceRecords = [];
     try {
       if (typeof Attendance !== 'undefined' && Attendance && typeof Attendance.find === 'function') {
