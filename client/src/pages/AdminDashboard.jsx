@@ -71,11 +71,12 @@ export default function AdminDashboard() {
   const [evalRoundFilter, setEvalRoundFilter] = useState('ALL');
   const [evalViewMode, setEvalViewMode] = useState('team'); // 'team' or 'reviewer'
   
-  // Admin Evaluation Edit Modal State
+  // Admin Evaluation Edit & Problem Statement Edit Modal State
   const [adminEditEvModal, setAdminEditEvModal] = useState(null);
   const [adminCriteriaInputs, setAdminCriteriaInputs] = useState({});
   const [adminCommentsInput, setAdminCommentsInput] = useState('');
   const [adminSubmittingEv, setAdminSubmittingEv] = useState(false);
+  const [editingProblem, setEditingProblem] = useState(null);
 
   const ADMIN_ROUNDS_CONFIG = {
     1: [
@@ -302,6 +303,32 @@ export default function AdminDashboard() {
       fetchAllData();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to create problem.');
+    }
+  };
+
+  const handleUpdateProblem = async (e) => {
+    e.preventDefault();
+    if (!editingProblem || !editingProblem._id) return;
+    try {
+      await axios.put(`/api/problems/admin/${editingProblem._id}`, editingProblem);
+      setEditingProblem(null);
+      setActionMsg(`Problem statement '${editingProblem.problemId}' updated successfully!`);
+      setTimeout(() => setActionMsg(''), 3000);
+      fetchAllData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update problem statement.');
+    }
+  };
+
+  const handleDeleteProblem = async (id, problemId) => {
+    if (!window.confirm(`Are you sure you want to delete problem statement '${problemId}'?`)) return;
+    try {
+      await axios.delete(`/api/problems/admin/${id}`);
+      setActionMsg(`Problem statement '${problemId}' deleted!`);
+      setTimeout(() => setActionMsg(''), 3000);
+      fetchAllData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete problem statement.');
     }
   };
 
@@ -563,17 +590,48 @@ export default function AdminDashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
               <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #00F2FE' }}>
                 <div style={{ fontSize: '0.8rem', color: '#00F2FE', marginBottom: '0.5rem', fontWeight: '800' }}>1. 🚀 START TIMED ROUND</div>
-                <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-                  Starts automated 3-stage sequence: Release Delay ({settings.releaseDelayMinutes || 5}m) ➔ Read-Only ({settings.selectionDelayMinutes || 2}m) ➔ Selection Open.
-                </p>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.7rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem', fontWeight: '700' }}>Release (m)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settings.releaseDelayMinutes ?? 5}
+                      onChange={(e) => setSettings({ ...settings, releaseDelayMinutes: Number(e.target.value) })}
+                      style={{ width: '100%', padding: '0.35rem 0.45rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#00F2FE', borderRadius: '6px', fontSize: '0.88rem', fontWeight: '800', fontFamily: 'Orbitron, monospace', textAlign: 'center' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.7rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem', fontWeight: '700' }}>Read-Only (m)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settings.selectionDelayMinutes ?? settings.readingDurationMinutes ?? 2}
+                      onChange={(e) => setSettings({ ...settings, selectionDelayMinutes: Number(e.target.value), readingDurationMinutes: Number(e.target.value) })}
+                      style={{ width: '100%', padding: '0.35rem 0.45rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFD700', borderRadius: '6px', fontSize: '0.88rem', fontWeight: '800', fontFamily: 'Orbitron, monospace', textAlign: 'center' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.7rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem', fontWeight: '700' }}>Select (m)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={settings.selectionDurationMinutes ?? 10}
+                      onChange={(e) => setSettings({ ...settings, selectionDurationMinutes: Number(e.target.value) })}
+                      style={{ width: '100%', padding: '0.35rem 0.45rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#00E676', borderRadius: '6px', fontSize: '0.88rem', fontWeight: '800', fontFamily: 'Orbitron, monospace', textAlign: 'center' }}
+                    />
+                  </div>
+                </div>
+
                 <button
                   onClick={() => handlePhaseAction('START_ROUND', {
-                    releaseDelayMinutes: settings.releaseDelayMinutes || 5,
-                    selectionDelayMinutes: settings.selectionDelayMinutes || 2,
-                    selectionDurationMinutes: settings.selectionDurationMinutes || 10
+                    releaseDelayMinutes: settings.releaseDelayMinutes ?? 5,
+                    selectionDelayMinutes: settings.selectionDelayMinutes ?? 2,
+                    selectionDurationMinutes: settings.selectionDurationMinutes ?? 10
                   })}
                   className="btn-alpha-cyan"
-                  style={{ width: '100%', justifyContent: 'center', fontWeight: '800' }}
+                  style={{ width: '100%', justifyContent: 'center', fontWeight: '800', padding: '0.55rem' }}
                 >
                   <Clock size={16} /> Start Timed Round
                 </button>
@@ -1282,6 +1340,7 @@ export default function AdminDashboard() {
                   <th>Capacity Limit</th>
                   <th>Selected Count</th>
                   <th>Status</th>
+                  <th style={{ textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1300,11 +1359,113 @@ export default function AdminDashboard() {
                         {p.status}
                       </span>
                     </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                        <button
+                          onClick={() => setEditingProblem(p)}
+                          className="btn-alpha-cyan"
+                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Edit size={13} /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProblem(p._id, p.problemId)}
+                          className="btn-alpha-outline"
+                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', borderColor: '#FF4B4B', color: '#FF4B4B', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          {editingProblem && (
+            <div className="modal-overlay">
+              <div className="modal-content" style={{ maxWidth: '650px', border: '1px solid #00F2FE', boxShadow: '0 0 30px rgba(0, 242, 254, 0.25)' }}>
+                <h3 style={{ fontFamily: 'var(--font-heading)', color: '#00F2FE', marginBottom: '1rem' }}>
+                  EDIT PROBLEM STATEMENT ({editingProblem.problemId})
+                </h3>
+                <form onSubmit={handleUpdateProblem}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem' }}>Problem ID</label>
+                      <input
+                        type="text"
+                        value={editingProblem.problemId}
+                        onChange={e => setEditingProblem({ ...editingProblem, problemId: e.target.value })}
+                        required
+                        style={{ width: '100%', padding: '0.65rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#00F2FE', borderRadius: '8px', fontFamily: 'Orbitron, monospace', fontWeight: '800' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem' }}>Problem Title</label>
+                      <input
+                        type="text"
+                        value={editingProblem.title}
+                        onChange={e => setEditingProblem({ ...editingProblem, title: e.target.value })}
+                        required
+                        style={{ width: '100%', padding: '0.65rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'block', marginBottom: '0.2rem' }}>Description</label>
+                    <textarea
+                      rows={4}
+                      value={editingProblem.description}
+                      onChange={e => setEditingProblem({ ...editingProblem, description: e.target.value })}
+                      required
+                      style={{ width: '100%', padding: '0.65rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Domain</label>
+                      <input
+                        type="text"
+                        value={editingProblem.domain}
+                        onChange={e => setEditingProblem({ ...editingProblem, domain: e.target.value })}
+                        style={{ width: '100%', padding: '0.65rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Max Team Capacity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={editingProblem.maxTeamCapacity}
+                        onChange={e => setEditingProblem({ ...editingProblem, maxTeamCapacity: Number(e.target.value) })}
+                        style={{ width: '100%', padding: '0.65rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Difficulty</label>
+                      <select
+                        value={editingProblem.difficulty}
+                        onChange={e => setEditingProblem({ ...editingProblem, difficulty: e.target.value })}
+                        style={{ width: '100%', padding: '0.65rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px' }}
+                      >
+                        <option value="Easy">Easy</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Hard">Hard</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setEditingProblem(null)} className="btn-alpha-outline">Cancel</button>
+                    <button type="submit" className="btn-alpha-cyan">Update Problem Statement</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           {showAddProblemModal && (
             <div className="modal-overlay">
