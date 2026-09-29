@@ -13,25 +13,21 @@ const handleTeamLeadLogin = async (req, res) => {
     const { teamId, registrationNumber, deviceId } = req.body;
 
     if (!teamId || typeof teamId !== 'string' || !registrationNumber || typeof registrationNumber !== 'string') {
-      return res.status(400).json({ error: 'Invalid Team ID or Team Lead Registration Number' });
+      return res.status(400).json({ error: 'Please enter both Team ID and Team Lead Registration Number' });
     }
 
-    let cleanTeamId = teamId.trim().toUpperCase();
+    const normalizeTeamCode = (raw) => raw ? String(raw).trim().toUpperCase().replace(/^(?:ALPHA-?)?(\d+)$/i, (_, num) => 'ALPHA-' + num.padStart(3, '0')) : '';
+    const cleanTeamId = normalizeTeamCode(teamId);
     const cleanRegNum = registrationNumber.trim().toUpperCase();
-
-    // Standardize teamId format (e.g. ALPHA-61 or 61 to ALPHA-061)
-    const teamMatchPattern = cleanTeamId.match(/^(?:ALPHA-?)?(\d+)$/i);
-    if (teamMatchPattern) {
-      cleanTeamId = `ALPHA-${teamMatchPattern[1].padStart(3, '0')}`;
-    }
 
     // 1. Find auth dataset entry for Team ID + Registration Number combination
     const authItem = AUTHORIZED_TEAMS.find(t => {
-      const sameTeam = (t.teamId === cleanTeamId);
-      const sameReg = (t.regNum === cleanRegNum) || 
-                      (t.members && t.members.some(m => m.registrationNumber === cleanRegNum)) ||
-                      (t.teamId === 'ALPHA-061' && (cleanRegNum === '9924005012' || cleanRegNum === '9824005012'));
-      return sameTeam && sameReg;
+      const normT = normalizeTeamCode(t.teamId);
+      const matchTeam = (normT === cleanTeamId) || (t.teamName && t.teamName.toUpperCase() === cleanTeamId);
+      const matchReg = (t.regNum === cleanRegNum) || 
+                       (t.members && t.members.some(m => m.registrationNumber === cleanRegNum)) ||
+                       (normT === 'ALPHA-061' && (cleanRegNum === '9924005012' || cleanRegNum === '9824005012'));
+      return matchTeam && matchReg;
     });
 
     if (!authItem) {
@@ -41,23 +37,25 @@ const handleTeamLeadLogin = async (req, res) => {
       });
     }
 
+    const targetTeamId = authItem.teamId;
+
     // 2. Ensure target Team document exists in database
     let team = await Team.findOne({
       $or: [
-        { name: cleanTeamId },
-        { teamId: cleanTeamId },
+        { name: targetTeamId },
+        { teamId: targetTeamId },
         { teamName: authItem.teamName }
       ]
     });
 
-    if (!team && authItem) {
-      const qrToken = `TQ-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
-      const passToken = `EP-${authItem.teamId}-${cleanRegNum.slice(-4)}`;
+    const qrToken = `TQ-${targetTeamId}-${cleanRegNum.slice(-4)}`;
+    const passToken = `EP-${targetTeamId}-${cleanRegNum.slice(-4)}`;
 
+    if (!team) {
       team = await Team.create({
-        name: authItem.teamId,
-        teamId: authItem.teamId,
-        teamName: authItem.teamName || authItem.teamId,
+        name: targetTeamId,
+        teamId: targetTeamId,
+        teamName: authItem.teamName || targetTeamId,
         teamLeadRegNum: cleanRegNum,
         college: 'KARE',
         department: 'CSE',
@@ -67,11 +65,9 @@ const handleTeamLeadLogin = async (req, res) => {
         registrationStatus: 'CONFIRMED',
         eventPassStatus: 'ISSUED'
       });
-    }
-
-    if (team) {
-      team.teamId = cleanTeamId;
-      team.name = cleanTeamId;
+    } else {
+      team.name = targetTeamId;
+      team.teamId = targetTeamId;
       if (authItem.teamName) team.teamName = authItem.teamName;
       if (authItem.members && Array.isArray(authItem.members) && authItem.members.length > 0) {
         team.members = authItem.members;
@@ -79,58 +75,30 @@ const handleTeamLeadLogin = async (req, res) => {
       await team.save();
     }
 
-    // 3. Lookup TeamLead document in Database
-    let teamLead = await TeamLead.findOne({ 
+    // 3. Lookup or Create TeamLead document in Database
+    let teamLead = await TeamLead.findOne({
       $or: [
         { registrationNumber: cleanRegNum },
-        ...(cleanTeamId === 'ALPHA-061' ? [{ registrationNumber: '9924005012' }, { registrationNumber: '9824005012' }] : [])
+        ...(targetTeamId === 'ALPHA-061' ? [{ registrationNumber: '9924005012' }, { registrationNumber: '9824005012' }] : []),
+        { teamId: team._id }
       ]
     }).populate('teamId');
 
-    // Auto-heal / Seed / Re-link TeamLead to the correct Team document
     if (!teamLead) {
       teamLead = await TeamLead.create({
         registrationNumber: cleanRegNum,
-        name: authItem?.leadName || `Team Lead (${cleanTeamId})`,
-        teamId: team ? team._id : null,
+        name: authItem?.leadName || `Team Lead (${targetTeamId})`,
+        teamId: team._id,
         phone: '9876543210',
         email: `${cleanRegNum}@klu.ac.in`
       });
-    } else if (team) {
+    } else {
       teamLead.teamId = team._id;
       teamLead.registrationNumber = cleanRegNum;
       if (authItem?.leadName) teamLead.name = authItem.leadName;
       await teamLead.save();
     }
-
-    if (teamLead && team) {
-      teamLead.teamId = team;
-    }
-
-    // 4. Ensure Team Lead's associated Team ID matches the submitted Team ID
-    const matchTeamKey = (val) => {
-      if (!val) return '';
-      const m = String(val).match(/^(?:ALPHA-?)?(\d+)$/i);
-      return m ? `ALPHA-${m[1].padStart(3, '0')}` : String(val).trim().toUpperCase();
-    };
-
-    const targetKey = matchTeamKey(cleanTeamId);
-
-    const isTeamMatch = teamLead && (
-      Boolean(authItem) ||
-      (teamLead.teamId && (
-        matchTeamKey(teamLead.teamId.name) === targetKey ||
-        matchTeamKey(teamLead.teamId.teamId) === targetKey ||
-        matchTeamKey(teamLead.teamId.teamName) === targetKey
-      ))
-    );
-
-    if (!isTeamMatch) {
-      return res.status(401).json({
-        error: 'Invalid Team ID or Team Lead Registration Number',
-        code: 'INVALID_CREDENTIALS'
-      });
-    }
+    teamLead.teamId = team;
 
     if (teamLead.revoked) {
       return res.status(403).json({
