@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { 
   SystemSettings, Team, TeamLead, ProblemStatement, ProblemSelection, 
-  Participant, Volunteer, Admin, ActiveSession, AuditLog, AttendanceSession,
+  Participant, Volunteer, Admin, ActiveSession, AuditLog, AttendanceSession, Attendance,
   Evaluation, EvaluationRound, Reviewer
 } = require('../models/Schema');
 const { authenticateToken, requireRole } = require('../middleware/auth');
