@@ -73,7 +73,7 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
       authItem = AUTHORIZED_TEAMS.find(t => t.regNum === cleanRegNum || (t.members && t.members.some(m => m.registrationNumber === cleanRegNum)));
     }
 
-    if (!authItem && (cleanRegNum === '9824005007' || userTeamId === 'ALPHA-050')) {
+    if (!authItem && (cleanRegNum === '9824005007' || cleanRegNum === '9924005012' || userTeamId === 'ALPHA-050')) {
       authItem = {
         teamId: 'ALPHA-050',
         regNum: '9824005007',
