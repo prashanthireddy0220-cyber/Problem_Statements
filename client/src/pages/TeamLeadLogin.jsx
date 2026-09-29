@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, LogIn, KeyRound, AlertCircle, Laptop, Users, Building2 } from 'lucide-react';
+import { ShieldCheck, LogIn, KeyRound, AlertCircle, Laptop, Users, Building2, MessageCircle, Instagram } from 'lucide-react';
 
 export default function TeamLeadLogin() {
   const [teamId, setTeamId] = useState('');
@@ -137,6 +137,69 @@ export default function TeamLeadLogin() {
             )}
           </button>
         </form>
+
+        {/* Footer with KARE IEEE Education Society and Social Links */}
+        <div style={{ 
+          textAlign: 'center', 
+          color: '#94A3B8', 
+          fontSize: '0.82rem', 
+          marginTop: '2rem',
+          paddingTop: '1rem',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justify: 'center',
+          gap: '0.65rem',
+          flexWrap: 'wrap'
+        }}>
+          <span>KARE IEEE Education Society</span>
+          
+          <a 
+            href="https://chat.whatsapp.com/KQgGm91cXyS1WiZC8nVyls" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ 
+              color: '#25D366', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '0.35rem', 
+              textDecoration: 'none',
+              fontSize: '0.8rem',
+              fontWeight: '600',
+              background: 'rgba(37, 211, 102, 0.12)',
+              padding: '0.2rem 0.55rem',
+              borderRadius: '10px',
+              border: '1px solid rgba(37, 211, 102, 0.3)'
+            }}
+            title="Join Official WhatsApp Group"
+          >
+            <MessageCircle size={14} color="#25D366" />
+            <span>WhatsApp Group</span>
+          </a>
+
+          <a 
+            href="https://www.instagram.com/kare_ieee_edu_society/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ 
+              color: '#E1306C', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '0.35rem', 
+              textDecoration: 'none',
+              fontSize: '0.8rem',
+              fontWeight: '600',
+              background: 'rgba(225, 48, 108, 0.12)',
+              padding: '0.2rem 0.55rem',
+              borderRadius: '10px',
+              border: '1px solid rgba(225, 48, 108, 0.3)'
+            }}
+            title="Follow on Instagram"
+          >
+            <Instagram size={14} color="#E1306C" />
+            <span>Instagram</span>
+          </a>
+        </div>
 
       </div>
     </div>

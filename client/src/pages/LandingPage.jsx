@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getDashboardRoute } from '../App';
 import { 
   ShieldCheck, QrCode, Users, BookOpen, Clock, CheckCircle2, 
-  Sparkles, ArrowRight, ShieldAlert, Award, ChevronRight, Zap, RefreshCw
+  Sparkles, ArrowRight, ShieldAlert, Award, ChevronRight, Zap, RefreshCw, MessageCircle, Instagram
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -154,8 +154,70 @@ export default function LandingPage() {
       </div>
 
       {/* FOOTER */}
-      <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: '0.85rem', marginTop: '3rem' }}>
-        Event ALPHA 2026 • College Hackathon Platform • KARE IEEE Education Society
+      <div style={{ 
+        textAlign: 'center', 
+        color: '#94A3B8', 
+        fontSize: '0.85rem', 
+        marginTop: '3rem',
+        paddingTop: '1.5rem',
+        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '0.75rem',
+        flexWrap: 'wrap'
+      }}>
+        <span>Event ALPHA 2026 • College Hackathon Platform • KARE IEEE Education Society</span>
+        
+        {/* WhatsApp Group Link */}
+        <a 
+          href="https://chat.whatsapp.com/KQgGm91cXyS1WiZC8nVyls" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={{ 
+            color: '#25D366', 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            gap: '0.35rem', 
+            textDecoration: 'none',
+            fontSize: '0.82rem',
+            fontWeight: '600',
+            background: 'rgba(37, 211, 102, 0.12)',
+            padding: '0.25rem 0.65rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(37, 211, 102, 0.3)',
+            transition: 'all 0.2s ease'
+          }}
+          title="Join Official WhatsApp Group"
+        >
+          <MessageCircle size={15} color="#25D366" />
+          <span>WhatsApp Group</span>
+        </a>
+
+        {/* Instagram Link */}
+        <a 
+          href="https://www.instagram.com/kare_ieee_edu_society/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={{ 
+            color: '#E1306C', 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            gap: '0.35rem', 
+            textDecoration: 'none',
+            fontSize: '0.82rem',
+            fontWeight: '600',
+            background: 'rgba(225, 48, 108, 0.12)',
+            padding: '0.25rem 0.65rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(225, 48, 108, 0.3)',
+            transition: 'all 0.2s ease'
+          }}
+          title="Follow on Instagram"
+        >
+          <Instagram size={15} color="#E1306C" />
+          <span>Instagram</span>
+        </a>
       </div>
 
     </div>
