@@ -503,12 +503,18 @@ export default function ReviewerDashboard() {
                       {/* Problem Statement */}
                       <td style={{ padding: '0.9rem 1.25rem', color: '#CBD5E1', fontSize: '0.82rem' }}>
                         {team.selectedProblemCode && team.selectedProblemCode !== 'Not Selected' ? (
-                          <span>
-                            <strong style={{ color: '#FFD700' }}>{team.selectedProblemCode}</strong>
-                            {team.selectedProblemTitle ? ` - ${team.selectedProblemTitle.slice(0, 32)}...` : ''}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ color: '#FFD700', fontWeight: '800', fontFamily: 'Orbitron, monospace', fontSize: '0.9rem' }}>
+                              {team.selectedProblemCode}
+                            </span>
+                            {team.selectedProblemTitle ? (
+                              <span style={{ fontSize: '0.78rem', color: '#94A3B8', maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={team.selectedProblemTitle}>
+                                {team.selectedProblemTitle}
+                              </span>
+                            ) : null}
+                          </div>
                         ) : (
-                          <span style={{ color: '#64748B', italic: true }}>Not Selected Yet</span>
+                          <span style={{ color: '#64748B', fontStyle: 'italic' }}>Not Selected Yet</span>
                         )}
                       </td>
 
@@ -589,6 +595,25 @@ export default function ReviewerDashboard() {
                 >
                   <X size={22} />
                 </button>
+              </div>
+
+              {/* Problem Statement Banner inside Modal */}
+              <div style={{ background: 'rgba(255, 215, 0, 0.08)', border: '1px solid rgba(255, 215, 0, 0.3)', padding: '0.85rem 1.1rem', borderRadius: '10px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: '#FFD700', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>
+                    Selected Problem Statement
+                  </div>
+                  <div style={{ fontSize: '0.98rem', fontWeight: '800', color: '#F8FAFC', marginTop: '2px' }}>
+                    {activeModalTeam.selectedProblemCode && activeModalTeam.selectedProblemCode !== 'Not Selected' ? (
+                      <>
+                        <span style={{ color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>{activeModalTeam.selectedProblemCode}</span>
+                        {activeModalTeam.selectedProblemTitle ? ` — ${activeModalTeam.selectedProblemTitle}` : ''}
+                      </>
+                    ) : (
+                      <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not Selected Yet</span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Modal Locked Alert for Reviewers */}

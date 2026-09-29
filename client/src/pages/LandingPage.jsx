@@ -87,8 +87,8 @@ export default function LandingPage() {
       {/* 2. EVENT METRICS COUNTERS GRID */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '3rem' }}>
         {[
-          { number: '60', label: 'Authorized Teams', desc: 'ALPHA-001 to ALPHA-060', color: '#00F2FE', icon: Users },
-          { number: '240', label: 'Hackathon Participants', desc: 'Registered College Students', color: '#00E676', icon: CheckCircle2 },
+          { number: '61', label: 'Authorized Teams', desc: 'ALPHA-001 to ALPHA-061', color: '#00F2FE', icon: Users },
+          { number: '244', label: 'Hackathon Participants', desc: 'Registered College Students', color: '#00E676', icon: CheckCircle2 },
           { number: '43', label: 'Problem Statements', desc: '2-Team Max Capacity Limit', color: '#FFD700', icon: BookOpen },
           { number: '100%', label: 'QR Attendance Security', desc: 'Strict Volunteer-Only Scanning', color: '#FF8585', icon: QrCode }
         ].map((item, idx) => {

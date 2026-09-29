@@ -207,9 +207,9 @@ export default function AdminDashboard() {
         }
       }
 
-      if (activeTab === 'evaluations') {
-        const evalRes = await axios.get('/api/admin/evaluations');
-        if (evalRes.data) {
+      if (activeTab === 'evaluations' || activeTab === 'live' || activeTab === 'teams') {
+        const evalRes = await axios.get('/api/admin/evaluations').catch(() => null);
+        if (evalRes && evalRes.data) {
           setEvalData(evalRes.data);
         }
       }
@@ -935,7 +935,11 @@ export default function AdminDashboard() {
                     {teamsToDisplay
                       .filter(t => !evalSearchTerm || t.teamId.toLowerCase().includes(evalSearchTerm.toLowerCase()) || t.teamName.toLowerCase().includes(evalSearchTerm.toLowerCase()))
                       .map((t) => {
-                        const evs = (evalData.evaluations || []).filter(e => e.teamCode === t.teamId || e.teamId === t._id);
+                        const evs = (evalData.evaluations || []).filter(e => 
+                          (e.teamCode && t.teamId && e.teamCode.trim().toUpperCase() === t.teamId.trim().toUpperCase()) ||
+                          (e.teamId && t._id && String(e.teamId) === String(t._id)) ||
+                          (e.teamCode && t.teamName && e.teamCode.trim().toUpperCase() === t.teamName.trim().toUpperCase())
+                        );
                         const r1Ev = evs.find(e => e.roundNumber === 1);
                         const r2Ev = evs.find(e => e.roundNumber === 2);
                         const r3Ev = evs.find(e => e.roundNumber === 3);

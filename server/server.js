@@ -278,21 +278,27 @@ async function triggerAutoSeed() {
         await leadDoc.save();
       }
 
-      let partDoc = await Participant.findOne({ registrationNumber: item.regNum });
-      if (!partDoc) {
-        await Participant.create({
-          registrationNumber: item.regNum,
-          name: item.leadName,
-          teamName: item.teamName || item.teamId,
-          college: 'KARE',
-          department: 'CSE',
-          isTeamLead: true,
-          qrCodeData: item.regNum
-        });
-      } else {
-        partDoc.teamName = item.teamName || item.teamId;
-        partDoc.name = item.leadName;
-        await partDoc.save();
+      if (item.members && Array.isArray(item.members)) {
+        for (const m of item.members) {
+          if (!m.registrationNumber) continue;
+          let partDoc = await Participant.findOne({ registrationNumber: m.registrationNumber });
+          if (!partDoc) {
+            await Participant.create({
+              registrationNumber: m.registrationNumber,
+              name: m.name,
+              teamName: item.teamName || item.teamId,
+              college: 'KARE',
+              department: 'CSE',
+              isTeamLead: m.role === 'LEAD',
+              qrCodeData: m.registrationNumber
+            });
+          } else {
+            partDoc.teamName = item.teamName || item.teamId;
+            partDoc.name = m.name;
+            partDoc.isTeamLead = m.role === 'LEAD';
+            await partDoc.save();
+          }
+        }
       }
     }
 

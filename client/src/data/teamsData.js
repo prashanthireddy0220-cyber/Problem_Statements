@@ -718,6 +718,18 @@ const AUTHORIZED_TEAMS = [
       { name: 'BUSETTY SIVANAGA PRANATHI', registrationNumber: '99250040123', role: 'MEMBER' },
       { name: 'NANDYALA BALAJI', registrationNumber: '9924005332', role: 'MEMBER' }
     ]
+  },
+  {
+    teamId: 'ALPHA-061',
+    regNum: '9824005012',
+    teamName: 'TEAM 61',
+    leadName: 'VUTAKANTI SREEKANTH REDDY',
+    members: [
+      { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9824005012', role: 'LEAD' },
+      { name: 'RAAVULA VINAY', registrationNumber: '9923005124', role: 'MEMBER' },
+      { name: 'KOLA ADARSH', registrationNumber: '9923005097', role: 'MEMBER' },
+      { name: 'GORLA UPENDRA', registrationNumber: '9923005005', role: 'MEMBER' }
+    ]
   }
 ];
 
