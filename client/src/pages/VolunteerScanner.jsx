@@ -374,7 +374,7 @@ export default function VolunteerScanner() {
               TOTAL MARKED PRESENT
             </div>
             <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#00E676', fontFamily: 'Orbitron, monospace', marginTop: '0.2rem' }}>
-              {rosterStats.markedCount} <span style={{ fontSize: '0.9rem', color: '#94A3B8' }}>/ {rosterStats.totalRegistered}</span>
+              {rosterStats.presentCount !== undefined ? rosterStats.presentCount : rosterStats.markedCount} <span style={{ fontSize: '0.9rem', color: '#94A3B8' }}>/ {rosterStats.totalRegistered || totalMemberCount}</span>
             </div>
           </div>
 

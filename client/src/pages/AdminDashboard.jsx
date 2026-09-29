@@ -1715,7 +1715,7 @@ export default function AdminDashboard() {
             {/* Quick Summary Badges */}
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.75rem' }}>
               <span style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
-                Total Participants: <strong style={{ color: '#00F2FE' }}>{attStats.totalRegistered || 240}</strong>
+                Total Participants: <strong style={{ color: '#00F2FE' }}>{attStats.totalRegistered || 244}</strong>
               </span>
               <span style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
                 Individual Present: <strong style={{ color: '#00E676' }}>{attStats.present || 0}</strong>
