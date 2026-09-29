@@ -63,8 +63,8 @@ const handleTeamLeadLogin = async (req, res) => {
       ]
     });
 
-    const qrToken = `TQ-${targetTeamId}-${cleanRegNum.slice(-4)}`;
-    const passToken = `EP-${targetTeamId}-${cleanRegNum.slice(-4)}`;
+    const initialQrToken = `TQ-${targetTeamId}-${cleanRegNum.slice(-4)}`;
+    const initialPassToken = `EP-${targetTeamId}-${cleanRegNum.slice(-4)}`;
 
     if (!team) {
       team = await Team.create({
@@ -75,8 +75,8 @@ const handleTeamLeadLogin = async (req, res) => {
         college: 'KARE',
         department: 'CSE',
         members: authItem.members || [],
-        teamQrToken: qrToken,
-        eventPassQrToken: passToken,
+        teamQrToken: initialQrToken,
+        eventPassQrToken: initialPassToken,
         registrationStatus: 'CONFIRMED',
         eventPassStatus: 'ISSUED'
       });
