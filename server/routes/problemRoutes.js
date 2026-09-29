@@ -9,11 +9,15 @@ async function getOrUpdateSystemState() {
   let settings = await SystemSettings.findOne();
   if (!settings) {
     settings = await SystemSettings.create({
-      readingDurationMinutes: config.READING_DURATION_MINUTES,
-      selectionDurationMinutes: config.SELECTION_DURATION_MINUTES,
+      releaseDelayMinutes: 5,
+      selectionDelayMinutes: 2,
+      selectionDurationMinutes: 10,
+      readingDurationMinutes: 2,
       problemStatementsReleased: false,
       selectionScheduledStart: null,
       selectionManualState: 'NONE',
+      releaseManualState: 'NONE',
+      roundStatus: 'IDLE',
       currentPhase: 'NOT_RELEASED'
     });
   }
@@ -22,53 +26,83 @@ async function getOrUpdateSystemState() {
 
   // Dynamic Phase Evaluation Logic
   let computedPhase = 'NOT_RELEASED';
+  let isReleased = false;
 
-  if (!settings.problemStatementsReleased) {
+  if (settings.releaseManualState === 'UNRELEASED') {
     computedPhase = 'NOT_RELEASED';
-  } else {
-    // Problem Statements are Released
+    isReleased = false;
+  } else if (settings.releaseManualState === 'RELEASED') {
+    isReleased = true;
     if (settings.selectionManualState === 'OPEN') {
       computedPhase = 'SELECTION_OPEN';
     } else if (settings.selectionManualState === 'CLOSED') {
       computedPhase = 'SELECTION_CLOSED';
-    } else if (settings.selectionScheduledStart) {
-      const schedStart = new Date(settings.selectionScheduledStart);
-      if (now < schedStart) {
-        computedPhase = 'RELEASED_LOCKED';
-      } else {
-        // Scheduled time reached or passed
-        if (settings.selectionEndsAt && now >= new Date(settings.selectionEndsAt)) {
-          computedPhase = 'SELECTION_CLOSED';
-        } else {
-          computedPhase = 'SELECTION_OPEN';
-          // Auto set end time if not set
-          if (!settings.selectionEndsAt) {
-            settings.selectionEndsAt = new Date(schedStart.getTime() + (settings.selectionDurationMinutes || 5) * 60 * 1000);
-            await settings.save();
-          }
-        }
-      }
+    } else if (settings.selectionScheduledStart && now < new Date(settings.selectionScheduledStart)) {
+      computedPhase = 'RELEASED_LOCKED';
+    } else if (settings.selectionEndsAt && now >= new Date(settings.selectionEndsAt)) {
+      computedPhase = 'SELECTION_CLOSED';
     } else {
-      // Released, but no scheduled time set and manual state is NONE
-      // Fallback for legacy timer phases: READING -> RELEASED_LOCKED, SELECTION -> SELECTION_OPEN, CLOSED -> SELECTION_CLOSED
-      if (settings.currentPhase === 'SELECTION') {
+      computedPhase = 'SELECTION_OPEN';
+    }
+  } else if (settings.roundStatus === 'ACTIVE' || settings.releaseScheduledAt || settings.selectionScheduledStart) {
+    // Round has been started by Admin with automated timer sequence
+    const releaseTime = settings.releaseScheduledAt ? new Date(settings.releaseScheduledAt) : null;
+    const selectStartTime = settings.selectionScheduledStart ? new Date(settings.selectionScheduledStart) : null;
+    const selectEndTime = settings.selectionEndsAt ? new Date(settings.selectionEndsAt) : null;
+
+    if (releaseTime && now < releaseTime) {
+      // Stage 1: Release Delay (Problem Statements completely hidden)
+      computedPhase = 'ROUND_STARTED_UNRELEASED';
+      isReleased = false;
+    } else {
+      // Release delay has passed -> Problem Statements released to all Team Leads!
+      isReleased = true;
+
+      if (settings.selectionManualState === 'OPEN') {
         computedPhase = 'SELECTION_OPEN';
-      } else if (settings.currentPhase === 'CLOSED') {
+      } else if (settings.selectionManualState === 'CLOSED') {
+        computedPhase = 'SELECTION_CLOSED';
+      } else if (selectStartTime && now < selectStartTime) {
+        // Stage 2: Selection Delay (View/Read-Only Mode)
+        computedPhase = 'RELEASED_LOCKED';
+      } else if (selectEndTime && now >= selectEndTime) {
+        // Stage 3: Selection Closed
         computedPhase = 'SELECTION_CLOSED';
       } else {
-        computedPhase = 'RELEASED_LOCKED';
+        // Stage 3: Selection Open
+        computedPhase = 'SELECTION_OPEN';
+        if (!settings.selectionEndsAt && selectStartTime) {
+          const durMs = (settings.selectionDurationMinutes || 10) * 60 * 1000;
+          settings.selectionEndsAt = new Date(selectStartTime.getTime() + durMs);
+          await settings.save();
+        }
       }
+    }
+  } else {
+    // Round is IDLE and not released
+    if (settings.problemStatementsReleased) {
+      isReleased = true;
+      computedPhase = settings.selectionManualState === 'OPEN' ? 'SELECTION_OPEN' : 'RELEASED_LOCKED';
+    } else {
+      isReleased = false;
+      computedPhase = 'NOT_RELEASED';
     }
   }
 
-  if (settings.currentPhase !== computedPhase) {
+  if (settings.problemStatementsReleased !== isReleased || settings.currentPhase !== computedPhase) {
+    settings.problemStatementsReleased = isReleased;
     settings.currentPhase = computedPhase;
     await settings.save();
   }
 
   // Calculate remaining seconds strictly against server time
+  let timeUntilReleaseSeconds = 0;
   let timeUntilSelectionStartSeconds = 0;
   let selectionTimeRemainingSeconds = 0;
+
+  if (settings.releaseScheduledAt && now < new Date(settings.releaseScheduledAt)) {
+    timeUntilReleaseSeconds = Math.max(0, Math.floor((new Date(settings.releaseScheduledAt) - now) / 1000));
+  }
 
   if (settings.selectionScheduledStart && now < new Date(settings.selectionScheduledStart)) {
     timeUntilSelectionStartSeconds = Math.max(0, Math.floor((new Date(settings.selectionScheduledStart) - now) / 1000));
@@ -84,16 +118,19 @@ async function getOrUpdateSystemState() {
     settings,
     serverTime: now,
     currentPhase: computedPhase,
-    problemStatementsReleased: Boolean(settings.problemStatementsReleased),
+    problemStatementsReleased: isReleased,
+    roundStartedAt: settings.roundStartedAt,
+    releaseScheduledAt: settings.releaseScheduledAt,
     selectionScheduledStart: settings.selectionScheduledStart,
-    selectionManualState: settings.selectionManualState,
+    selectionEndsAt: settings.selectionEndsAt,
+    timeUntilReleaseSeconds,
     timeUntilSelectionStartSeconds,
     selectionTimeRemainingSeconds,
-    readingStartedAt: settings.readingStartedAt,
-    readingEndsAt: settings.readingEndsAt,
-    selectionStartedAt: settings.selectionStartedAt,
-    selectionEndsAt: settings.selectionEndsAt,
-    problemSelectionEnabled: settings.problemSelectionEnabled
+    releaseDelayMinutes: settings.releaseDelayMinutes || 5,
+    selectionDelayMinutes: settings.selectionDelayMinutes || settings.readingDurationMinutes || 2,
+    selectionDurationMinutes: settings.selectionDurationMinutes || 10,
+    problemSelectionEnabled: settings.problemSelectionEnabled,
+    roundStatus: settings.roundStatus
   };
 }
 

@@ -130,18 +130,24 @@ const ActiveSessionSchema = new mongoose.Schema({
 
 // 11. System Settings Schema
 const SystemSettingsSchema = new mongoose.Schema({
-  readingDurationMinutes: { type: Number, default: 30 },
-  selectionDurationMinutes: { type: Number, default: 5 },
+  releaseDelayMinutes: { type: Number, default: 5 },
+  selectionDelayMinutes: { type: Number, default: 2 },
+  selectionDurationMinutes: { type: Number, default: 10 },
+  readingDurationMinutes: { type: Number, default: 2 },
+  roundStartedAt: { type: Date, default: null },
+  releaseScheduledAt: { type: Date, default: null },
   readingStartedAt: { type: Date, default: null },
   readingEndsAt: { type: Date, default: null },
   selectionStartedAt: { type: Date, default: null },
+  selectionScheduledStart: { type: Date, default: null },
   selectionEndsAt: { type: Date, default: null },
   problemStatementsReleased: { type: Boolean, default: false },
-  selectionScheduledStart: { type: Date, default: null },
+  releaseManualState: { type: String, enum: ['NONE', 'RELEASED', 'UNRELEASED'], default: 'NONE' },
   selectionManualState: { type: String, enum: ['NONE', 'OPEN', 'CLOSED'], default: 'NONE' },
+  roundStatus: { type: String, enum: ['IDLE', 'ACTIVE', 'PAUSED', 'ENDED'], default: 'IDLE' },
   currentPhase: { 
     type: String, 
-    enum: ['NOT_RELEASED', 'RELEASED_LOCKED', 'SELECTION_OPEN', 'SELECTION_CLOSED', 'NOT_STARTED', 'READING', 'SELECTION', 'CLOSED'], 
+    enum: ['NOT_RELEASED', 'ROUND_STARTED_UNRELEASED', 'RELEASED_LOCKED', 'SELECTION_OPEN', 'SELECTION_CLOSED', 'NOT_STARTED', 'READING', 'SELECTION', 'CLOSED'], 
     default: 'NOT_RELEASED' 
   },
   teamLeadAccessEnabled: { type: Boolean, default: true },

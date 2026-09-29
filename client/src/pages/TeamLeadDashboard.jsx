@@ -293,10 +293,11 @@ export default function TeamLeadDashboard() {
     document.body.removeChild(link);
   };
 
-  const isUnreleased = !timerState?.problemStatementsReleased || timerState?.currentPhase === 'NOT_RELEASED';
+  const isRoundStartedUnreleased = timerState?.currentPhase === 'ROUND_STARTED_UNRELEASED';
   const isReleasedLocked = timerState?.problemStatementsReleased && (timerState?.currentPhase === 'RELEASED_LOCKED' || timerState?.currentPhase === 'READING' || timerState?.currentPhase === 'NOT_STARTED');
   const isSelectionOpen = timerState?.currentPhase === 'SELECTION_OPEN' || timerState?.currentPhase === 'SELECTION';
   const isSelectionClosed = timerState?.currentPhase === 'SELECTION_CLOSED' || timerState?.currentPhase === 'CLOSED';
+  const isUnreleased = !timerState?.problemStatementsReleased && !isRoundStartedUnreleased;
 
   const domains = ['ALL', 'IoT & Smart Energy', 'AI & Cybersecurity', 'Web3 & Blockchain', 'Smart Cities & AI', 'Healthcare & NLP'];
 
@@ -706,59 +707,73 @@ export default function TeamLeadDashboard() {
               <div className="glass-panel" style={{
                 padding: '1.75rem 2rem',
                 marginBottom: '2rem',
-                borderColor: isSelectionOpen ? '#00E676' : (isReleasedLocked ? '#FFD700' : 'rgba(255,255,255,0.1)'),
-                boxShadow: isSelectionOpen ? '0 0 35px rgba(0, 230, 118, 0.25)' : (isReleasedLocked ? '0 0 35px rgba(255, 215, 0, 0.25)' : 'none')
+                borderColor: isSelectionOpen ? '#00E676' : (isReleasedLocked ? '#FFD700' : (isRoundStartedUnreleased ? '#00F2FE' : 'rgba(255,255,255,0.1)')),
+                boxShadow: isSelectionOpen ? '0 0 35px rgba(0, 230, 118, 0.25)' : (isReleasedLocked ? '0 0 35px rgba(255, 215, 0, 0.25)' : (isRoundStartedUnreleased ? '0 0 35px rgba(0, 242, 254, 0.25)' : 'none'))
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
                   <div style={{ flex: 1, minWidth: '280px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.4rem' }}>
                       {isUnreleased && <span className="phase-pill closed" style={{ background: 'rgba(255,75,75,0.15)', color: '#FF4B4B' }}>🔴 NOT RELEASED</span>}
-                      {isReleasedLocked && <span className="phase-pill reading" style={{ background: 'rgba(255,215,0,0.15)', color: '#FFD700' }}>🟡 PROBLEM STATEMENTS RELEASED</span>}
+                      {isRoundStartedUnreleased && <span className="phase-pill reading" style={{ background: 'rgba(0,242,254,0.15)', color: '#00F2FE' }}>⏳ ROUND STARTED — RELEASING SOON</span>}
+                      {isReleasedLocked && <span className="phase-pill reading" style={{ background: 'rgba(255,215,0,0.15)', color: '#FFD700' }}>🟡 PROBLEM STATEMENTS RELEASED (READ-ONLY)</span>}
                       {isSelectionOpen && <span className="phase-pill selection" style={{ background: 'rgba(0,230,118,0.2)', color: '#00E676' }}>🟢 SELECTION IS OPEN</span>}
                       {isSelectionClosed && <span className="phase-pill closed">🔴 SELECTION CLOSED</span>}
                     </div>
                     
                     <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.4rem', color: '#F8FAFC', letterSpacing: '0.5px' }}>
                       {isUnreleased && 'Problem Statements have not been released yet.'}
-                      {isReleasedLocked && 'Problem Statements Released'}
+                      {isRoundStartedUnreleased && 'Problem Statements will be released soon'}
+                      {isReleasedLocked && 'Problem Statements Released — View / Read Only Mode'}
                       {isSelectionOpen && 'Selection is OPEN'}
                       {isSelectionClosed && 'Problem Selection Period Ended'}
                     </h2>
 
                     <p style={{ color: '#CBD5E1', fontSize: '0.92rem', marginTop: '0.35rem', lineHeight: '1.5' }}>
                       {isUnreleased && 'The administrator has not released the problem statements yet. Please stand by.'}
-                      {isReleasedLocked && 'Problem Statements are released for viewing. Selection will open automatically when the scheduled timer reaches 00:00:00.'}
+                      {isRoundStartedUnreleased && 'The round has been started by the administrator. Problem statements will be automatically published when the countdown reaches 00:00.'}
+                      {isReleasedLocked && 'Problem Statements are released for viewing. Problem selection is currently disabled and will be enabled automatically when the countdown reaches 00:00.'}
                       {isSelectionOpen && 'Selection is OPEN! Note: Each Problem Statement can be selected by a MAXIMUM OF 2 TEAMS (First-Come, First-Served basis).'}
                       {isSelectionClosed && 'The problem selection period is now closed. Unselected teams must contact the event administrator.'}
                     </p>
                   </div>
 
-                  {(isReleasedLocked || isSelectionOpen) && (
+                  {(isRoundStartedUnreleased || isReleasedLocked || isSelectionOpen) && (
                     <div style={{
                       background: 'rgba(15, 23, 42, 0.95)',
-                      border: `2px solid ${isSelectionOpen ? '#00E676' : '#FFD700'}`,
+                      border: `2px solid ${isSelectionOpen ? '#00E676' : (isReleasedLocked ? '#FFD700' : '#00F2FE')}`,
                       padding: '1.15rem 2rem',
                       borderRadius: '16px',
                       textAlign: 'center',
-                      boxShadow: `0 0 25px ${isSelectionOpen ? 'rgba(0, 230, 118, 0.35)' : 'rgba(255, 215, 0, 0.35)'}`
+                      boxShadow: `0 0 25px ${isSelectionOpen ? 'rgba(0, 230, 118, 0.35)' : (isReleasedLocked ? 'rgba(255, 215, 0, 0.35)' : 'rgba(0, 242, 254, 0.35)')}`
                     }}>
-                      <div style={{ fontSize: '0.75rem', color: isSelectionOpen ? '#00E676' : '#FFD700', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
-                        {isSelectionOpen ? 'SELECTION TIME REMAINING' : 'SELECTION STARTS IN'}
+                      <div style={{ fontSize: '0.75rem', color: isSelectionOpen ? '#00E676' : (isReleasedLocked ? '#FFD700' : '#00F2FE'), textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
+                        {isSelectionOpen ? 'SELECTION TIME REMAINING' : (isReleasedLocked ? 'SELECTION WILL BE ENABLED IN' : 'PROBLEM STATEMENTS WILL BE RELEASED IN')}
                       </div>
                       <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '2.5rem', fontWeight: '900', color: '#F8FAFC', letterSpacing: '3px', marginTop: '0.2rem' }}>
-                        {formatTime(secondsRemaining || (isReleasedLocked ? timerState?.timeUntilSelectionStartSeconds : timerState?.selectionTimeRemainingSeconds))}
+                        {formatTime(
+                          secondsRemaining || (
+                            isRoundStartedUnreleased ? timerState?.timeUntilReleaseSeconds :
+                            (isReleasedLocked ? timerState?.timeUntilSelectionStartSeconds : timerState?.selectionTimeRemainingSeconds)
+                          )
+                        )}
                       </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {isUnreleased ? (
+              {isUnreleased || isRoundStartedUnreleased ? (
                 <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', margin: '2rem 0' }}>
-                  <Lock size={48} color="#FF4B4B" style={{ margin: '0 auto 1rem' }} />
-                  <h3 style={{ color: '#F8FAFC', fontSize: '1.3rem', marginBottom: '0.5rem' }}>Problem Statements Have Not Been Released Yet</h3>
+                  <Lock size={48} color={isRoundStartedUnreleased ? '#00F2FE' : '#FF4B4B'} style={{ margin: '0 auto 1rem' }} />
+                  <h3 style={{ color: '#F8FAFC', fontSize: '1.3rem', marginBottom: '0.5rem' }}>
+                    {isRoundStartedUnreleased ? 'Problem Statements Releasing Soon' : 'Problem Statements Have Not Been Released Yet'}
+                  </h3>
                   <p style={{ color: '#94A3B8', fontSize: '0.95rem' }}>
-                    Problem Statements have not been released yet. Please wait for the event administrator to release them from the Admin panel.
+                    {isRoundStartedUnreleased ? (
+                      <>Problem Statements will be released in <strong style={{ color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>{formatTime(secondsRemaining || timerState?.timeUntilReleaseSeconds)}</strong>. Please wait.</>
+                    ) : (
+                      'Problem Statements have not been released yet. Please wait for the event administrator to start the round from the Admin panel.'
+                    )}
                   </p>
                 </div>
               ) : (

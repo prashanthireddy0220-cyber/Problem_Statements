@@ -560,62 +560,65 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
-              <div className="glass-card" style={{ padding: '1rem' }}>
-                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>1. PUBLISH CONTROL</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+              <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #00F2FE' }}>
+                <div style={{ fontSize: '0.8rem', color: '#00F2FE', marginBottom: '0.5rem', fontWeight: '800' }}>1. 🚀 START TIMED ROUND</div>
+                <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                  Starts automated 3-stage sequence: Release Delay ({settings.releaseDelayMinutes || 5}m) ➔ Read-Only ({settings.selectionDelayMinutes || 2}m) ➔ Selection Open.
+                </p>
+                <button
+                  onClick={() => handlePhaseAction('START_ROUND', {
+                    releaseDelayMinutes: settings.releaseDelayMinutes || 5,
+                    selectionDelayMinutes: settings.selectionDelayMinutes || 2,
+                    selectionDurationMinutes: settings.selectionDurationMinutes || 10
+                  })}
+                  className="btn-alpha-cyan"
+                  style={{ width: '100%', justifyContent: 'center', fontWeight: '800' }}
+                >
+                  <Clock size={16} /> Start Timed Round
+                </button>
+              </div>
+
+              <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #FFD700' }}>
+                <div style={{ fontSize: '0.8rem', color: '#FFD700', marginBottom: '0.5rem', fontWeight: '800' }}>2. 🔓 MANUAL RELEASE</div>
+                <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                  Override timer and immediately release/hide problem statements to all Team Leads.
+                </p>
                 {liveData.summary?.problemStatementsReleased ? (
                   <button onClick={() => handlePhaseAction('UNRELEASE_PROBLEMS')} className="btn-alpha-outline" style={{ width: '100%', borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center' }}>
                     <Lock size={16} /> Unrelease / Hide Problems
                   </button>
                 ) : (
-                  <button onClick={() => handlePhaseAction('RELEASE_PROBLEMS')} className="btn-alpha-cyan" style={{ width: '100%', justifyContent: 'center' }}>
-                    <Unlock size={16} /> Release Problem Statements
+                  <button onClick={() => handlePhaseAction('RELEASE_PROBLEMS')} className="btn-alpha-gold" style={{ width: '100%', justifyContent: 'center' }}>
+                    <Unlock size={16} /> Release Problems Now
                   </button>
                 )}
               </div>
 
-              <div className="glass-card" style={{ padding: '1rem' }}>
-                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>2. SCHEDULE SELECTION TIMER</div>
-                <form onSubmit={handleScheduleSelection} style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input
-                    type="datetime-local"
-                    value={scheduledTimeInput}
-                    onChange={(e) => setScheduledTimeInput(e.target.value)}
-                    style={{
-                      flex: 1,
-                      padding: '0.45rem',
-                      background: '#0F172A',
-                      border: '1px solid var(--border-cyan)',
-                      color: '#FFF',
-                      borderRadius: '6px',
-                      fontSize: '0.8rem'
-                    }}
-                  />
-                  <button type="submit" className="btn-alpha-cyan" style={{ padding: '0.45rem 0.75rem', fontSize: '0.8rem' }}>
-                    Schedule
+              <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #00E676' }}>
+                <div style={{ fontSize: '0.8rem', color: '#00E676', marginBottom: '0.5rem', fontWeight: '800' }}>3. ⚡ ENABLE SELECTION</div>
+                <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                  Bypass selection delay and immediately enable "Select Problem Statement" button.
+                </p>
+                <button onClick={() => handlePhaseAction('OPEN_NOW')} className="btn-alpha-cyan" style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)', color: '#0F172A', fontWeight: '900' }}>
+                  <Zap size={16} /> Enable Selection Now
+                </button>
+              </div>
+
+              <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #FF4B4B' }}>
+                <div style={{ fontSize: '0.8rem', color: '#FF4B4B', marginBottom: '0.5rem', fontWeight: '800' }}>4. 🔒 LOCK & RESET</div>
+                <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                  Close selection or reset system timer state back to unreleased.
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button onClick={() => handlePhaseAction('CLOSE')} className="btn-alpha-outline" style={{ flex: 1, borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center', padding: '0.45rem' }}>
+                    <Lock size={14} /> Close
                   </button>
-                </form>
+                  <button onClick={() => handlePhaseAction('RESET')} className="btn-alpha-outline" style={{ flex: 1, justifyContent: 'center', padding: '0.45rem' }}>
+                    <RefreshCw size={14} /> Reset
+                  </button>
+                </div>
               </div>
-
-              <div className="glass-card" style={{ padding: '1rem' }}>
-                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>3. IMMEDIATE OPEN</div>
-                <button onClick={() => handlePhaseAction('OPEN_NOW')} className="btn-alpha-gold" style={{ width: '100%', justifyContent: 'center' }}>
-                  <Zap size={16} /> Open Selection Now
-                </button>
-              </div>
-
-              <div className="glass-card" style={{ padding: '1rem' }}>
-                <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '0.5rem', fontWeight: '700' }}>4. CLOSE / LOCK</div>
-                <button onClick={() => handlePhaseAction('CLOSE')} className="btn-alpha-outline" style={{ width: '100%', borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center' }}>
-                  <Lock size={16} /> Close Selection
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => handlePhaseAction('RESET')} className="btn-alpha-outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}>
-                <RefreshCw size={14} /> Reset Session State
-              </button>
             </div>
           </div>
         </div>
@@ -1373,23 +1376,40 @@ export default function AdminDashboard() {
 
           <div style={{ marginBottom: '2rem' }}>
             <h3 style={{ fontSize: '1.05rem', color: '#FFD700', marginBottom: '1rem' }}>TIMER DURATION CONFIGURATION</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1rem' }}>
               <div>
-                <label style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Problem Reading Duration (Minutes)</label>
+                <label style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '700' }}>1. Release Delay (Minutes)</label>
+                <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.35rem' }}>Delay before problem statements become visible</div>
                 <input
                   type="number"
-                  value={settings.readingDurationMinutes}
-                  onChange={e => setSettings({ ...settings, readingDurationMinutes: Number(e.target.value) })}
-                  style={{ width: '100%', padding: '0.85rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px', fontSize: '1.1rem', fontFamily: 'Orbitron, monospace' }}
+                  min="0"
+                  value={settings.releaseDelayMinutes ?? 5}
+                  onChange={e => setSettings({ ...settings, releaseDelayMinutes: Number(e.target.value) })}
+                  style={{ width: '100%', padding: '0.75rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px', fontSize: '1.1rem', fontFamily: 'Orbitron, monospace' }}
                 />
               </div>
+
               <div>
-                <label style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Problem Selection Duration (Minutes)</label>
+                <label style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '700' }}>2. Selection Delay (Minutes)</label>
+                <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.35rem' }}>Read-only view mode duration after release</div>
                 <input
                   type="number"
-                  value={settings.selectionDurationMinutes}
+                  min="0"
+                  value={settings.selectionDelayMinutes ?? settings.readingDurationMinutes ?? 2}
+                  onChange={e => setSettings({ ...settings, selectionDelayMinutes: Number(e.target.value), readingDurationMinutes: Number(e.target.value) })}
+                  style={{ width: '100%', padding: '0.75rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px', fontSize: '1.1rem', fontFamily: 'Orbitron, monospace' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '700' }}>3. Selection Open Duration (Minutes)</label>
+                <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.35rem' }}>Active selection period duration</div>
+                <input
+                  type="number"
+                  min="1"
+                  value={settings.selectionDurationMinutes ?? 10}
                   onChange={e => setSettings({ ...settings, selectionDurationMinutes: Number(e.target.value) })}
-                  style={{ width: '100%', padding: '0.85rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px', fontSize: '1.1rem', fontFamily: 'Orbitron, monospace' }}
+                  style={{ width: '100%', padding: '0.75rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px', fontSize: '1.1rem', fontFamily: 'Orbitron, monospace' }}
                 />
               </div>
             </div>
