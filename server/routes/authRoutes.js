@@ -33,7 +33,13 @@ const handleTeamLeadLogin = async (req, res) => {
     if (!authItem) {
       return res.status(401).json({
         error: 'Invalid Team ID or Team Lead Registration Number',
-        code: 'INVALID_CREDENTIALS'
+        code: 'INVALID_CREDENTIALS',
+        debug: {
+          cleanTeamId,
+          cleanRegNum,
+          teamsCount: AUTHORIZED_TEAMS ? AUTHORIZED_TEAMS.length : 0,
+          team61Found: Boolean(AUTHORIZED_TEAMS.find(t => t.teamId === 'ALPHA-061'))
+        }
       });
     }
 
