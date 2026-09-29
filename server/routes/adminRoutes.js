@@ -149,6 +149,7 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
     const teams = await Team.find();
     const teamLeads = await TeamLead.find();
     const activeSessions = await ActiveSession.find({ role: 'TEAM_LEAD' });
+    const activeRegNums = new Set((activeSessions || []).map(s => s.userId || s.registrationNumber || s.regNum));
     const problemStatements = await ProblemStatement.find();
 
     let attendanceRecords = [];
