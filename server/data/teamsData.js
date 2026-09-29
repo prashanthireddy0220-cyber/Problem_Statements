@@ -589,11 +589,11 @@ const AUTHORIZED_TEAMS = [
   },
   {
     teamId: 'ALPHA-050',
-    regNum: '9924005012',
+    regNum: '9824005007',
     teamName: 'STRANGER THINGS',
     leadName: 'BOPADALA NAGA SANJAY',
     members: [
-      { name: 'BOPADALA NAGA SANJAY', registrationNumber: '9924005012', role: 'LEAD' },
+      { name: 'BOPADALA NAGA SANJAY', registrationNumber: '9824005007', role: 'LEAD' },
       { name: 'MORUMPALLI BHANUPRAKASH REDDY', registrationNumber: '9824005010', role: 'MEMBER' },
       { name: 'CHEMBETI VINAY HARSHA', registrationNumber: '9923005067', role: 'MEMBER' },
       { name: 'Y.PATHIV', registrationNumber: '9923005315', role: 'MEMBER' }
