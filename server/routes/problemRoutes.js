@@ -128,7 +128,7 @@ router.get('/', authenticateToken, async (req, res) => {
         problems: teamSelectedProblems,
         phase: state.currentPhase,
         timerState: state,
-        message: 'Problem Statements will be released soon.'
+        message: 'Problem Statements have not been released yet.'
       });
     }
 
@@ -164,6 +164,25 @@ router.get('/', authenticateToken, async (req, res) => {
 // 3. GET SINGLE PROBLEM DETAILS
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
+    const state = await getOrUpdateSystemState();
+    const isAdmin = req.user && req.user.role === 'ADMIN';
+
+    if (!state.problemStatementsReleased && !isAdmin) {
+      let isSelectedProblem = false;
+      if (req.user && req.user.role === 'TEAM_LEAD') {
+        const teamLead = await TeamLead.findOne({ registrationNumber: req.user.registrationNumber }).populate('teamId');
+        if (teamLead?.teamId?.selectedProblemCode) {
+          const problem = await ProblemStatement.findById(req.params.id);
+          if (problem && problem.problemId === teamLead.teamId.selectedProblemCode) {
+            isSelectedProblem = true;
+          }
+        }
+      }
+      if (!isSelectedProblem) {
+        return res.status(403).json({ error: 'Problem Statements have not been released yet.', code: 'NOT_RELEASED' });
+      }
+    }
+
     const problem = await ProblemStatement.findById(req.params.id);
     if (!problem) {
       return res.status(404).json({ error: 'Problem statement not found.' });

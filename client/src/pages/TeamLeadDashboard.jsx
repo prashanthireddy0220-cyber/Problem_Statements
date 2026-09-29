@@ -719,7 +719,7 @@ export default function TeamLeadDashboard() {
                     </div>
                     
                     <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.4rem', color: '#F8FAFC', letterSpacing: '0.5px' }}>
-                      {isUnreleased && 'Problem Statements will be released soon.'}
+                      {isUnreleased && 'Problem Statements have not been released yet.'}
                       {isReleasedLocked && 'Problem Statements Released'}
                       {isSelectionOpen && 'Selection is OPEN'}
                       {isSelectionClosed && 'Problem Selection Period Ended'}
@@ -756,9 +756,9 @@ export default function TeamLeadDashboard() {
               {isUnreleased ? (
                 <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', margin: '2rem 0' }}>
                   <Lock size={48} color="#FF4B4B" style={{ margin: '0 auto 1rem' }} />
-                  <h3 style={{ color: '#F8FAFC', fontSize: '1.3rem', marginBottom: '0.5rem' }}>Problem Statements Not Released</h3>
+                  <h3 style={{ color: '#F8FAFC', fontSize: '1.3rem', marginBottom: '0.5rem' }}>Problem Statements Have Not Been Released Yet</h3>
                   <p style={{ color: '#94A3B8', fontSize: '0.95rem' }}>
-                    Problem Statements will be released soon. Please wait for the event organizer to publish them.
+                    Problem Statements have not been released yet. Please wait for the event administrator to release them from the Admin panel.
                   </p>
                 </div>
               ) : (
