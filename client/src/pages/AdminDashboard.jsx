@@ -356,6 +356,30 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteSess = async (id, sessionName) => {
+    if (!window.confirm(`Are you sure you want to delete attendance session '${sessionName}' and its marked attendance records?`)) return;
+    try {
+      await axios.delete(`/api/attendance/sessions/${id}`);
+      setActionMsg(`Attendance session '${sessionName}' deleted!`);
+      setTimeout(() => setActionMsg(''), 3000);
+      fetchAllData();
+    } catch (err) {
+      alert('Failed to delete attendance session.');
+    }
+  };
+
+  const handleClearAllAttendance = async () => {
+    if (!window.confirm(`⚠️ Are you sure you want to CLEAR ALL attendance sessions and marked records from the system? This action cannot be undone.`)) return;
+    try {
+      await axios.delete('/api/attendance/clear-all');
+      setActionMsg('All attendance sessions and marked records deleted successfully!');
+      setTimeout(() => setActionMsg(''), 4000);
+      fetchAllData();
+    } catch (err) {
+      alert('Failed to clear attendance data.');
+    }
+  };
+
   const handleRevokeSession = async (regNum) => {
     if (!window.confirm(`Are you sure you want to revoke single-device access for ${regNum}?`)) return;
     try {
@@ -1613,7 +1637,7 @@ export default function AdminDashboard() {
               </p>
             </div>
             
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
                 onClick={() => window.open(`/api/attendance/admin/export?sessionId=${attSessionFilter}&status=${attStatusFilter}`, '_blank')}
                 className="btn-alpha-cyan"
@@ -1624,6 +1648,10 @@ export default function AdminDashboard() {
               
               <button onClick={() => setShowCreateSessModal(true)} className="btn-alpha-gold" style={{ fontSize: '0.85rem' }}>
                 <Plus size={18} /> Create Attendance Session
+              </button>
+
+              <button onClick={handleClearAllAttendance} className="btn-alpha-outline" style={{ fontSize: '0.85rem', borderColor: '#FF4B4B', color: '#FF4B4B', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Trash2 size={15} /> Clear All Attendance
               </button>
             </div>
           </div>
@@ -1641,7 +1669,7 @@ export default function AdminDashboard() {
                 <h4 style={{ color: '#F8FAFC', fontSize: '1.05rem', marginBottom: '0.25rem' }}>{s.sessionName}</h4>
                 <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>{s.date} • {s.startTime} - {s.endTime}</div>
 
-                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.75rem' }}>
+                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.75rem', flexWrap: 'wrap' }}>
                   {s.status !== 'ACTIVE' && (
                     <button
                       onClick={() => handleToggleSessStatus(s._id, 'ACTIVE')}
@@ -1660,6 +1688,13 @@ export default function AdminDashboard() {
                       🔴 Close Session
                     </button>
                   )}
+                  <button
+                    onClick={() => handleDeleteSess(s._id, s.sessionName)}
+                    className="btn-alpha-outline"
+                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', color: '#FF4B4B', borderColor: 'rgba(255,75,75,0.4)' }}
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
                 </div>
               </div>
             ))}

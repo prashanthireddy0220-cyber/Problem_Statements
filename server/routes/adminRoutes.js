@@ -527,20 +527,6 @@ router.post('/seed', async (req, res) => {
       }
     }
 
-    // F. Seed Sample Attendance Session
-    const sessCount = await AttendanceSession.countDocuments();
-    if (sessCount === 0) {
-      await AttendanceSession.create({
-        sessionId: 'SESS-101',
-        sessionName: 'Day 1 Morning Keynote',
-        date: new Date().toISOString().split('T')[0],
-        startTime: '09:00 AM',
-        endTime: '10:30 AM',
-        status: 'ACTIVE',
-        createdBy: 'admin'
-      });
-    }
-
     return res.json({ message: 'Seed data generated successfully!' });
   } catch (err) {
     console.error('Seed error:', err);

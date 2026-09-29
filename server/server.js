@@ -297,19 +297,6 @@ async function triggerAutoSeed() {
         }
       }
     }
-
-    const sessCount = await AttendanceSession.countDocuments();
-    if (sessCount === 0) {
-      await AttendanceSession.create({
-        sessionId: 'SESS-101',
-        sessionName: 'Day 1 Morning Keynote',
-        date: new Date().toISOString().split('T')[0],
-        startTime: '09:00 AM',
-        endTime: '10:30 AM',
-        status: 'ACTIVE',
-        createdBy: 'admin'
-      });
-    }
   } catch (e) {
     console.error('Auto-seed error:', e);
   }

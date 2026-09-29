@@ -103,6 +103,25 @@ router.delete('/sessions/:id', authenticateToken, requireRole('ADMIN'), async (r
   }
 });
 
+// 4B. ADMIN: CLEAR ALL ATTENDANCE SESSIONS & RECORDS
+router.delete('/clear-all', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    await AttendanceSession.deleteMany({});
+    await Attendance.deleteMany({});
+
+    await AuditLog.create({
+      actor: req.user.username || 'admin',
+      role: 'ADMIN',
+      action: 'CLEAR_ALL_ATTENDANCE',
+      target: 'All Attendance Sessions & Marked Records'
+    });
+
+    return res.json({ message: 'All attendance sessions and marked records deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to clear attendance data.' });
+  }
+});
+
 const AUTHORIZED_TEAMS = require('../data/teamsData');
 
 // Helper to look up official student name from AUTHORIZED_TEAMS dataset by registration number
