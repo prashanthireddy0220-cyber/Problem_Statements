@@ -85,7 +85,7 @@ app.get('*', (req, res) => {
 // Seed helper
 async function triggerAutoSeed() {
   try {
-    const { Admin, Volunteer, Reviewer, EvaluationRound, SystemSettings, ProblemStatement, Team, TeamLead, Participant, AttendanceSession } = require('./models/Schema');
+    const { Admin, Volunteer, Reviewer, EvaluationRound, SystemSettings, ProblemStatement, Team, TeamLead, Participant, AttendanceSession, Attendance } = require('./models/Schema');
     const bcrypt = require('bcryptjs');
 
     // Clean up all legacy indexes on teams collection
