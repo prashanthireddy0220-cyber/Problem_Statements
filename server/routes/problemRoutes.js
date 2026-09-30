@@ -271,48 +271,65 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
 
     const team = teamLead.teamId;
 
-    if (team.selectionConfirmed) {
-      return res.status(400).json({
-        error: 'Your team has already confirmed a problem statement selection.',
-        code: 'ALREADY_SELECTED',
-        selectedProblemCode: team.selectedProblemCode
-      });
-    }
-
-    // C. Find Target Problem Statement
+    // C. Check Target Problem Statement
     const problem = await ProblemStatement.findById(problemId);
     if (!problem || problem.status !== 'PUBLISHED') {
       return res.status(404).json({ error: 'Selected problem statement is unavailable or unpublished.' });
     }
 
+    // IDEMPOTENCY CHECK:
+    // If the team has already confirmed selection:
+    if (team.selectionConfirmed) {
+      // If it is the SAME problem, return 200 OK idempotently
+      if (team.selectedProblemId?.toString() === problem._id.toString() || team.selectedProblemCode === problem.problemId) {
+        return res.json({
+          message: 'Problem Statement selected successfully.',
+          isIdempotent: true,
+          selection: {
+            teamName: team.name,
+            problemId: team.selectedProblemCode,
+            problemTitle: problem.title,
+            domain: problem.domain,
+            selectedAt: team.selectedAt,
+            status: 'CONFIRMED'
+          }
+        });
+      }
+      return res.status(400).json({
+        error: 'Your team already has a Problem Statement.',
+        code: 'ALREADY_SELECTED',
+        selectedProblemCode: team.selectedProblemCode
+      });
+    }
+
     const maxCapacity = problem.maxTeamCapacity || 2;
     if (problem.selectedCount >= maxCapacity) {
       return res.status(400).json({
-        error: `This problem statement has already been selected by 2 teams. (${problem.selectedCount}/${maxCapacity} teams). Please select another problem.`,
+        error: 'This problem statement is now full. Please select another available Problem Statement.',
         code: 'PROBLEM_FULL'
       });
     }
 
-    // D. CRITICAL ATOMIC TRANSACTION / CONDITIONAL UPDATE (Prevents Concurrent Overbooking - Max 2 Teams)
+    // D. CRITICAL ATOMIC CONDITIONAL INCREMENT (Strictly prevents oversubscription beyond maxCapacity)
     const updatedProblem = await ProblemStatement.findOneAndUpdate(
       {
         _id: problem._id,
         status: 'PUBLISHED',
-        selectedCount: { $lt: maxCapacity } // Strict atomic condition check
+        selectedCount: { $lt: maxCapacity } // Atomic condition: MUST be strictly less than capacity
       },
       { $inc: { selectedCount: 1 } },
       { new: true }
     );
 
     if (!updatedProblem) {
-      // Race condition occurred: Another team claimed the last slot just milliseconds ago
+      // Race condition occurred: Another team claimed the last available slot just milliseconds ago
       return res.status(400).json({
-        error: `This problem statement has already been selected by 2 teams. Please choose another problem.`,
+        error: 'This problem statement is now full. Please select another available Problem Statement.',
         code: 'PROBLEM_FULL'
       });
     }
 
-    // E. Lock Team Selection Atomically (Prevents multi-tab double submission by same team)
+    // E. Lock Team Selection Atomically (Prevents multi-tab / parallel double submission by same team)
     const updatedTeam = await Team.findOneAndUpdate(
       {
         _id: team._id,
@@ -332,13 +349,31 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
     if (!updatedTeam) {
       // Rollback problem selectedCount if team had already selected in a parallel request
       await ProblemStatement.findByIdAndUpdate(updatedProblem._id, { $inc: { selectedCount: -1 } });
+
+      // Check if the team selected THIS exact problem in the parallel request (Idempotent response)
+      const freshTeam = await Team.findById(team._id);
+      if (freshTeam && (freshTeam.selectedProblemId?.toString() === updatedProblem._id.toString() || freshTeam.selectedProblemCode === updatedProblem.problemId)) {
+        return res.json({
+          message: 'Problem Statement selected successfully.',
+          isIdempotent: true,
+          selection: {
+            teamName: freshTeam.name,
+            problemId: freshTeam.selectedProblemCode,
+            problemTitle: updatedProblem.title,
+            domain: updatedProblem.domain,
+            selectedAt: freshTeam.selectedAt,
+            status: 'CONFIRMED'
+          }
+        });
+      }
+
       return res.status(400).json({
-        error: 'Your team has already confirmed a problem statement selection.',
+        error: 'Your team already has a Problem Statement.',
         code: 'ALREADY_SELECTED'
       });
     }
 
-    // F. Record Problem Selection Log with DB level unique constraint protection
+    // F. Record Problem Selection Log with DB-level unique constraint protection
     try {
       await ProblemSelection.create({
         teamId: updatedTeam._id,
@@ -349,7 +384,24 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
       });
     } catch (selErr) {
       if (selErr.code === 11000) {
-        // Duplicate selection record for team
+        // Unique constraint on teamId hit: Check if it's the exact same problem
+        const existingSel = await ProblemSelection.findOne({ teamId: updatedTeam._id });
+        if (existingSel && existingSel.problemStatementId?.toString() === updatedProblem._id.toString()) {
+          return res.json({
+            message: 'Problem Statement selected successfully.',
+            isIdempotent: true,
+            selection: {
+              teamName: updatedTeam.name,
+              problemId: updatedProblem.problemId,
+              problemTitle: updatedProblem.title,
+              domain: updatedProblem.domain,
+              selectedAt: updatedTeam.selectedAt,
+              status: 'CONFIRMED'
+            }
+          });
+        }
+
+        // Duplicate selection record for team with a different PS -> Rollback
         await Team.findByIdAndUpdate(updatedTeam._id, {
           selectedProblemId: null,
           selectedProblemCode: null,
@@ -358,20 +410,24 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
         });
         await ProblemStatement.findByIdAndUpdate(updatedProblem._id, { $inc: { selectedCount: -1 } });
         return res.status(400).json({
-          error: 'Your team has already confirmed a problem statement selection.',
+          error: 'Your team already has a Problem Statement.',
           code: 'ALREADY_SELECTED'
         });
       }
     }
 
     // G. Audit Log Entry
-    await AuditLog.create({
-      actor: req.user.registrationNumber,
-      role: 'TEAM_LEAD',
-      action: 'SELECT_PROBLEM',
-      target: updatedProblem.problemId,
-      metadata: { teamName: updatedTeam.name, problemTitle: updatedProblem.title }
-    });
+    try {
+      await AuditLog.create({
+        actor: req.user.registrationNumber,
+        role: 'TEAM_LEAD',
+        action: 'SELECT_PROBLEM',
+        target: updatedProblem.problemId,
+        metadata: { teamName: updatedTeam.name, problemTitle: updatedProblem.title }
+      });
+    } catch (auditErr) {
+      console.warn('AuditLog creation warning (non-fatal):', auditErr.message);
+    }
 
     return res.json({
       message: 'Problem Statement selected successfully.',

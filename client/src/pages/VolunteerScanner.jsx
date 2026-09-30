@@ -47,14 +47,18 @@ export default function VolunteerScanner() {
       setSessions(list);
       
       if (list.length > 0) {
-        if (!selectedSessionId) {
+        if (!selectedSessionId || !list.some(s => s.sessionId === selectedSessionId)) {
           const activeSess = list.find(s => s.status === 'ACTIVE') || list[0];
           setSelectedSessionId(activeSess.sessionId);
           setActiveSession(activeSess);
         } else {
-          const current = list.find(s => s.sessionId === selectedSessionId) || list[0];
-          setActiveSession(current);
+          const current = list.find(s => s.sessionId === selectedSessionId);
+          setActiveSession(current || null);
         }
+      } else {
+        setSelectedSessionId('');
+        setActiveSession(null);
+        setRoster([]);
       }
     } catch (e) {
       // ignore
@@ -359,6 +363,16 @@ export default function VolunteerScanner() {
 
   const isClosed = activeSession?.status === 'CLOSED';
   const isActive = activeSession?.status === 'ACTIVE';
+
+  const isTeamAlreadySubmitted = Boolean(
+    scannedParticipant && roster.some(r => {
+      const memberRegs = (scannedParticipant.members || []).map(m => String(m.registrationNumber || '').trim().toUpperCase());
+      const cleanScannedTeamId = String(scannedParticipant.teamId || '').trim().toUpperCase();
+      const rReg = String(r.participantRegNum || '').trim().toUpperCase();
+      const rTeam = String(r.teamId || '').trim().toUpperCase();
+      return (memberRegs.includes(rReg) || (cleanScannedTeamId && rTeam === cleanScannedTeamId)) && (r.status === 'PRESENT' || r.status === 'ABSENT');
+    })
+  );
 
   return (
     <div className="main-layout" style={{ maxWidth: '1000px' }}>
@@ -714,15 +728,27 @@ export default function VolunteerScanner() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', alignItems: 'center' }}>
                 <button onClick={() => setScannedParticipant(null)} className="btn-alpha-outline">Cancel</button>
                 <button
                   onClick={handleMarkTeamAttendance}
-                  disabled={markingLoading}
+                  disabled={markingLoading || isTeamAlreadySubmitted || !isActive}
                   className="btn-alpha-cyan"
-                  style={{ background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)', padding: '0.75rem 1.5rem', fontWeight: '800' }}
+                  style={{
+                    background: isTeamAlreadySubmitted 
+                      ? 'rgba(255, 75, 75, 0.2)' 
+                      : 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)',
+                    border: isTeamAlreadySubmitted ? '1px solid #FF4B4B' : '1px solid #00F2FE',
+                    color: isTeamAlreadySubmitted ? '#FF4B4B' : '#0F172A',
+                    padding: '0.75rem 1.5rem',
+                    fontWeight: '800',
+                    cursor: (isTeamAlreadySubmitted || !isActive) ? 'not-allowed' : 'pointer',
+                    opacity: (isTeamAlreadySubmitted || !isActive) ? 0.7 : 1
+                  }}
                 >
-                  {markingLoading ? 'Submitting...' : 'SUBMIT TEAM ATTENDANCE ✅'}
+                  {isTeamAlreadySubmitted 
+                    ? '🔒 ATTENDANCE LOCKED (ALREADY SUBMITTED)' 
+                    : (markingLoading ? 'Submitting...' : 'SUBMIT TEAM ATTENDANCE ✅')}
                 </button>
               </div>
             </div>

@@ -36,6 +36,21 @@ router.post('/sessions/create', authenticateToken, requireRole('ADMIN'), async (
       return res.status(400).json({ error: 'Session name, date, start time, and end time are required.' });
     }
 
+    const targetStatus = status || 'UPCOMING';
+
+    // REQUIREMENT 17: Maximum ONE active attendance session at any time
+    if (targetStatus === 'ACTIVE') {
+      const activeSession = await AttendanceSession.findOne({ status: 'ACTIVE' });
+      if (activeSession) {
+        return res.status(400).json({
+          error: 'Another attendance session is currently active. Close it before opening a new session.',
+          code: 'ACTIVE_SESSION_EXISTS',
+          activeSessionId: activeSession.sessionId,
+          activeSessionName: activeSession.sessionName
+        });
+      }
+    }
+
     const sessionId = `SESS-${Date.now().toString().slice(-6)}`;
     const newSession = await AttendanceSession.create({
       sessionId,
@@ -43,7 +58,7 @@ router.post('/sessions/create', authenticateToken, requireRole('ADMIN'), async (
       date,
       startTime,
       endTime,
-      status: status || 'ACTIVE',
+      status: targetStatus,
       createdBy: req.user.username || 'Admin'
     });
 
@@ -60,17 +75,40 @@ router.post('/sessions/create', authenticateToken, requireRole('ADMIN'), async (
   }
 });
 
-// 3. ADMIN: UPDATE ATTENDANCE SESSION STATUS (Start / Close / Reopen)
-router.put('/sessions/:id/status', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+// 3. ADMIN: UPDATE ATTENDANCE SESSION STATUS (Start / Close / Reopen) - PUT and PATCH
+const updateSessionStatusHandler = async (req, res) => {
   try {
     const { status } = req.body;
     if (!['UPCOMING', 'ACTIVE', 'CLOSED'].includes(status)) {
       return res.status(400).json({ error: 'Invalid session status.' });
     }
 
-    const session = await AttendanceSession.findById(req.params.id);
+    const session = await AttendanceSession.findOne({
+      $or: [
+        { _id: req.params.id.match(/^[0-9a-fA-F]{24}$/) ? req.params.id : null },
+        { sessionId: req.params.id }
+      ].filter(Boolean)
+    });
+
     if (!session) {
       return res.status(404).json({ error: 'Attendance session not found.' });
+    }
+
+    // REQUIREMENT 17: Maximum ONE active attendance session at any time
+    if (status === 'ACTIVE') {
+      const activeSession = await AttendanceSession.findOne({
+        status: 'ACTIVE',
+        _id: { $ne: session._id },
+        sessionId: { $ne: session.sessionId }
+      });
+      if (activeSession) {
+        return res.status(400).json({
+          error: 'Another attendance session is currently active. Close it before opening a new session.',
+          code: 'ACTIVE_SESSION_EXISTS',
+          activeSessionId: activeSession.sessionId,
+          activeSessionName: activeSession.sessionName
+        });
+      }
     }
 
     session.status = status;
@@ -87,17 +125,26 @@ router.put('/sessions/:id/status', authenticateToken, requireRole('ADMIN'), asyn
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update session status.' });
   }
-});
+};
+
+router.put('/sessions/:id/status', authenticateToken, requireRole('ADMIN'), updateSessionStatusHandler);
+router.patch('/sessions/:id/status', authenticateToken, requireRole('ADMIN'), updateSessionStatusHandler);
 
 // 4. ADMIN: DELETE ATTENDANCE SESSION
 router.delete('/sessions/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const session = await AttendanceSession.findById(req.params.id);
+    const session = await AttendanceSession.findOne({
+      $or: [
+        { _id: req.params.id.match(/^[0-9a-fA-F]{24}$/) ? req.params.id : null },
+        { sessionId: req.params.id }
+      ].filter(Boolean)
+    });
+
     if (!session) {
       return res.status(404).json({ error: 'Session not found.' });
     }
 
-    await AttendanceSession.findByIdAndDelete(req.params.id);
+    await AttendanceSession.findByIdAndDelete(session._id);
     await Attendance.deleteMany({ sessionId: session.sessionId });
 
     await AuditLog.create({
@@ -609,6 +656,28 @@ router.post('/mark-team-attendance', authenticateToken, requireRole('VOLUNTEER',
 
     const volunteerName = (req.user?.username || req.user?.name || req.user?.registrationNumber || 'Volunteer').trim() || 'Volunteer';
     const volunteerRole = req.user?.role || 'VOLUNTEER';
+
+    // REQUIREMENT 18: Once submitted, lock submission so volunteer cannot submit the same team twice
+    const memberRegs = attendanceList
+      .map(item => String(item.registrationNumber || item.regNum || item.regNo || '').trim().toUpperCase())
+      .filter(Boolean);
+
+    const existingSubmission = await Attendance.findOne({
+      sessionId: session.sessionId,
+      $or: [
+        { teamId: authTeam?.teamId || cleanTeamId },
+        { teamName: teamName },
+        { participantRegNum: { $in: memberRegs } }
+      ]
+    });
+
+    if (existingSubmission && req.user?.role !== 'ADMIN' && !req.body.forceUpdate) {
+      return res.status(400).json({
+        error: `Attendance for Team ${teamName} (${cleanTeamId || 'ALPHA'}) has already been submitted and locked for this session.`,
+        code: 'TEAM_ALREADY_SUBMITTED'
+      });
+    }
+
     const savedRecords = [];
 
     for (const item of attendanceList) {

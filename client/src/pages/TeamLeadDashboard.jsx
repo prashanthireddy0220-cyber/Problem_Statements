@@ -181,10 +181,18 @@ export default function TeamLeadDashboard() {
       try {
         const res = await axios.get('/api/attendance/sessions');
         if (res.data?.sessions) {
-          setAttSessions(res.data.sessions);
-          if (!selectedAttSession && res.data.sessions.length > 0) {
-            const active = res.data.sessions.find(s => s.status === 'ACTIVE') || res.data.sessions[0];
-            setSelectedAttSession(active);
+          const list = res.data.sessions || [];
+          setAttSessions(list);
+          if (list.length > 0) {
+            if (!selectedAttSession || !list.some(s => s.sessionId === selectedAttSession.sessionId)) {
+              const active = list.find(s => s.status === 'ACTIVE') || list[0];
+              setSelectedAttSession(active);
+            } else {
+              const current = list.find(s => s.sessionId === selectedAttSession.sessionId);
+              setSelectedAttSession(current || null);
+            }
+          } else {
+            setSelectedAttSession(null);
           }
         }
 
@@ -843,11 +851,15 @@ export default function TeamLeadDashboard() {
                                 fontWeight: '700',
                                 padding: '0.25rem 0.65rem',
                                 borderRadius: '12px',
-                                background: isFull ? 'rgba(255,75,75,0.2)' : 'rgba(0,230,118,0.15)',
-                                color: isFull ? '#FF4B4B' : '#00E676',
-                                border: `1px solid ${isFull ? 'rgba(255,75,75,0.4)' : 'rgba(0,230,118,0.3)'}`
+                                background: isFull 
+                                  ? 'rgba(255,75,75,0.2)' 
+                                  : (count === 1 ? 'rgba(255,215,0,0.18)' : 'rgba(0,230,118,0.15)'),
+                                color: isFull 
+                                  ? '#FF4B4B' 
+                                  : (count === 1 ? '#FFD700' : '#00E676'),
+                                border: `1px solid ${isFull ? 'rgba(255,75,75,0.4)' : (count === 1 ? 'rgba(255,215,0,0.4)' : 'rgba(0,230,118,0.3)')}`
                               }}>
-                                {isFull ? `FULL - ${count}/${maxCap} Teams` : `AVAILABLE (${count}/${maxCap} Teams)`}
+                                {isFull ? `FULL (${count}/${maxCap})` : (count === 1 ? `ALMOST FULL (${count}/${maxCap})` : `AVAILABLE (${count}/${maxCap})`)}
                               </span>
                             </div>
 
@@ -882,7 +894,7 @@ export default function TeamLeadDashboard() {
                               className="btn-alpha-gold"
                               style={{ flex: 1, padding: '0.6rem', fontSize: '0.82rem', justifyContent: 'center', opacity: (!isSelectionOpen || isFull) ? 0.45 : 1 }}
                             >
-                              {isReleasedLocked ? 'SELECTION NOT STARTED' : (isFull ? `FULL (${count}/${maxCap})` : (isSelectionClosed ? 'SELECTION CLOSED' : 'Select Problem'))}
+                              {isReleasedLocked ? 'RELEASE NOT STARTED' : (isFull ? `FULL (${count}/${maxCap})` : (isSelectionClosed ? 'SELECTION CLOSED' : (count === 1 ? 'ALMOST FULL • Select' : 'Select Problem')))}
                             </button>
                           </div>
                         </div>
@@ -1215,7 +1227,7 @@ export default function TeamLeadDashboard() {
                 className="btn-alpha-gold"
                 disabled={selectingLoading}
               >
-                {selectingLoading ? 'Confirming...' : 'CONFIRM & LOCK SELECTION ✅'}
+                {selectingLoading ? 'Selecting...' : 'CONFIRM & LOCK SELECTION ✅'}
               </button>
             </div>
           </div>

@@ -345,7 +345,7 @@ export default function AdminDashboard() {
       setTimeout(() => setActionMsg(''), 3000);
       fetchAllData();
     } catch (err) {
-      alert('Failed to update session status.');
+      alert(err.response?.data?.error || 'Failed to update session status.');
     }
   };
 
@@ -357,7 +357,7 @@ export default function AdminDashboard() {
       setTimeout(() => setActionMsg(''), 3000);
       fetchAllData();
     } catch (err) {
-      alert('Failed to delete attendance session.');
+      alert(err.response?.data?.error || 'Failed to delete attendance session.');
     }
   };
 
