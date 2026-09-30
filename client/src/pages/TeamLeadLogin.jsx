@@ -8,6 +8,7 @@ export default function TeamLeadLogin() {
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Verifying Credentials...');
   const { loginTeamLead } = useAuth();
   const navigate = useNavigate();
 
@@ -21,10 +22,16 @@ export default function TeamLeadLogin() {
 
     setError('');
     setLoading(true);
+    setLoadingMessage('Verifying Credentials...');
+
+    const wakeTimer = setTimeout(() => {
+      setLoadingMessage('Waking up server instance...');
+    }, 2500);
 
     const deviceId = `browser-device-${Math.random().toString(36).substring(2, 9)}`;
     const result = await loginTeamLead(teamId, registrationNumber, deviceId);
 
+    clearTimeout(wakeTimer);
     setLoading(false);
     if (result.success) {
       navigate('/team-lead/dashboard');
@@ -130,7 +137,7 @@ export default function TeamLeadLogin() {
             className="btn-alpha-cyan"
             style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontSize: '1rem' }}
           >
-            {loading ? 'Verifying Credentials...' : (
+            {loading ? loadingMessage : (
               <>
                 <LogIn size={18} /> Login to Selection Portal
               </>

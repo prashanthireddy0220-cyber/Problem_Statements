@@ -105,26 +105,22 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
 
     const targetTeamId = authItem?.teamId || userTeamId;
 
-    // 1. Lookup Team Lead & Team
-    let team = null;
-    if (targetTeamId) {
-      team = await Team.findOne({
+    // 1. Lookup Team Lead & Team concurrently
+    let [team, teamLead] = await Promise.all([
+      targetTeamId ? Team.findOne({
         $or: [
           { teamId: targetTeamId },
           { name: targetTeamId }
         ]
-      });
-    }
+      }) : null,
+      TeamLead.findOne({ registrationNumber: cleanRegNum })
+    ]);
 
-    let teamLead = null;
-    if (team) {
-      teamLead = await TeamLead.findOne({ teamId: team._id }).populate('teamId');
+    if (!team && teamLead?.teamId) {
+      team = await Team.findById(teamLead.teamId);
     }
-    if (!teamLead) {
-      teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
-    }
-    if (!team) {
-      team = teamLead?.teamId;
+    if (!teamLead && team) {
+      teamLead = await TeamLead.findOne({ teamId: team._id });
     }
     if (!team && cleanRegNum) {
       team = await Team.findOne({ teamLeadRegNum: cleanRegNum });

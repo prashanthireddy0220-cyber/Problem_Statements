@@ -79,6 +79,16 @@ export const AuthProvider = ({ children }) => {
     return () => axios.interceptors.request.eject(reqInterceptor);
   }, [token]);
 
+  // Proactively wake up backend cloud instance on site load and keep alive
+  useEffect(() => {
+    const warmBackend = () => {
+      axios.get('/api/health').catch(() => {});
+    };
+    warmBackend();
+    const keepAliveTimer = setInterval(warmBackend, 4 * 60 * 1000); // Ping every 4 minutes to avoid Render sleep
+    return () => clearInterval(keepAliveTimer);
+  }, []);
+
   useEffect(() => {
     const verifySessionOnMount = async () => {
       const savedToken = localStorage.getItem('alpha_token');

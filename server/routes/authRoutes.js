@@ -78,15 +78,20 @@ const handleTeamLeadLogin = async (req, res) => {
     }
 
     const targetTeamId = authItem.teamId;
+    const newSessionId = uuidv4();
+    const currentDeviceId = deviceId || `browser-${Date.now()}`;
 
-    // 2. Ensure target Team document exists in database
-    let team = await Team.findOne({
-      $or: [
-        { name: targetTeamId },
-        { teamId: targetTeamId },
-        { teamName: authItem.teamName }
-      ]
-    });
+    // 2. Fetch Team and TeamLead concurrently in parallel
+    let [team, teamLead] = await Promise.all([
+      Team.findOne({
+        $or: [
+          { teamId: targetTeamId },
+          { name: targetTeamId },
+          { teamName: authItem.teamName }
+        ]
+      }),
+      TeamLead.findOne({ registrationNumber: cleanRegNum })
+    ]);
 
     const initialQrToken = `TQ-${targetTeamId}-${cleanRegNum.slice(-4)}`;
     const initialPassToken = `EP-${targetTeamId}-${cleanRegNum.slice(-4)}`;
@@ -106,19 +111,19 @@ const handleTeamLeadLogin = async (req, res) => {
         eventPassStatus: 'ISSUED'
       });
     } else {
-      team.name = targetTeamId;
-      team.teamId = targetTeamId;
-      if (authItem.teamName) team.teamName = authItem.teamName;
-      if (authItem.members && Array.isArray(authItem.members) && authItem.members.length > 0) {
-        team.members = authItem.members;
+      // Only write to database if essential tokens are missing
+      let needsSave = false;
+      if (!team.teamQrToken) { team.teamQrToken = initialQrToken; needsSave = true; }
+      if (!team.eventPassQrToken) { team.eventPassQrToken = initialPassToken; needsSave = true; }
+      if (!team.teamId) { team.teamId = targetTeamId; needsSave = true; }
+      if (needsSave) {
+        await team.save();
       }
-      await team.save();
     }
 
-    // 3. Lookup or Create TeamLead document in Database
-    let teamLead = await TeamLead.findOne({ teamId: team._id }).populate('teamId');
-    if (!teamLead) {
-      teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum }).populate('teamId');
+    // Fallback: If teamLead not found by regNum, look up by team._id
+    if (!teamLead && team) {
+      teamLead = await TeamLead.findOne({ teamId: team._id });
     }
 
     if (!teamLead) {
@@ -127,45 +132,40 @@ const handleTeamLeadLogin = async (req, res) => {
         name: authItem?.leadName || `Team Lead (${targetTeamId})`,
         teamId: team._id,
         phone: '9876543210',
-        email: `${cleanRegNum}@klu.ac.in`
+        email: `${cleanRegNum}@klu.ac.in`,
+        activeSessionId: newSessionId
       });
     } else {
+      if (teamLead.revoked) {
+        return res.status(403).json({
+          error: 'Your account access has been revoked by the administrator.',
+          code: 'ACCOUNT_REVOKED'
+        });
+      }
       teamLead.teamId = team._id;
+      teamLead.activeSessionId = newSessionId;
       teamLead.registrationNumber = cleanRegNum;
       if (authItem?.leadName) teamLead.name = authItem.leadName;
-      await teamLead.save();
-    }
-    teamLead.teamId = team;
-
-    if (teamLead.revoked) {
-      return res.status(403).json({
-        error: 'Your account access has been revoked by the administrator.',
-        code: 'ACCOUNT_REVOKED'
-      });
     }
 
-    // Generate new Session ID for this login
-    const newSessionId = uuidv4();
-    const currentDeviceId = deviceId || `browser-${Date.now()}`;
+    // Concurrently persist activeSession and updated teamLead
+    const sessionPromise = ActiveSession.deleteMany({ registrationNumber: cleanRegNum })
+      .then(() => ActiveSession.create({
+        userId: teamLead._id.toString(),
+        registrationNumber: cleanRegNum,
+        role: 'TEAM_LEAD',
+        sessionId: newSessionId,
+        deviceId: currentDeviceId,
+        loginTime: new Date(),
+        lastActivity: new Date(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      }));
 
-    // SINGLE DEVICE ENFORCEMENT: Update activeSessionId on TeamLead
-    teamLead.activeSessionId = newSessionId;
-    await teamLead.save();
-
-    // Delete any previous active session records for this user
-    await ActiveSession.deleteMany({ registrationNumber: cleanRegNum });
-
-    // Insert new active session record
-    await ActiveSession.create({
-      userId: teamLead._id.toString(),
-      registrationNumber: cleanRegNum,
-      role: 'TEAM_LEAD',
-      sessionId: newSessionId,
-      deviceId: currentDeviceId,
-      loginTime: new Date(),
-      lastActivity: new Date(),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-    });
+    if (teamLead.isModified && teamLead.isModified()) {
+      await Promise.all([teamLead.save(), sessionPromise]);
+    } else {
+      await sessionPromise;
+    }
 
     // Create JWT Token containing sessionId
     const token = jwt.sign({
@@ -176,20 +176,20 @@ const handleTeamLeadLogin = async (req, res) => {
       sessionId: newSessionId
     }, JWT_SECRET, { expiresIn: '24h' });
 
-    // Log audit event
-    await AuditLog.create({
+    // Non-blocking Audit log
+    AuditLog.create({
       actor: cleanRegNum,
       role: 'TEAM_LEAD',
       action: 'LOGIN',
       target: teamLead.name,
       metadata: { deviceId: currentDeviceId, sessionId: newSessionId, teamId: cleanTeamId }
-    });
+    }).catch(err => console.error('AuditLog login write error:', err));
 
     const displayLeadName = authItem?.leadName || teamLead.name || `Team Lead (${cleanTeamId})`;
-    const displayTeamName = authItem?.teamName || teamLead.teamId?.teamName || teamLead.teamId?.name || cleanTeamId;
-    const teamMembers = (authItem?.members && authItem.members.length > 0) ? authItem.members : (teamLead.teamId?.members || []);
-    const qrToken = teamLead.teamId?.teamQrToken || `TQ-${cleanTeamId}-${cleanRegNum.slice(-4)}`;
-    const passToken = teamLead.teamId?.eventPassQrToken || `EP-${cleanTeamId}-${cleanRegNum.slice(-4)}`;
+    const displayTeamName = authItem?.teamName || team?.teamName || team?.name || cleanTeamId;
+    const teamMembers = (authItem?.members && authItem.members.length > 0) ? authItem.members : (team?.members || []);
+    const qrToken = team?.teamQrToken || `TQ-${cleanTeamId}-${cleanRegNum.slice(-4)}`;
+    const passToken = team?.eventPassQrToken || `EP-${cleanTeamId}-${cleanRegNum.slice(-4)}`;
 
     return res.json({
       message: 'Login successful',
@@ -201,19 +201,19 @@ const handleTeamLeadLogin = async (req, res) => {
         name: displayLeadName,
         role: 'TEAM_LEAD',
         team: {
-          id: teamLead.teamId?._id || cleanTeamId,
+          id: team?._id || cleanTeamId,
           teamId: cleanTeamId,
           name: displayTeamName,
           teamName: displayTeamName,
-          college: teamLead.teamId?.college || 'KARE',
-          department: teamLead.teamId?.department || 'CSE',
-          registrationStatus: teamLead.teamId?.registrationStatus || 'CONFIRMED',
-          eventPassStatus: teamLead.teamId?.eventPassStatus || 'ISSUED',
+          college: team?.college || 'KARE',
+          department: team?.department || 'CSE',
+          registrationStatus: team?.registrationStatus || 'CONFIRMED',
+          eventPassStatus: team?.eventPassStatus || 'ISSUED',
           members: teamMembers,
           teamQrToken: qrToken,
           eventPassQrToken: passToken,
-          selectionConfirmed: Boolean(teamLead.teamId?.selectionConfirmed),
-          selectedProblemCode: teamLead.teamId?.selectedProblemCode || null
+          selectionConfirmed: Boolean(team?.selectionConfirmed),
+          selectedProblemCode: team?.selectedProblemCode || null
         }
       }
     });
@@ -268,12 +268,13 @@ router.post('/admin/login', async (req, res) => {
       sessionId: newSessionId
     }, JWT_SECRET, { expiresIn: '24h' });
 
-    await AuditLog.create({
+    // Non-blocking Audit log
+    AuditLog.create({
       actor: admin.username,
       role: 'ADMIN',
       action: 'LOGIN',
       target: 'Admin Dashboard'
-    });
+    }).catch(err => console.error('Admin AuditLog write error:', err));
 
     return res.json({
       message: 'Admin login successful',
@@ -327,12 +328,13 @@ router.post('/volunteer/login', async (req, res) => {
       sessionId: newSessionId
     }, JWT_SECRET, { expiresIn: '24h' });
 
-    await AuditLog.create({
+    // Non-blocking Audit log
+    AuditLog.create({
       actor: volunteer.username,
       role: 'VOLUNTEER',
       action: 'LOGIN',
       target: 'Volunteer Attendance Dashboard'
-    });
+    }).catch(err => console.error('Volunteer AuditLog write error:', err));
 
     return res.json({
       message: 'Volunteer login successful',
@@ -387,12 +389,13 @@ const handleReviewerLogin = async (req, res) => {
       sessionId: newSessionId
     }, JWT_SECRET, { expiresIn: '24h' });
 
-    await AuditLog.create({
+    // Non-blocking Audit log
+    AuditLog.create({
       actor: reviewer.username,
       role: 'REVIEWER',
       action: 'LOGIN',
       target: 'Reviewer Dashboard'
-    });
+    }).catch(err => console.error('Reviewer AuditLog write error:', err));
 
     return res.json({
       message: 'Reviewer login successful',

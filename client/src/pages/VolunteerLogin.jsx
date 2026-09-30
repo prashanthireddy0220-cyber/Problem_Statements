@@ -8,6 +8,7 @@ export default function VolunteerLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Authenticating...');
   const { loginVolunteer } = useAuth();
   const navigate = useNavigate();
 
@@ -20,8 +21,14 @@ export default function VolunteerLogin() {
 
     setError('');
     setLoading(true);
+    setLoadingMessage('Authenticating...');
+
+    const wakeTimer = setTimeout(() => {
+      setLoadingMessage('Waking up server instance...');
+    }, 2500);
 
     const result = await loginVolunteer(username, password);
+    clearTimeout(wakeTimer);
     setLoading(false);
 
     if (result.success) {
@@ -103,7 +110,7 @@ export default function VolunteerLogin() {
             className="btn-alpha-gold"
             style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontSize: '1rem' }}
           >
-            {loading ? 'Authenticating...' : (
+            {loading ? loadingMessage : (
               <>
                 <LogIn size={18} /> Login to Scanner
               </>

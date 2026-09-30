@@ -205,16 +205,14 @@ async function triggerAutoSeed() {
       await ProblemStatement.updateMany({ maxTeamCapacity: { $ne: 2 } }, { $set: { maxTeamCapacity: 2 } });
     }
 
+    const existingTeamsCount = await Team.countDocuments();
+    if (existingTeamsCount >= 60) {
+      console.log(`✅ All ${existingTeamsCount} teams already initialized in database. Fast boot enabled.`);
+      return;
+    }
+
     const authorizedTeams = require('./data/teamsData');
-    const validTeamIds = authorizedTeams.map(t => t.teamId);
-    const validRegNums = authorizedTeams.map(t => t.regNum);
-
-    console.log(`🧹 Purging all existing team records to eliminate duplicates...`);
-    await Team.deleteMany({});
-    await TeamLead.deleteMany({});
-    await Participant.deleteMany({});
-
-    console.log(`🌱 Ensuring all ${authorizedTeams.length} authorized Teams & Team Leads exist (ALPHA-001 to ALPHA-061)...`);
+    console.log(`🌱 Initializing ${authorizedTeams.length} authorized Teams & Team Leads (ALPHA-001 to ALPHA-061)...`);
 
     for (const item of authorizedTeams) {
       let teamDoc = await Team.findOne({ $or: [{ name: item.teamId }, { teamId: item.teamId }, { teamLeadRegNum: item.regNum }] });
@@ -248,53 +246,18 @@ async function triggerAutoSeed() {
         await teamDoc.save();
       }
 
-      // Delete any secondary duplicate TeamLead docs for this regNum
-      const leadDocs = await TeamLead.find({ registrationNumber: item.regNum });
-      let leadDoc = null;
-      if (leadDocs.length > 0) {
-        leadDoc = leadDocs[0];
-        for (const doc of leadDocs) {
-          if (doc._id.toString() !== leadDoc._id.toString()) {
-            await TeamLead.findByIdAndDelete(doc._id);
-          }
-        }
-      }
-
+      const leadDoc = await TeamLead.findOne({ registrationNumber: item.regNum });
       if (!leadDoc) {
-        leadDoc = await TeamLead.create({
+        await TeamLead.create({
           registrationNumber: item.regNum,
           name: item.leadName,
           teamId: teamDoc._id,
           phone: '9876543210',
           email: `${item.teamId.toLowerCase()}@hackathon.edu`
         });
-      } else {
+      } else if (!leadDoc.teamId) {
         leadDoc.teamId = teamDoc._id;
-        leadDoc.name = item.leadName;
         await leadDoc.save();
-      }
-
-      if (item.members && Array.isArray(item.members)) {
-        for (const m of item.members) {
-          if (!m.registrationNumber) continue;
-          let partDoc = await Participant.findOne({ registrationNumber: m.registrationNumber });
-          if (!partDoc) {
-            await Participant.create({
-              registrationNumber: m.registrationNumber,
-              name: m.name,
-              teamName: item.teamName || item.teamId,
-              college: 'KARE',
-              department: 'CSE',
-              isTeamLead: m.role === 'LEAD',
-              qrCodeData: m.registrationNumber
-            });
-          } else {
-            partDoc.teamName = item.teamName || item.teamId;
-            partDoc.name = m.name;
-            partDoc.isTeamLead = m.role === 'LEAD';
-            await partDoc.save();
-          }
-        }
       }
     }
   } catch (e) {
@@ -330,8 +293,7 @@ async function startServer() {
       console.log(`✅ Embedded MongoDB Server started at: ${mongoUri}`);
     }
 
-    await triggerAutoSeed();
-
+    // Start Express listening immediately so health checks pass instantly
     app.listen(PORT, () => {
       console.log(`=======================================================`);
       console.log(`🚀 EVENT ALPHA HACKATHON SERVER ACTIVE ON PORT: ${PORT}`);
@@ -339,6 +301,9 @@ async function startServer() {
       console.log(`   Web App URL: http://localhost:${PORT}`);
       console.log(`=======================================================`);
     });
+
+    // Run auto-seed asynchronously in background
+    triggerAutoSeed().catch(err => console.error('Auto-seed error:', err));
   } catch (err) {
     console.error('❌ Server startup error:', err);
     process.exit(1);

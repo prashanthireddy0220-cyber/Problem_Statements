@@ -12,7 +12,7 @@ const AdminSchema = new mongoose.Schema({
 const TeamLeadSchema = new mongoose.Schema({
   registrationNumber: { type: String, required: true, unique: true, index: true },
   name: { type: String, required: true },
-  teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+  teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', index: true },
   phone: { type: String },
   email: { type: String },
   activeSessionId: { type: String, default: null },
@@ -22,8 +22,8 @@ const TeamLeadSchema = new mongoose.Schema({
 // 3. Team Schema
 const TeamSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
-  teamId: { type: String },
-  teamLeadRegNum: { type: String, required: true },
+  teamId: { type: String, index: true },
+  teamLeadRegNum: { type: String, required: true, index: true },
   college: { type: String, default: 'KARE' },
   department: { type: String, default: 'CSE' },
   members: [{
@@ -118,8 +118,8 @@ const VolunteerSchema = new mongoose.Schema({
 
 // 10. Active Sessions Schema
 const ActiveSessionSchema = new mongoose.Schema({
-  userId: { type: String, required: true },
-  registrationNumber: { type: String },
+  userId: { type: String, required: true, index: true },
+  registrationNumber: { type: String, index: true },
   role: { type: String, required: true },
   sessionId: { type: String, required: true, unique: true, index: true },
   deviceId: { type: String, default: 'default-device' },

@@ -8,6 +8,7 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Authenticating Admin...');
   const { loginAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -20,8 +21,14 @@ export default function AdminLogin() {
 
     setError('');
     setLoading(true);
+    setLoadingMessage('Authenticating Admin...');
+
+    const wakeTimer = setTimeout(() => {
+      setLoadingMessage('Waking up server instance...');
+    }, 2500);
 
     const result = await loginAdmin(username, password);
+    clearTimeout(wakeTimer);
     setLoading(false);
 
     if (result.success) {
@@ -103,7 +110,7 @@ export default function AdminLogin() {
             className="btn-alpha-cyan"
             style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontSize: '1rem' }}
           >
-            {loading ? 'Authenticating Admin...' : (
+            {loading ? loadingMessage : (
               <>
                 <LogIn size={18} /> Enter Admin Control
               </>

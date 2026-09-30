@@ -16,9 +16,11 @@ export default function TeamLeadDashboard() {
   // Participant Navigation: 'dashboard', 'problems', 'attendance'
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Team Details Data State
-  const [myTeamData, setMyTeamData] = useState(null);
-  const [loadingTeam, setLoadingTeam] = useState(true);
+  // Team Details Data State (Instantly seeded from login session if available)
+  const [myTeamData, setMyTeamData] = useState(() => {
+    return user?.team ? { team: user.team, members: user.team.members || [] } : null;
+  });
+  const [loadingTeam, setLoadingTeam] = useState(!user?.team);
   const [teamQrDataUrl, setTeamQrDataUrl] = useState('');
   const [eventPassQrDataUrl, setEventPassQrDataUrl] = useState('');
 
@@ -88,7 +90,7 @@ export default function TeamLeadDashboard() {
   // 1. Fetch My Team Details
   const fetchMyTeam = async () => {
     try {
-      setLoadingTeam(true);
+      if (!myTeamData) setLoadingTeam(true);
       const res = await axios.get('/api/teams/my-team');
       if (res.data) {
         setMyTeamData(res.data);

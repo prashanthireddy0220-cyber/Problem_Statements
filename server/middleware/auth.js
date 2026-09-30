@@ -4,6 +4,30 @@ const { TeamLead, ActiveSession, SystemSettings } = require('../models/Schema');
 
 const JWT_SECRET = config.JWT_SECRET;
 
+// Lightweight in-memory cache for SystemSettings to avoid hitting MongoDB on every single request
+let cachedSettings = null;
+let cachedSettingsTime = 0;
+const SETTINGS_CACHE_TTL = 10000; // 10 seconds
+
+const getCachedSettings = async () => {
+  const now = Date.now();
+  if (cachedSettings && (now - cachedSettingsTime < SETTINGS_CACHE_TTL)) {
+    return cachedSettings;
+  }
+  try {
+    cachedSettings = await SystemSettings.findOne().lean();
+    cachedSettingsTime = now;
+  } catch (err) {
+    if (cachedSettings) return cachedSettings;
+  }
+  return cachedSettings;
+};
+
+const invalidateSettingsCache = () => {
+  cachedSettings = null;
+  cachedSettingsTime = 0;
+};
+
 // Middleware to authenticate JWT token and enforce single-device session lock
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -17,8 +41,8 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded; // { id, registrationNumber, username, role, sessionId }
 
-    // Verify system module settings (e.g. if access is disabled by admin)
-    const settings = await SystemSettings.findOne();
+    // Fast cached check of system module settings
+    const settings = await getCachedSettings();
     if (settings) {
       if (decoded.role === 'TEAM_LEAD' && !settings.teamLeadAccessEnabled) {
         return res.status(403).json({ error: 'Team Lead access has been temporarily disabled by the administrator.', code: 'ACCESS_DISABLED' });
@@ -28,9 +52,13 @@ const authenticateToken = async (req, res, next) => {
       }
     }
 
-    // STRICT SINGLE-DEVICE LOGIN VERIFICATION FOR TEAM LEADS
+    // STRICT SINGLE-DEVICE LOGIN VERIFICATION FOR TEAM LEADS (Queried concurrently)
     if (decoded.role === 'TEAM_LEAD') {
-      const teamLead = await TeamLead.findOne({ registrationNumber: decoded.registrationNumber });
+      const [teamLead, sessionRecord] = await Promise.all([
+        TeamLead.findOne({ registrationNumber: decoded.registrationNumber }),
+        ActiveSession.findOne({ sessionId: decoded.sessionId }).lean()
+      ]);
+
       if (!teamLead) {
         return res.status(401).json({ error: 'Registered Team Lead account not found.', code: 'USER_NOT_FOUND' });
       }
@@ -48,7 +76,6 @@ const authenticateToken = async (req, res, next) => {
       }
 
       // Also check ActiveSession collection
-      const sessionRecord = await ActiveSession.findOne({ sessionId: decoded.sessionId });
       if (!sessionRecord) {
         return res.status(401).json({
           error: 'Your session has expired or been terminated from another device.',
@@ -103,5 +130,6 @@ const requireRole = (...allowedRoles) => {
 module.exports = {
   authenticateToken,
   requireRole,
-  JWT_SECRET
+  JWT_SECRET,
+  invalidateSettingsCache
 };
