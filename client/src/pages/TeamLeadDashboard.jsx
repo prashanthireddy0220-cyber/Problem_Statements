@@ -13,8 +13,36 @@ import AUTHORIZED_TEAMS from '../data/teamsData.js';
 export default function TeamLeadDashboard() {
   const { user, refreshUserSession } = useAuth();
 
-  // Participant Navigation: 'dashboard', 'problems', 'attendance'
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // Participant Navigation: 'dashboard', 'problems', 'attendance' (Persisted across refreshes)
+  const getInitialTab = () => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '');
+      if (['dashboard', 'problems', 'attendance'].includes(hash)) {
+        return hash;
+      }
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (['dashboard', 'problems', 'attendance'].includes(tabParam)) {
+        return tabParam;
+      }
+      const saved = localStorage.getItem('alpha_team_lead_tab');
+      if (saved && ['dashboard', 'problems', 'attendance'].includes(saved)) {
+        return saved;
+      }
+    }
+    return 'dashboard';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+
+  useEffect(() => {
+    if (activeTab) {
+      localStorage.setItem('alpha_team_lead_tab', activeTab);
+      if (window.location.hash !== `#${activeTab}`) {
+        window.history.replaceState(null, '', `#${activeTab}`);
+      }
+    }
+  }, [activeTab]);
 
   // Team Details Data State (Instantly seeded from login session if available)
   const [myTeamData, setMyTeamData] = useState(() => {
@@ -76,13 +104,47 @@ export default function TeamLeadDashboard() {
   const [confirmingProblem, setConfirmingProblem] = useState(null);
   const [selectingLoading, setSelectingLoading] = useState(false);
   const [selectionError, setSelectionError] = useState('');
-  const [confirmedData, setConfirmedData] = useState(null);
+  const [confirmedData, setConfirmedData] = useState(() => {
+    if (user?.team?.selectionConfirmed) {
+      return {
+        teamName: user.team.name || user.team.teamName,
+        problemId: user.team.selectedProblemCode,
+        problemCode: user.team.selectedProblemCode,
+        status: 'CONFIRMED'
+      };
+    }
+    try {
+      const saved = localStorage.getItem('alpha_confirmed_selection');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (confirmedData) {
+      localStorage.setItem('alpha_confirmed_selection', JSON.stringify(confirmedData));
+    }
+  }, [confirmedData]);
 
   const [secondsRemaining, setSecondsRemaining] = useState(0);
 
-  // Attendance Sessions State
+  // Attendance Sessions State (Persisted across refreshes)
   const [attSessions, setAttSessions] = useState([]);
-  const [selectedAttSession, setSelectedAttSession] = useState(null);
+  const [selectedAttSession, setSelectedAttSession] = useState(() => {
+    try {
+      const saved = localStorage.getItem('alpha_selected_att_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (selectedAttSession) {
+      localStorage.setItem('alpha_selected_att_session', JSON.stringify(selectedAttSession));
+    }
+  }, [selectedAttSession]);
   const [attQrDataUrl, setAttQrDataUrl] = useState('');
   const [myAttendanceRecords, setMyAttendanceRecords] = useState({});
   const [myAttendanceFullData, setMyAttendanceFullData] = useState(null);

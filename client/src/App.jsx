@@ -101,11 +101,25 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 };
 
 export default function App() {
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(() => {
+    if (typeof window !== 'undefined') {
+      if (sessionStorage.getItem('alpha_intro_shown')) return false;
+      if (localStorage.getItem('alpha_token')) return false;
+      if (window.location.pathname.includes('/dashboard') || window.location.pathname.includes('/reviewer')) return false;
+    }
+    return true;
+  });
+
+  const handleIntroComplete = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('alpha_intro_shown', 'true');
+    }
+    setShowIntro(false);
+  };
 
   return (
     <AuthProvider>
-      {showIntro && <ClubLogoIntro onComplete={() => setShowIntro(false)} />}
+      {showIntro && <ClubLogoIntro onComplete={handleIntroComplete} />}
       <Router>
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative' }}>
           <Interactive3DBackground />
