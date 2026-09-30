@@ -71,6 +71,13 @@ async function runTests() {
       }
     }
     console.log(`   ✅ Authenticated ${teamTokens.length} test team leads\n`);
+
+    // Reset previous run allocations to ensure clean test environment
+    await req('/api/admin/session-control', {
+      method: 'POST',
+      body: { action: 'RESET', resetAllocations: true },
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
   } catch (err) {
     console.error('❌ Setup authentication failed:', err.response?.data || err.message);
     process.exit(1);

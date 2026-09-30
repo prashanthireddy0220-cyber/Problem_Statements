@@ -123,6 +123,12 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
       settings.readingStartedAt = null;
       settings.readingEndsAt = null;
       settings.selectionStartedAt = null;
+
+      if (req.body.resetAllocations) {
+        await ProblemSelection.deleteMany({});
+        await ProblemStatement.updateMany({}, { $set: { selectedCount: 0 } });
+        await Team.updateMany({}, { $set: { selectedProblemId: null, selectedProblemCode: null, selectionConfirmed: false, selectedAt: null } });
+      }
     } else {
       return res.status(400).json({ error: 'Invalid session control action.' });
     }
