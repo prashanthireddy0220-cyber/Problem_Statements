@@ -475,12 +475,16 @@ router.post('/seed', async (req, res) => {
       });
     }
 
-    // D. Seed Problem Statements (All 43 Problem Statements)
-    const psCount = await ProblemStatement.countDocuments();
-    if (psCount === 0) {
-      const problemStatementsData = require('../data/problemStatements');
-      await ProblemStatement.insertMany(problemStatementsData);
-    }
+    // D. Seed Problem Statements (All 40 Problem Statements from Hackathon 2026 Booklet)
+    await ProblemStatement.deleteMany({});
+    const problemStatementsData = require('../data/problemStatements');
+    const preparedPsData = problemStatementsData.map(p => ({
+      ...p,
+      maxTeamCapacity: 2,
+      selectedCount: 0,
+      status: 'PUBLISHED'
+    }));
+    await ProblemStatement.insertMany(preparedPsData);
 
     // E. Seed Authorized Teams & Registered Team Leads (ALPHA-001 to ALPHA-060)
     try {

@@ -433,5 +433,46 @@ router.delete('/admin/:id', authenticateToken, requireRole('ADMIN'), async (req,
   }
 });
 
+// 8. ADMIN: RESET / RESEED PROBLEM STATEMENTS FROM BOOKLET (All 40 KARE Statements)
+router.post('/admin/reset-booklet', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const problemStatementsData = require('../data/problemStatements');
+    await ProblemStatement.deleteMany({});
+    await ProblemSelection.deleteMany({});
+    await Team.updateMany({}, {
+      $set: {
+        selectedProblemId: null,
+        selectedProblemCode: 'Not Selected',
+        selectionConfirmed: false,
+        selectedAt: null
+      }
+    });
+
+    const preparedData = problemStatementsData.map(p => ({
+      ...p,
+      maxTeamCapacity: 2,
+      selectedCount: 0,
+      status: 'PUBLISHED'
+    }));
+
+    await ProblemStatement.insertMany(preparedData);
+
+    await AuditLog.create({
+      actor: req.user.username,
+      role: 'ADMIN',
+      action: 'RESET_PROBLEM_STATEMENTS_BOOKLET',
+      target: `ALL_${preparedData.length}_PROBLEMS`
+    });
+
+    return res.json({
+      message: `Successfully reloaded ${preparedData.length} problem statements from the 2026 booklet.`,
+      count: preparedData.length
+    });
+  } catch (err) {
+    console.error('Reset booklet error:', err);
+    return res.status(500).json({ error: 'Failed to reload problem statements from booklet.' });
+  }
+});
+
 router.getOrUpdateSystemState = getOrUpdateSystemState;
 module.exports = router;

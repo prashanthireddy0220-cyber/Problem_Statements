@@ -371,7 +371,13 @@ export default function TeamLeadDashboard() {
   const isSelectionClosed = timerState?.currentPhase === 'SELECTION_CLOSED' || timerState?.currentPhase === 'CLOSED';
   const isUnreleased = !timerState?.problemStatementsReleased && !isRoundStartedUnreleased;
 
-  const domains = ['ALL', 'IoT & Smart Energy', 'AI & Cybersecurity', 'Web3 & Blockchain', 'Smart Cities & AI', 'Healthcare & NLP'];
+  const domains = [
+    'ALL',
+    'Artificial Intelligence & Machine Learning',
+    'Cybersecurity & Blockchain',
+    'Data Science & Predictive Analytics',
+    'Full-Stack Web & Smart Automation'
+  ];
 
   return (
     <div className="main-layout" style={{ maxWidth: '1350px' }}>

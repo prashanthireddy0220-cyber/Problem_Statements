@@ -29,10 +29,12 @@ export default function AdminDashboard() {
   // State for Problems
   const [problems, setProblems] = useState([]);
   const [showAddProblemModal, setShowAddProblemModal] = useState(false);
+  const [adminProblemSearch, setAdminProblemSearch] = useState('');
+  const [adminProblemDomainFilter, setAdminProblemDomainFilter] = useState('ALL');
   const [newProblem, setNewProblem] = useState({
     problemId: '', title: '', description: '', background: '', expectedSolution: '',
-    requirements: '', constraints: '', domain: 'IoT & Smart Energy', difficulty: 'Medium',
-    technologies: 'React, Node.js', maxTeamCapacity: 2, status: 'PUBLISHED'
+    requirements: '', constraints: '', domain: 'Artificial Intelligence & Machine Learning', difficulty: 'Medium',
+    technologies: 'Python, React', maxTeamCapacity: 2, status: 'PUBLISHED'
   });
 
   // State for Timers & Access Settings
@@ -330,6 +332,18 @@ export default function AdminDashboard() {
       fetchAllData();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to delete problem statement.');
+    }
+  };
+
+  const handleResetBooklet = async () => {
+    if (!window.confirm("Are you sure you want to reload all 40 Problem Statements from the 2026 Booklet? This will replace all existing statements in the database and reset team selections.")) return;
+    try {
+      const res = await axios.post('/api/problems/admin/reset-booklet');
+      setActionMsg(res.data.message || 'Successfully reloaded 40 problem statements from 2026 booklet!');
+      setTimeout(() => setActionMsg(''), 4000);
+      fetchAllData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to reload problem statements.');
     }
   };
 
@@ -1616,66 +1630,168 @@ export default function AdminDashboard() {
       {/* TAB 3: PROBLEM STATEMENTS MANAGER */}
       {activeTab === 'problems' && (
         <div className="glass-panel" style={{ padding: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC' }}>PROBLEM STATEMENTS MANAGER</h2>
-            <button onClick={() => setShowAddProblemModal(true)} className="btn-alpha-cyan">
-              <Plus size={18} /> Add New Problem Statement
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC', marginBottom: '0.25rem' }}>PROBLEM STATEMENTS MANAGER</h2>
+              <p style={{ color: '#94A3B8', fontSize: '0.85rem' }}>
+                Hackathon 2026 Comprehensive Booklet • 4 Core CSE Domains (10 Each) • Strictly 2-Team Capacity Limit
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleResetBooklet}
+                className="btn-alpha-gold"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '0.55rem 1.1rem' }}
+                title="Reload all 40 Problem Statements from the 2026 Booklet"
+              >
+                <RefreshCw size={15} /> Reload 2026 Booklet (40 PS)
+              </button>
+              <button
+                onClick={() => setShowAddProblemModal(true)}
+                className="btn-alpha-cyan"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '0.55rem 1.1rem' }}
+              >
+                <Plus size={16} /> Add New Problem Statement
+              </button>
+            </div>
           </div>
 
-          <div className="alpha-table-container">
-            <table className="alpha-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Problem Title</th>
-                  <th>Domain</th>
-                  <th>Difficulty</th>
-                  <th>Capacity Limit</th>
-                  <th>Selected Count</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {problems.map((p) => (
-                  <tr key={p._id}>
-                    <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800' }}>{p.problemId}</td>
-                    <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{p.title}</td>
-                    <td>{p.domain}</td>
-                    <td>{p.difficulty}</td>
-                    <td>{p.maxTeamCapacity} Teams</td>
-                    <td style={{ color: p.selectedCount >= p.maxTeamCapacity ? '#FF4B4B' : '#00E676', fontWeight: '800' }}>
-                      {p.selectedCount} / {p.maxTeamCapacity}
-                    </td>
-                    <td>
-                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(0,242,254,0.15)', color: '#00F2FE' }}>
-                        {p.status}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                        <button
-                          onClick={() => setEditingProblem(p)}
-                          className="btn-alpha-cyan"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <Edit size={13} /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProblem(p._id, p.problemId)}
-                          className="btn-alpha-outline"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', borderColor: '#FF4B4B', color: '#FF4B4B', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <Trash2 size={13} /> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* DOMAIN FILTERS & SEARCH BAR */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ position: 'relative', minWidth: '280px', flex: '1 1 280px' }}>
+              <input
+                type="text"
+                placeholder="Search by PS Code, Title, or Keyword..."
+                value={adminProblemSearch}
+                onChange={e => setAdminProblemSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 1rem 0.65rem 2.5rem',
+                  background: 'rgba(15,23,42,0.8)',
+                  border: '1px solid rgba(0,242,254,0.3)',
+                  color: '#FFF',
+                  borderRadius: '10px',
+                  fontSize: '0.85rem'
+                }}
+              />
+              <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.25rem', flexWrap: 'wrap' }}>
+              {[
+                'ALL',
+                'Artificial Intelligence & Machine Learning',
+                'Cybersecurity & Blockchain',
+                'Data Science & Predictive Analytics',
+                'Full-Stack Web & Smart Automation'
+              ].map((dom) => (
+                <button
+                  key={dom}
+                  onClick={() => setAdminProblemDomainFilter(dom)}
+                  className={`btn-alpha-outline ${adminProblemDomainFilter === dom ? 'active' : ''}`}
+                  style={{
+                    padding: '0.45rem 0.85rem',
+                    fontSize: '0.78rem',
+                    borderRadius: '20px',
+                    borderColor: adminProblemDomainFilter === dom ? '#00F2FE' : 'rgba(255,255,255,0.1)',
+                    background: adminProblemDomainFilter === dom ? 'rgba(0,242,254,0.15)' : 'rgba(255,255,255,0.03)',
+                    color: adminProblemDomainFilter === dom ? '#00F2FE' : '#94A3B8',
+                    fontWeight: adminProblemDomainFilter === dom ? '700' : '500'
+                  }}
+                >
+                  {dom === 'Artificial Intelligence & Machine Learning' ? 'AI & ML (10)' :
+                   dom === 'Cybersecurity & Blockchain' ? 'Cyber & Blockchain (10)' :
+                   dom === 'Data Science & Predictive Analytics' ? 'Data Science (10)' :
+                   dom === 'Full-Stack Web & Smart Automation' ? 'Full-Stack (10)' : `ALL (${problems.length})`}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {(() => {
+            const filteredProblems = problems.filter((p) => {
+              const matchesDomain = adminProblemDomainFilter === 'ALL' || p.domain === adminProblemDomainFilter;
+              const q = adminProblemSearch.toLowerCase().trim();
+              const matchesSearch = !q || p.problemId?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q) || p.domain?.toLowerCase().includes(q);
+              return matchesDomain && matchesSearch;
+            });
+
+            return (
+              <div className="alpha-table-container">
+                <table className="alpha-table">
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Problem Title</th>
+                      <th>Domain</th>
+                      <th>Difficulty</th>
+                      <th>Capacity Limit</th>
+                      <th>Selected Count</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'center' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProblems.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#94A3B8' }}>
+                          No problem statements match the current filter or search criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredProblems.map((p) => (
+                        <tr key={p._id}>
+                          <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800' }}>{p.problemId}</td>
+                          <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{p.title}</td>
+                          <td style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>{p.domain}</td>
+                          <td>
+                            <span style={{
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.72rem',
+                              fontWeight: '700',
+                              background: p.difficulty === 'Hard' ? 'rgba(255,75,75,0.15)' : 'rgba(255,215,0,0.15)',
+                              color: p.difficulty === 'Hard' ? '#FF4B4B' : '#FFD700',
+                              border: `1px solid ${p.difficulty === 'Hard' ? 'rgba(255,75,75,0.3)' : 'rgba(255,215,0,0.3)'}`
+                            }}>
+                              {p.difficulty}
+                            </span>
+                          </td>
+                          <td>{p.maxTeamCapacity || 2} Teams</td>
+                          <td style={{ color: p.selectedCount >= (p.maxTeamCapacity || 2) ? '#FF4B4B' : '#00E676', fontWeight: '800' }}>
+                            {p.selectedCount} / {p.maxTeamCapacity || 2}
+                          </td>
+                          <td>
+                            <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(0,242,254,0.15)', color: '#00F2FE' }}>
+                              {p.status}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                              <button
+                                onClick={() => setEditingProblem(p)}
+                                className="btn-alpha-cyan"
+                                style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Edit size={13} /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProblem(p._id, p.problemId)}
+                                className="btn-alpha-outline"
+                                style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', borderColor: '#FF4B4B', color: '#FF4B4B', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Trash2 size={13} /> Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
 
           {editingProblem && (
             <div className="modal-overlay">
@@ -1718,15 +1834,19 @@ export default function AdminDashboard() {
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div>
                       <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Domain</label>
-                      <input
-                        type="text"
+                      <select
                         value={editingProblem.domain}
                         onChange={e => setEditingProblem({ ...editingProblem, domain: e.target.value })}
                         style={{ width: '100%', padding: '0.65rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px' }}
-                      />
+                      >
+                        <option value="Artificial Intelligence & Machine Learning">Artificial Intelligence & Machine Learning</option>
+                        <option value="Cybersecurity & Blockchain">Cybersecurity & Blockchain</option>
+                        <option value="Data Science & Predictive Analytics">Data Science & Predictive Analytics</option>
+                        <option value="Full-Stack Web & Smart Automation">Full-Stack Web & Smart Automation</option>
+                      </select>
                     </div>
                     <div>
                       <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Max Team Capacity</label>
@@ -1768,7 +1888,7 @@ export default function AdminDashboard() {
                 <form onSubmit={handleCreateProblem}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
                     <input
-                      type="text" placeholder="Problem ID (e.g. PS-006)"
+                      type="text" placeholder="Problem ID (e.g. KARE-AI-01)"
                       value={newProblem.problemId} onChange={e => setNewProblem({ ...newProblem, problemId: e.target.value })}
                       required style={{ padding: '0.75rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px' }}
                     />
@@ -1785,18 +1905,23 @@ export default function AdminDashboard() {
                     required style={{ width: '100%', padding: '0.75rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px', marginBottom: '1rem' }}
                   />
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div>
                       <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Domain</label>
-                      <input
-                        type="text" value={newProblem.domain} onChange={e => setNewProblem({ ...newProblem, domain: e.target.value })}
+                      <select
+                        value={newProblem.domain} onChange={e => setNewProblem({ ...newProblem, domain: e.target.value })}
                         style={{ width: '100%', padding: '0.65rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px' }}
-                      />
+                      >
+                        <option value="Artificial Intelligence & Machine Learning">Artificial Intelligence & Machine Learning</option>
+                        <option value="Cybersecurity & Blockchain">Cybersecurity & Blockchain</option>
+                        <option value="Data Science & Predictive Analytics">Data Science & Predictive Analytics</option>
+                        <option value="Full-Stack Web & Smart Automation">Full-Stack Web & Smart Automation</option>
+                      </select>
                     </div>
                     <div>
                       <label style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Max Team Capacity</label>
                       <input
-                        type="number" value={newProblem.maxTeamCapacity} onChange={e => setNewProblem({ ...newProblem, maxTeamCapacity: e.target.value })}
+                        type="number" value={newProblem.maxTeamCapacity} onChange={e => setNewProblem({ ...newProblem, maxTeamCapacity: Number(e.target.value) })}
                         style={{ width: '100%', padding: '0.65rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFF', borderRadius: '8px' }}
                       />
                     </div>

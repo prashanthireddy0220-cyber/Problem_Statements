@@ -85,7 +85,7 @@ app.get('*', (req, res) => {
 // Seed helper
 async function triggerAutoSeed() {
   try {
-    const { Admin, Volunteer, Reviewer, EvaluationRound, SystemSettings, ProblemStatement, Team, TeamLead, Participant, AttendanceSession, Attendance } = require('./models/Schema');
+    const { Admin, Volunteer, Reviewer, EvaluationRound, SystemSettings, ProblemStatement, ProblemSelection, Team, TeamLead, Participant, AttendanceSession, Attendance } = require('./models/Schema');
     const bcrypt = require('bcryptjs');
 
     // Clean up all legacy indexes on teams collection
@@ -229,14 +229,31 @@ async function triggerAutoSeed() {
       });
     }
 
-    const psCount = await ProblemStatement.countDocuments();
-    if (psCount === 0) {
-      console.log('🌱 Seeding Problem Statements (PS-001 to PS-043 with 2-Team capacity limit)...');
+    const legacyPs = await ProblemStatement.findOne({ problemId: /^PS-/ });
+    const kareCount = await ProblemStatement.countDocuments({ problemId: /^KARE-/ });
+
+    if (legacyPs || kareCount < 40) {
+      console.log('🌱 Syncing Problem Statements: Seeding Hackathon 2026 Comprehensive Booklet (40 statements, KARE-AI-01 to KARE-SYS-10 with 2-Team capacity limit)...');
+      await ProblemStatement.deleteMany({});
+      await ProblemSelection.deleteMany({});
+      await Team.updateMany({}, {
+        $set: {
+          selectedProblemId: null,
+          selectedProblemCode: 'Not Selected',
+          selectionConfirmed: false,
+          selectedAt: null
+        }
+      });
       const problemStatementsData = require('./data/problemStatements');
-      const preparedData = problemStatementsData.map(p => ({ ...p, maxTeamCapacity: 2 }));
+      const preparedData = problemStatementsData.map(p => ({
+        ...p,
+        maxTeamCapacity: 2,
+        selectedCount: 0,
+        status: 'PUBLISHED'
+      }));
       await ProblemStatement.insertMany(preparedData);
+      console.log(`✅ Seeded ${preparedData.length} new problem statements.`);
     } else {
-      // Ensure all existing problem statements have maxTeamCapacity: 2 as per requirement
       await ProblemStatement.updateMany({ maxTeamCapacity: { $ne: 2 } }, { $set: { maxTeamCapacity: 2 } });
     }
 
