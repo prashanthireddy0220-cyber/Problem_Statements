@@ -347,6 +347,18 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleResetAllSelections = async () => {
+    if (!window.confirm("⚠️ Are you sure you want to DELETE ALL team problem statement selections? All teams will be unassigned and problem capacities will be reset to 0/2.")) return;
+    try {
+      const res = await axios.post('/api/admin/reset-all-selections');
+      setActionMsg(res.data.message || 'All problem statement selections cleared successfully!');
+      setTimeout(() => setActionMsg(''), 4000);
+      fetchAllData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to clear problem selections.');
+    }
+  };
+
   const handleCreateSess = async (e) => {
     e.preventDefault();
     try {
@@ -796,6 +808,24 @@ export default function AdminDashboard() {
                     <RefreshCw size={14} /> Reset
                   </button>
                 </div>
+                <button
+                  disabled={phaseActionLoading}
+                  onClick={handleResetAllSelections}
+                  className="btn-alpha-outline"
+                  style={{
+                    width: '100%',
+                    marginTop: '0.5rem',
+                    borderColor: '#FF4B4B',
+                    color: '#FF4B4B',
+                    background: 'rgba(255, 75, 75, 0.08)',
+                    justifyContent: 'center',
+                    padding: '0.45rem',
+                    fontSize: '0.78rem'
+                  }}
+                  title="Delete all team problem statement selections and reset capacities"
+                >
+                  <Trash2 size={13} /> Delete All Problem Selections
+                </button>
               </div>
             </div>
           </div>
@@ -1645,6 +1675,14 @@ export default function AdminDashboard() {
                 title="Reload all 40 Problem Statements from the 2026 Booklet"
               >
                 <RefreshCw size={15} /> Reload 2026 Booklet (40 PS)
+              </button>
+              <button
+                onClick={handleResetAllSelections}
+                className="btn-alpha-outline"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '0.55rem 1.1rem', borderColor: '#FF4B4B', color: '#FF4B4B' }}
+                title="Clear all team problem selections and reset capacity counters"
+              >
+                <Trash2 size={15} /> Delete All Selections
               </button>
               <button
                 onClick={() => setShowAddProblemModal(true)}

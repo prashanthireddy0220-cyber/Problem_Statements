@@ -158,7 +158,7 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
       if (req.body.resetAllocations) {
         await ProblemSelection.deleteMany({});
         await ProblemStatement.updateMany({}, { $set: { selectedCount: 0 } });
-        await Team.updateMany({}, { $set: { selectedProblemId: null, selectedProblemCode: null, selectionConfirmed: false, selectedAt: null } });
+        await Team.updateMany({}, { $set: { selectedProblemId: null, selectedProblemCode: 'Not Selected', selectionConfirmed: false, selectedAt: null } });
       }
     } else {
       return res.status(400).json({ error: 'Invalid session control action.' });
@@ -327,6 +327,39 @@ router.post('/teams/:teamId/reset-selection', authenticateToken, requireRole('AD
     return res.json({ message: `Selection reset for team ${team.name}.` });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to reset team selection.' });
+  }
+});
+
+// 4B. ADMIN: RESET ALL PROBLEM SELECTIONS ACROSS ALL TEAMS
+router.post('/reset-all-selections', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const selDeleteResult = await ProblemSelection.deleteMany({});
+    const psUpdateResult = await ProblemStatement.updateMany({}, { $set: { selectedCount: 0 } });
+    const teamUpdateResult = await Team.updateMany({}, {
+      $set: {
+        selectedProblemId: null,
+        selectedProblemCode: 'Not Selected',
+        selectionConfirmed: false,
+        selectedAt: null
+      }
+    });
+
+    await AuditLog.create({
+      actor: req.user.username,
+      role: 'ADMIN',
+      action: 'RESET_ALL_PROBLEM_SELECTIONS',
+      target: 'ALL_TEAMS'
+    });
+
+    return res.json({
+      message: 'All problem statement selections have been successfully cleared.',
+      deletedSelectionsCount: selDeleteResult.deletedCount,
+      resetProblemsCount: psUpdateResult.modifiedCount,
+      resetTeamsCount: teamUpdateResult.modifiedCount
+    });
+  } catch (err) {
+    console.error('Reset all selections error:', err);
+    return res.status(500).json({ error: 'Failed to reset all problem selections.' });
   }
 });
 
