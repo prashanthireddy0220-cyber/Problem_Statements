@@ -97,46 +97,85 @@ const handleTeamLeadLogin = async (req, res) => {
     const initialQrToken = `TQ-${targetTeamId}-${cleanRegNum.slice(-4)}`;
     const initialPassToken = `EP-${targetTeamId}-${cleanRegNum.slice(-4)}`;
 
+    // Prevent cross-team token collision between Team 50 and Team 61
+    if (targetTeamId === 'ALPHA-050') {
+      await Team.updateMany(
+        { teamQrToken: initialQrToken, $and: [{ teamId: { $ne: 'ALPHA-050' } }, { name: { $ne: 'ALPHA-050' } }] },
+        { $set: { teamQrToken: 'TQ-ALPHA-061-5007', eventPassQrToken: 'EP-ALPHA-061-5007' } }
+      ).catch(() => {});
+    }
+
     if (!team) {
-      team = await Team.create({
-        name: targetTeamId,
-        teamId: targetTeamId,
-        teamName: authItem.teamName || targetTeamId,
-        teamLeadRegNum: cleanRegNum,
-        college: 'KARE',
-        department: 'CSE',
-        members: authItem.members || [],
-        teamQrToken: initialQrToken,
-        eventPassQrToken: initialPassToken,
-        registrationStatus: 'CONFIRMED',
-        eventPassStatus: 'ISSUED'
-      });
+      try {
+        team = await Team.create({
+          name: targetTeamId,
+          teamId: targetTeamId,
+          teamName: authItem.teamName || targetTeamId,
+          teamLeadRegNum: cleanRegNum,
+          college: 'KARE',
+          department: 'CSE',
+          members: authItem.members || [],
+          teamQrToken: initialQrToken,
+          eventPassQrToken: initialPassToken,
+          registrationStatus: 'CONFIRMED',
+          eventPassStatus: 'ISSUED'
+        });
+      } catch (createErr) {
+        team = await Team.findOne({ $or: [{ name: targetTeamId }, { teamId: targetTeamId }] });
+        if (!team) {
+          // Token collision fallback
+          const uniqueQr = `TQ-${targetTeamId}-${cleanRegNum.slice(-4)}-${Date.now().toString().slice(-4)}`;
+          team = await Team.create({
+            name: targetTeamId,
+            teamId: targetTeamId,
+            teamName: authItem.teamName || targetTeamId,
+            teamLeadRegNum: cleanRegNum,
+            college: 'KARE',
+            department: 'CSE',
+            members: authItem.members || [],
+            teamQrToken: uniqueQr,
+            eventPassQrToken: initialPassToken,
+            registrationStatus: 'CONFIRMED',
+            eventPassStatus: 'ISSUED'
+          });
+        }
+      }
     } else {
-      // Only write to database if essential tokens are missing
       let needsSave = false;
       if (!team.teamQrToken) { team.teamQrToken = initialQrToken; needsSave = true; }
       if (!team.eventPassQrToken) { team.eventPassQrToken = initialPassToken; needsSave = true; }
       if (!team.teamId) { team.teamId = targetTeamId; needsSave = true; }
+      if (team.teamLeadRegNum !== cleanRegNum && (targetTeamId === 'ALPHA-050' || targetTeamId === 'ALPHA-061')) {
+        team.teamLeadRegNum = cleanRegNum;
+        if (authItem.members) team.members = authItem.members;
+        needsSave = true;
+      }
       if (needsSave) {
-        await team.save();
+        await team.save().catch(e => console.warn('Non-fatal team save warning:', e.message));
       }
     }
 
-    // Fallback: If teamLead not found by regNum, look up by team._id
-    if (!teamLead && team) {
-      teamLead = await TeamLead.findOne({ teamId: team._id });
+    // Lookup TeamLead strictly by registration number to avoid mutating another user's record
+    if (!teamLead) {
+      teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum });
     }
 
     if (!teamLead) {
-      teamLead = await TeamLead.create({
-        registrationNumber: cleanRegNum,
-        name: authItem?.leadName || `Team Lead (${targetTeamId})`,
-        teamId: team._id,
-        phone: '9876543210',
-        email: `${cleanRegNum}@klu.ac.in`,
-        activeSessionId: newSessionId
-      });
-    } else {
+      try {
+        teamLead = await TeamLead.create({
+          registrationNumber: cleanRegNum,
+          name: authItem?.leadName || `Team Lead (${targetTeamId})`,
+          teamId: team._id,
+          phone: '9876543210',
+          email: `${cleanRegNum}@klu.ac.in`,
+          activeSessionId: newSessionId
+        });
+      } catch (leadErr) {
+        teamLead = await TeamLead.findOne({ registrationNumber: cleanRegNum });
+      }
+    }
+
+    if (teamLead) {
       if (teamLead.revoked) {
         return res.status(403).json({
           error: 'Your account access has been revoked by the administrator.',
@@ -145,8 +184,8 @@ const handleTeamLeadLogin = async (req, res) => {
       }
       teamLead.teamId = team._id;
       teamLead.activeSessionId = newSessionId;
-      teamLead.registrationNumber = cleanRegNum;
       if (authItem?.leadName) teamLead.name = authItem.leadName;
+      await teamLead.save().catch(e => console.warn('Non-fatal teamLead save:', e.message));
     }
 
     // Concurrently persist activeSession and updated teamLead
@@ -220,7 +259,7 @@ const handleTeamLeadLogin = async (req, res) => {
     });
   } catch (err) {
     console.error('Team lead login error:', err);
-    return res.status(500).json({ error: 'Server error during authentication.' });
+    return res.status(500).json({ error: 'Server error during authentication.', details: err.message });
   }
 };
 

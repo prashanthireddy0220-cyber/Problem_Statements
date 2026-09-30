@@ -41,7 +41,7 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
 // Health check endpoint (Registered BEFORE any route handlers)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', version: '1.0.4-alpha-team61-fix', message: 'College Hackathon ALPHA Server Running', time: new Date() });
+  res.json({ status: 'OK', version: '1.0.6-alpha-team50-61-sync', message: 'College Hackathon ALPHA Server Running', time: new Date() });
 });
 
 // Mount API Routes (Specific path prefixes registered first)
@@ -219,8 +219,28 @@ async function triggerAutoSeed() {
       { name: 'GORLA UPENDRA', registrationNumber: '9923005005', role: 'MEMBER' }
     ];
 
+    // Free up any conflicting tokens
+    await Team.updateMany(
+      { teamQrToken: 'TQ-ALPHA-050-5012', $and: [{ teamId: { $ne: 'ALPHA-050' } }, { name: { $ne: 'ALPHA-050' } }] },
+      { $set: { teamQrToken: 'TQ-ALPHA-061-5007', eventPassQrToken: 'EP-ALPHA-061-5007' } }
+    ).catch(() => {});
+
     let t50 = await Team.findOne({ $or: [{ teamId: 'ALPHA-050' }, { name: 'ALPHA-050' }] });
-    if (t50) {
+    if (!t50) {
+      t50 = await Team.create({
+        name: 'ALPHA-050',
+        teamId: 'ALPHA-050',
+        teamName: 'STRANGER THINGS',
+        teamLeadRegNum: '9824005012',
+        college: 'KARE',
+        department: 'CSE',
+        members: team50Members,
+        teamQrToken: 'TQ-ALPHA-050-5012',
+        eventPassQrToken: 'EP-ALPHA-050-5012',
+        registrationStatus: 'CONFIRMED',
+        eventPassStatus: 'ISSUED'
+      });
+    } else {
       t50.name = 'ALPHA-050';
       t50.teamId = 'ALPHA-050';
       t50.teamName = 'STRANGER THINGS';
