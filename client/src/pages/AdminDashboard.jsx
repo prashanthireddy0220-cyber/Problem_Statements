@@ -1973,15 +1973,21 @@ export default function AdminDashboard() {
 
                     let authTeam = AUTHORIZED_TEAMS.find(t => t.teamId === targetTeamCode || t.regNum === cleanReg);
                     if (!authTeam && cleanReg) {
-                      authTeam = AUTHORIZED_TEAMS.find(t => t.members && t.members.some(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg));
+                      authTeam = AUTHORIZED_TEAMS.find(t => t.members && t.members.some(m => {
+                        const mReg = String(m.registrationNumber || '').trim().toUpperCase();
+                        return mReg === cleanReg || (m.name === 'GORLA UPENDRA' && (cleanReg === '9924005005' || cleanReg === '9923005005'));
+                      }));
                     }
 
-                    const authMember = authTeam?.members?.find(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg);
+                    const authMember = authTeam?.members?.find(m => {
+                      const mReg = String(m.registrationNumber || '').trim().toUpperCase();
+                      return mReg === cleanReg || (m.name === 'GORLA UPENDRA' && (cleanReg === '9924005005' || cleanReg === '9923005005'));
+                    });
 
-                    const displayName = authMember?.name || (authTeam && (!r.participantName || r.participantName.includes('Team Lead ('))) ? authTeam.leadName : r.participantName;
+                    const displayName = authMember?.name || r.participantName || (cleanReg === authTeam?.regNum ? authTeam?.leadName : cleanReg);
                     const displayTeamId = authTeam?.teamId || r.teamId || 'ALPHA';
                     const displayTeamName = authTeam?.teamName || r.teamName || 'Team';
-                    const displayRegNum = authMember?.registrationNumber || (authTeam ? authTeam.regNum : r.participantRegNum);
+                    const displayRegNum = authMember?.registrationNumber || r.participantRegNum || cleanReg;
 
                     return (
                       <tr key={r._id || idx}>

@@ -129,15 +129,22 @@ function getRealStudentName(regNum, fallbackName = '') {
   if (!regNum) return fallbackName || 'Participant';
   const cleanReg = String(regNum).trim().toUpperCase();
 
+  if (cleanReg === '9923005005' || cleanReg === '9924005005') {
+    return 'GORLA UPENDRA';
+  }
+
   for (const team of AUTHORIZED_TEAMS) {
-    if (team.regNum === cleanReg && team.leadName) {
-      return team.leadName;
-    }
     if (team.members && Array.isArray(team.members)) {
-      const match = team.members.find(m => String(m.registrationNumber || '').trim().toUpperCase() === cleanReg);
+      const match = team.members.find(m => {
+        const mReg = String(m.registrationNumber || '').trim().toUpperCase();
+        return mReg === cleanReg || (m.name === 'GORLA UPENDRA' && (cleanReg === '9923005005' || cleanReg === '9924005005'));
+      });
       if (match && match.name) {
         return match.name;
       }
+    }
+    if (team.regNum === cleanReg && team.leadName) {
+      return team.leadName;
     }
   }
   return fallbackName || cleanReg;
@@ -163,46 +170,53 @@ function resolveParticipantDetails(rawRegNum, rawName, rawTeamId, rawTeamName) {
   let foundMember = null;
 
   for (const t of AUTHORIZED_TEAMS) {
-    if (targetTeamId && t.teamId === targetTeamId) {
-      foundTeam = t;
-    } else if (cleanReg && (t.regNum === cleanReg || t.teamId === cleanReg)) {
-      foundTeam = t;
-    } else if (t.members && t.members.some(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg)) {
-      foundTeam = t;
+    if (t.members && Array.isArray(t.members)) {
+      const mMatch = t.members.find(m => {
+        const mReg = String(m.registrationNumber || '').trim().toUpperCase();
+        if (cleanReg && mReg === cleanReg) return true;
+        if (cleanName && m.name && m.name.toUpperCase() === cleanName.toUpperCase()) return true;
+        if ((cleanReg === '9924005005' || cleanReg === '9923005005') && m.name === 'GORLA UPENDRA') return true;
+        return false;
+      });
+      if (mMatch) {
+        foundMember = mMatch;
+        foundTeam = t;
+        break;
+      }
     }
 
-    if (foundTeam) {
-      if (t.members && Array.isArray(t.members)) {
-        foundMember = t.members.find(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg);
-      }
-      break;
+    if (!foundTeam && targetTeamId && t.teamId === targetTeamId) {
+      foundTeam = t;
     }
   }
 
-  if (foundTeam) {
-    const finalRegNum = foundMember ? foundMember.registrationNumber : (foundTeam.regNum || cleanReg);
-    const finalName = foundMember ? foundMember.name : foundTeam.leadName;
-    const finalTeamId = foundTeam.teamId;
-    const finalTeamName = foundTeam.teamName;
-
+  if (foundMember && foundTeam) {
     return {
-      registrationNumber: finalRegNum,
-      name: finalName,
-      teamId: finalTeamId,
-      teamName: finalTeamName
+      registrationNumber: foundMember.registrationNumber,
+      name: foundMember.name,
+      teamId: foundTeam.teamId,
+      teamName: foundTeam.teamName,
+      role: foundMember.role || (foundMember.registrationNumber === foundTeam.regNum ? 'LEAD' : 'MEMBER')
     };
   }
 
-  let fallbackName = cleanName;
-  if (!fallbackName || fallbackName.includes('Team Lead (') || fallbackName === 'Student') {
-    fallbackName = cleanReg;
+  if (foundTeam) {
+    const isLeadReg = cleanReg && cleanReg === foundTeam.regNum;
+    return {
+      registrationNumber: isLeadReg ? foundTeam.regNum : (cleanReg || foundTeam.regNum),
+      name: isLeadReg ? foundTeam.leadName : (cleanName && !cleanName.includes('Team Lead (') ? cleanName : foundTeam.leadName),
+      teamId: foundTeam.teamId,
+      teamName: foundTeam.teamName,
+      role: isLeadReg ? 'LEAD' : 'MEMBER'
+    };
   }
 
   return {
     registrationNumber: cleanReg,
-    name: fallbackName,
+    name: cleanName || cleanReg,
     teamId: cleanTeamId || 'ALPHA-001',
-    teamName: cleanTeamName || cleanTeamId || 'Team'
+    teamName: cleanTeamName || cleanTeamId || 'Team',
+    role: 'MEMBER'
   };
 }
 
@@ -241,12 +255,7 @@ function extractCleanId(rawInput) {
   // 4. Extract ALPHA team code if present (e.g. TQ-ALPHA-008-0811, EP-ALPHA-008-0811, ALPHA-008, ALPHA-8)
   const alphaMatch = str.match(/ALPHA-?(\d+)/i);
   if (alphaMatch) {
-    const formattedTeamId = `ALPHA-${alphaMatch[1].padStart(3, '0')}`;
-    const authByCode = AUTHORIZED_TEAMS.find(t => t.teamId === formattedTeamId);
-    if (authByCode) {
-      return authByCode.regNum; // Return lead registration number for team resolution
-    }
-    return formattedTeamId;
+    return `ALPHA-${alphaMatch[1].padStart(3, '0')}`;
   }
 
   return str;
@@ -258,47 +267,83 @@ async function resolveParticipant(rawInput) {
   const str = rawInput.trim();
   const cleanId = extractCleanId(rawInput);
   const upperStr = str.toUpperCase();
+  const cleanUpper = cleanId.toUpperCase();
 
   // Extract candidate team ID format (e.g. ALPHA-008, ALPHA-8)
-  const alphaMatch = str.match(/ALPHA-?(\d+)/i);
+  const alphaMatch = str.match(/ALPHA-?(\d+)/i) || cleanUpper.match(/ALPHA-?(\d+)/i);
   const candidateTeamId = alphaMatch ? `ALPHA-${alphaMatch[1].padStart(3, '0')}` : null;
 
-  // Search in official AUTHORIZED_TEAMS first by ALL criteria
-  const authItem = AUTHORIZED_TEAMS.find(t => 
-    t.regNum === cleanId || 
-    t.regNum === upperStr ||
-    t.teamId === cleanId || 
+  // 1. Check if the input is an INDIVIDUAL STUDENT registration number or member name
+  for (const t of AUTHORIZED_TEAMS) {
+    if (t.members && Array.isArray(t.members)) {
+      const m = t.members.find(mem => {
+        const memReg = String(mem.registrationNumber || '').trim().toUpperCase();
+        if (cleanUpper && memReg === cleanUpper) return true;
+        if (upperStr && memReg === upperStr) return true;
+        if (mem.name.toUpperCase() === upperStr) return true;
+        if ((cleanUpper === '9924005005' || cleanUpper === '9923005005' || upperStr === '9924005005' || upperStr === '9923005005') && mem.name === 'GORLA UPENDRA') return true;
+        return false;
+      });
+
+      if (m) {
+        const isLead = m.role === 'LEAD' || m.registrationNumber === t.regNum;
+        return {
+          isTeamScan: false,
+          scannedRegNum: m.registrationNumber,
+          registrationNumber: m.registrationNumber,
+          name: m.name,
+          role: m.role || (isLead ? 'LEAD' : 'MEMBER'),
+          isTeamLead: isLead,
+          teamName: t.teamName,
+          teamId: t.teamId,
+          leadName: t.leadName,
+          leadRegNum: t.regNum,
+          college: 'KARE',
+          department: 'CSE',
+          members: t.members
+        };
+      }
+    }
+  }
+
+  // 2. Check if the input is a TEAM CODE or TEAM NAME (Team Scan)
+  const authTeam = AUTHORIZED_TEAMS.find(t => 
+    t.teamId === cleanUpper || 
     t.teamId === upperStr ||
     (candidateTeamId && t.teamId === candidateTeamId) ||
-    (t.teamName && t.teamName.toUpperCase() === upperStr) ||
-    (t.members && t.members.some(m => m.registrationNumber === cleanId || m.registrationNumber === upperStr))
+    t.regNum === cleanUpper || 
+    t.regNum === upperStr ||
+    (t.teamName && t.teamName.toUpperCase() === upperStr)
   );
 
-  if (authItem) {
-    const matchedMember = authItem.members.find(m => m.registrationNumber === cleanId || m.registrationNumber === upperStr);
+  if (authTeam) {
+    const isExactLeadReg = cleanUpper === authTeam.regNum || upperStr === authTeam.regNum;
     return {
-      registrationNumber: matchedMember ? matchedMember.registrationNumber : authItem.regNum,
-      name: matchedMember ? matchedMember.name : authItem.leadName,
-      teamName: authItem.teamName,
-      teamId: authItem.teamId,
-      leadName: authItem.leadName,
-      leadRegNum: authItem.regNum,
+      isTeamScan: !isExactLeadReg,
+      scannedRegNum: isExactLeadReg ? authTeam.regNum : null,
+      registrationNumber: authTeam.regNum,
+      name: isExactLeadReg ? authTeam.leadName : authTeam.teamName,
+      teamName: authTeam.teamName,
+      teamId: authTeam.teamId,
+      leadName: authTeam.leadName,
+      leadRegNum: authTeam.regNum,
       college: 'KARE',
       department: 'CSE',
-      isTeamLead: !matchedMember || matchedMember.registrationNumber === authItem.regNum,
-      members: authItem.members
+      isTeamLead: true,
+      role: isExactLeadReg ? 'LEAD' : 'TEAM',
+      members: authTeam.members
     };
   }
 
   // Fallback 1: Database Team model
   const dbTeam = await Team.findOne({
     $or: [
-      { teamId: cleanId },
+      { teamId: cleanUpper },
       { teamId: upperStr },
       ...(candidateTeamId ? [{ teamId: candidateTeamId }, { name: candidateTeamId }] : []),
       { name: upperStr },
       { teamName: upperStr },
-      { teamLeadRegNum: cleanId },
+      { teamLeadRegNum: cleanUpper },
       { teamLeadRegNum: upperStr }
     ]
   });
@@ -306,8 +351,10 @@ async function resolveParticipant(rawInput) {
   if (dbTeam) {
     const leadRealName = getRealStudentName(dbTeam.teamLeadRegNum, dbTeam.teamName || dbTeam.name);
     return {
+      isTeamScan: true,
+      scannedRegNum: null,
       registrationNumber: dbTeam.teamLeadRegNum || 'LEAD',
-      name: leadRealName,
+      name: dbTeam.teamName || dbTeam.name,
       teamName: dbTeam.teamName || dbTeam.name,
       teamId: dbTeam.teamId || dbTeam.name,
       leadName: leadRealName,
@@ -315,6 +362,7 @@ async function resolveParticipant(rawInput) {
       college: 'KARE',
       department: 'CSE',
       isTeamLead: true,
+      role: 'TEAM',
       members: dbTeam.members || []
     };
   }
@@ -322,11 +370,10 @@ async function resolveParticipant(rawInput) {
   // Fallback 2: Database Participant model
   let participant = await Participant.findOne({
     $or: [
-      { registrationNumber: cleanId },
+      { registrationNumber: cleanUpper },
       { registrationNumber: upperStr },
-      { qrCodeData: cleanId },
-      { qrCodeData: upperStr },
-      { teamName: upperStr }
+      { qrCodeData: cleanUpper },
+      { qrCodeData: upperStr }
     ]
   });
 
@@ -334,15 +381,18 @@ async function resolveParticipant(rawInput) {
     const teamDoc = await Team.findOne({ name: participant.teamName });
     const pRealName = getRealStudentName(participant.registrationNumber, participant.name);
     return {
+      isTeamScan: false,
+      scannedRegNum: participant.registrationNumber,
       registrationNumber: participant.registrationNumber,
       name: pRealName,
       teamName: teamDoc?.teamName || participant.teamName,
       teamId: teamDoc?.teamId || 'ALPHA',
-      leadName: pRealName,
-      leadRegNum: participant.registrationNumber,
+      leadName: teamDoc ? getRealStudentName(teamDoc.teamLeadRegNum, teamDoc.leadName) : pRealName,
+      leadRegNum: teamDoc?.teamLeadRegNum || participant.registrationNumber,
       college: participant.college || 'KARE',
       department: participant.department || 'CSE',
       isTeamLead: participant.isTeamLead,
+      role: participant.isTeamLead ? 'LEAD' : 'MEMBER',
       members: teamDoc?.members || []
     };
   }
@@ -528,17 +578,18 @@ router.post('/mark-team-attendance', authenticateToken, requireRole('VOLUNTEER',
       });
     }
 
-    const firstMember = attendanceList[0];
-    const resolvedInfo = await resolveParticipant(firstMember.registrationNumber || teamId || '');
-    const teamName = resolvedInfo?.teamName || firstMember.teamName || 'Team';
-    const cleanTeamId = resolvedInfo?.teamId || teamId || 'ALPHA-001';
+    const cleanTeamId = (teamId || '').trim().toUpperCase();
+    const authTeam = AUTHORIZED_TEAMS.find(t => t.teamId === cleanTeamId || t.teamName?.toUpperCase() === cleanTeamId);
+    const teamName = authTeam?.teamName || attendanceList[0]?.teamName || 'Team';
 
     const volunteerName = req.user.username || req.user.name || 'Volunteer';
     const savedRecords = [];
 
     for (const item of attendanceList) {
       const regNum = (item.registrationNumber || '').trim().toUpperCase();
-      const status = item.status === 'ABSENT' ? 'ABSENT' : 'PRESENT';
+      if (!regNum) continue;
+
+      const status = item.status === 'PRESENT' ? 'PRESENT' : 'ABSENT';
       const realName = getRealStudentName(regNum, item.name);
 
       const rec = await Attendance.findOneAndUpdate(
@@ -549,7 +600,8 @@ router.post('/mark-team-attendance', authenticateToken, requireRole('VOLUNTEER',
           participantRegNum: regNum,
           participantName: realName,
           teamName: teamName,
-          teamId: cleanTeamId,
+          teamId: authTeam?.teamId || cleanTeamId,
+          college: 'KARE',
           status: status,
           markedByVolunteer: volunteerName,
           markedAt: new Date()
@@ -605,6 +657,13 @@ router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async
       return res.status(404).json({
         error: `Participant '${cleanId}' is not registered in the system.`,
         code: 'PARTICIPANT_NOT_FOUND'
+      });
+    }
+
+    if (participant.isTeamScan) {
+      return res.status(400).json({
+        error: `Scanning team '${participant.teamId}' identifies the team. Please select individual member attendance and click Submit Team Attendance.`,
+        code: 'TEAM_SCAN_REQUIRES_SELECTION'
       });
     }
 
@@ -673,21 +732,26 @@ router.get('/session-roster', authenticateToken, async (req, res) => {
       if (cleanKey) recordsMap[cleanKey] = r;
     });
 
-    // Build complete individual roster for all 240 members across 60 teams
+    // Build complete individual roster for all members across all teams
     let fullRoster = [];
     AUTHORIZED_TEAMS.forEach(t => {
       if (t.members && Array.isArray(t.members)) {
         t.members.forEach(m => {
           const cleanReg = (m.registrationNumber || '').trim().toUpperCase();
-          const att = recordsMap[cleanReg];
-          const details = resolveParticipantDetails(m.registrationNumber, m.name, t.teamId, t.teamName);
+          let att = recordsMap[cleanReg];
+          if (!att && (cleanReg === '9923005005' || cleanReg === '9924005005')) {
+            att = recordsMap['9923005005'] || recordsMap['9924005005'];
+          }
+
+          const isLead = m.role === 'LEAD' || m.registrationNumber === t.regNum;
+
           fullRoster.push({
             _id: att?._id || `temp-${m.registrationNumber}`,
-            participantRegNum: details.registrationNumber,
-            participantName: details.name,
-            teamId: details.teamId,
-            teamName: details.teamName,
-            role: m.role || 'MEMBER',
+            participantRegNum: m.registrationNumber,
+            participantName: m.name,
+            teamId: t.teamId,
+            teamName: t.teamName,
+            role: m.role || (isLead ? 'LEAD' : 'MEMBER'),
             status: att ? att.status : 'NOT_MARKED',
             markedByVolunteer: att ? att.markedByVolunteer : '—',
             markedAt: att ? att.markedAt : null

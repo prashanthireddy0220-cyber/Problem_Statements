@@ -141,38 +141,78 @@ export default function VolunteerScanner() {
     if (!queryStr || !queryStr.trim()) return;
     const cleanQuery = extractCleanId(queryStr);
     const upperRaw = queryStr.trim().toUpperCase();
+    const cleanUpper = cleanQuery.toUpperCase();
     setInputRegNum(cleanQuery);
     setLookupError('');
     setScanResult(null);
 
     // 1. Guaranteed Instant Local Lookup using AUTHORIZED_TEAMS
-    const alphaMatch = upperRaw.match(/ALPHA-?(\d+)/i);
+    const alphaMatch = upperRaw.match(/ALPHA-?(\d+)/i) || cleanUpper.match(/ALPHA-?(\d+)/i);
     const candidateTeamId = alphaMatch ? `ALPHA-${alphaMatch[1].padStart(3, '0')}` : null;
 
-    const localItem = AUTHORIZED_TEAMS.find(t => 
-      t.teamId === cleanQuery || 
-      t.teamId === upperRaw ||
-      (candidateTeamId && t.teamId === candidateTeamId) ||
-      t.regNum === cleanQuery || 
-      t.regNum === upperRaw ||
-      (t.teamName && t.teamName.toUpperCase() === upperRaw) ||
-      (t.members && t.members.some(m => m.registrationNumber === cleanQuery || m.registrationNumber === upperRaw))
-    );
+    // Check if the query is an individual member registration number
+    let localMember = null;
+    let localTeam = null;
 
-    if (localItem) {
-      const matchedMember = localItem.members.find(m => m.registrationNumber === cleanQuery || m.registrationNumber === upperRaw);
+    for (const t of AUTHORIZED_TEAMS) {
+      if (t.members && Array.isArray(t.members)) {
+        const m = t.members.find(mem => {
+          const mReg = String(mem.registrationNumber || '').trim().toUpperCase();
+          if (cleanUpper && mReg === cleanUpper) return true;
+          if (upperRaw && mReg === upperRaw) return true;
+          if ((cleanUpper === '9924005005' || cleanUpper === '9923005005' || upperRaw === '9924005005' || upperRaw === '9923005005') && mem.name === 'GORLA UPENDRA') return true;
+          return false;
+        });
+        if (m) {
+          localMember = m;
+          localTeam = t;
+          break;
+        }
+      }
+    }
+
+    if (localMember && localTeam) {
+      const isLead = localMember.role === 'LEAD' || localMember.registrationNumber === localTeam.regNum;
       setScannedParticipant({
-        registrationNumber: matchedMember ? matchedMember.registrationNumber : localItem.regNum,
-        name: matchedMember ? matchedMember.name : localItem.leadName,
-        teamName: localItem.teamName,
-        teamId: localItem.teamId,
-        leadName: localItem.leadName,
-        leadRegNum: localItem.regNum,
+        isTeamScan: false,
+        scannedRegNum: localMember.registrationNumber,
+        registrationNumber: localMember.registrationNumber,
+        name: localMember.name,
+        role: localMember.role || (isLead ? 'LEAD' : 'MEMBER'),
+        isTeamLead: isLead,
+        teamName: localTeam.teamName,
+        teamId: localTeam.teamId,
+        leadName: localTeam.leadName,
+        leadRegNum: localTeam.regNum,
         college: 'KARE',
         department: 'CSE',
-        isTeamLead: !matchedMember || matchedMember.registrationNumber === localItem.regNum,
-        members: localItem.members
+        members: localTeam.members
       });
+    } else {
+      const localTeamOnly = AUTHORIZED_TEAMS.find(t => 
+        t.teamId === cleanUpper || 
+        t.teamId === upperRaw ||
+        (candidateTeamId && t.teamId === candidateTeamId) ||
+        (t.teamName && t.teamName.toUpperCase() === upperRaw)
+      );
+
+      if (localTeamOnly) {
+        setScannedParticipant({
+          isTeamScan: true,
+          scannedRegNum: null,
+          registrationNumber: localTeamOnly.regNum,
+          name: localTeamOnly.teamName,
+          teamName: localTeamOnly.teamName,
+          teamId: localTeamOnly.teamId,
+          leadName: localTeamOnly.leadName,
+          leadRegNum: localTeamOnly.regNum,
+          college: 'KARE',
+          department: 'CSE',
+          isTeamLead: true,
+          role: 'TEAM',
+          members: localTeamOnly.members
+        });
+      }
     }
 
     // 2. Query backend to verify server state
@@ -184,7 +224,7 @@ export default function VolunteerScanner() {
         setScannedParticipant(res.data.participant);
       }
     } catch (err) {
-      if (!localItem) {
+      if (!localMember && !localTeam) {
         setScannedParticipant(null);
         setLookupError(err.response?.data?.error || `Participant / Team '${cleanQuery}' not found.`);
       }
@@ -198,20 +238,43 @@ export default function VolunteerScanner() {
   useEffect(() => {
     if (scannedParticipant) {
       const initialMap = {};
-      const members = scannedParticipant.members || [
-        { name: scannedParticipant.name, registrationNumber: scannedParticipant.registrationNumber }
-      ];
+      const members = scannedParticipant.members || [];
+
       members.forEach(m => {
-        initialMap[m.registrationNumber] = 'PRESENT';
+        const cleanReg = String(m.registrationNumber || '').trim().toUpperCase();
+
+        // Check if this member is ALREADY recorded in the current session roster
+        const existingRosterItem = roster.find(r => {
+          const rReg = String(r.participantRegNum || '').trim().toUpperCase();
+          return rReg === cleanReg || (m.name === 'GORLA UPENDRA' && (rReg === '9923005005' || rReg === '9924005005'));
+        });
+
+        if (existingRosterItem && (existingRosterItem.status === 'PRESENT' || existingRosterItem.status === 'ABSENT')) {
+          // Preserve existing status already recorded
+          initialMap[m.registrationNumber] = existingRosterItem.status;
+        } else {
+          // If this was an individual scan/search for this specific member:
+          const isScannedIndividual = !scannedParticipant.isTeamScan && (
+            cleanReg === String(scannedParticipant.registrationNumber || '').trim().toUpperCase() ||
+            m.name === scannedParticipant.name
+          );
+
+          if (isScannedIndividual) {
+            initialMap[m.registrationNumber] = 'PRESENT';
+          } else {
+            // "initially: NO individual member should be marked PRESENT unless their attendance is actually submitted."
+            initialMap[m.registrationNumber] = 'ABSENT';
+          }
+        }
       });
       setTeamToggles(initialMap);
     }
-  }, [scannedParticipant]);
+  }, [scannedParticipant, roster]);
 
   const toggleMemberStatus = (regNum) => {
     setTeamToggles(prev => ({
       ...prev,
-      [regNum]: prev[regNum] === 'ABSENT' ? 'PRESENT' : 'ABSENT'
+      [regNum]: prev[regNum] === 'PRESENT' ? 'ABSENT' : 'PRESENT'
     }));
   };
 
@@ -230,7 +293,7 @@ export default function VolunteerScanner() {
       registrationNumber: m.registrationNumber,
       name: m.name,
       teamName: scannedParticipant.teamName,
-      status: teamToggles[m.registrationNumber] || 'PRESENT'
+      status: teamToggles[m.registrationNumber] === 'PRESENT' ? 'PRESENT' : 'ABSENT'
     }));
 
     try {
@@ -243,7 +306,7 @@ export default function VolunteerScanner() {
       setScanResult({ success: true, message: res.data.message, records: res.data.records });
       setScannedParticipant(null);
       setInputRegNum('');
-      fetchRoster();
+      await fetchRoster();
     } catch (err) {
       setMarkingLoading(false);
       const errData = err.response?.data;
@@ -512,7 +575,7 @@ export default function VolunteerScanner() {
             <div className="glass-card" style={{ padding: '1.75rem', borderLeft: '4px solid #00F2FE', marginBottom: '1.5rem', background: 'rgba(15, 23, 42, 0.95)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', pb: '0.75rem' }}>
                 <div style={{ fontSize: '0.78rem', color: '#00E676', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '800' }}>
-                  TEAM VERIFIED FOR ATTENDANCE ✅
+                  {scannedParticipant.isTeamScan ? 'TEAM IDENTIFIED FOR ATTENDANCE ✅' : 'PARTICIPANT IDENTIFIED FOR ATTENDANCE ✅'}
                 </div>
                 <span style={{ fontFamily: 'Orbitron, monospace', fontSize: '0.9rem', fontWeight: '800', color: '#00F2FE', background: 'rgba(0,242,254,0.1)', padding: '0.25rem 0.65rem', borderRadius: '12px', border: '1px solid rgba(0,242,254,0.3)' }}>
                   {scannedParticipant.teamId || 'TEAM'}
@@ -528,23 +591,33 @@ export default function VolunteerScanner() {
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Scanned Lead / Student</div>
+                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>
+                    {scannedParticipant.isTeamScan ? 'Team Lead' : 'Scanned Student'}
+                  </div>
                   <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#F8FAFC' }}>
-                    {scannedParticipant.name}
+                    {scannedParticipant.isTeamScan ? scannedParticipant.leadName : scannedParticipant.name}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Registration Number</div>
+                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>
+                    {scannedParticipant.isTeamScan ? 'Team Lead Reg No' : 'Registration Number'}
+                  </div>
                   <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace' }}>
-                    {scannedParticipant.registrationNumber}
+                    {scannedParticipant.isTeamScan ? scannedParticipant.leadRegNum : scannedParticipant.registrationNumber}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>College / Dept</div>
+                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Role / Status</div>
                   <div style={{ fontSize: '1rem', fontWeight: '600', color: '#CBD5E1' }}>
-                    {scannedParticipant.college || 'KARE'} ({scannedParticipant.department || 'CSE'})
+                    {scannedParticipant.isTeamScan ? (
+                      <span style={{ color: '#FFD700' }}>👑 TEAM (Lead: {scannedParticipant.leadName})</span>
+                    ) : (
+                      <span style={{ color: scannedParticipant.role === 'LEAD' ? '#FFD700' : '#00E676' }}>
+                        {scannedParticipant.role === 'LEAD' ? '👑 TEAM LEAD' : '👤 TEAM MEMBER'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -552,11 +625,36 @@ export default function VolunteerScanner() {
               {/* ALL TEAM MEMBERS LIST WITH TOGGLE BUTTONS */}
               {scannedParticipant.members && scannedParticipant.members.length > 0 && (
                 <div style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.02)', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(0, 242, 254, 0.2)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                     <div style={{ fontSize: '0.85rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Users size={18} color="#00F2FE" /> TEAM MEMBERS ATTENDANCE TOGGLES ({scannedParticipant.members.length} Members)
+                      <Users size={18} color="#00F2FE" /> TEAM MEMBERS ATTENDANCE ({scannedParticipant.members.length} Members)
                     </div>
-                    <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>Click toggle to set Present / Absent</span>
+                    
+                    {/* Quick Select All Buttons */}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allP = {};
+                          scannedParticipant.members.forEach(m => { allP[m.registrationNumber] = 'PRESENT'; });
+                          setTeamToggles(allP);
+                        }}
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', background: 'rgba(0,230,118,0.15)', border: '1px solid #00E676', color: '#00E676', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}
+                      >
+                        ✓ Mark All Present
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allA = {};
+                          scannedParticipant.members.forEach(m => { allA[m.registrationNumber] = 'ABSENT'; });
+                          setTeamToggles(allA);
+                        }}
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', background: 'rgba(255,75,75,0.15)', border: '1px solid #FF4B4B', color: '#FF4B4B', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}
+                      >
+                        ✗ Mark All Absent
+                      </button>
+                    </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
@@ -718,16 +816,22 @@ export default function VolunteerScanner() {
 
                   let authTeam = AUTHORIZED_TEAMS.find(t => t.teamId === targetTeamCode || t.regNum === cleanReg);
                   if (!authTeam && cleanReg) {
-                    authTeam = AUTHORIZED_TEAMS.find(t => t.members && t.members.some(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg));
+                    authTeam = AUTHORIZED_TEAMS.find(t => t.members && t.members.some(m => {
+                      const mReg = String(m.registrationNumber || '').trim().toUpperCase();
+                      return mReg === cleanReg || (m.name === 'GORLA UPENDRA' && (cleanReg === '9924005005' || cleanReg === '9923005005'));
+                    }));
                   }
 
-                  const authMember = authTeam?.members?.find(m => String(m.registrationNumber).trim().toUpperCase() === cleanReg);
+                  const authMember = authTeam?.members?.find(m => {
+                    const mReg = String(m.registrationNumber || '').trim().toUpperCase();
+                    return mReg === cleanReg || (m.name === 'GORLA UPENDRA' && (cleanReg === '9924005005' || cleanReg === '9923005005'));
+                  });
 
-                  const displayName = authMember?.name || (authTeam && (!item.participantName || item.participantName.includes('Team Lead ('))) ? authTeam.leadName : item.participantName;
+                  const displayName = authMember?.name || item.participantName || (cleanReg === authTeam?.regNum ? authTeam?.leadName : cleanReg);
                   const displayTeamId = authTeam?.teamId || item.teamId || 'ALPHA';
                   const displayTeamName = authTeam?.teamName || item.teamName || 'Team';
-                  const displayRegNum = authMember?.registrationNumber || (authTeam ? authTeam.regNum : item.participantRegNum);
-                  const role = item.role || authMember?.role || (authTeam?.regNum === displayRegNum ? 'LEAD' : 'MEMBER');
+                  const displayRegNum = authMember?.registrationNumber || item.participantRegNum || cleanReg;
+                  const role = authMember?.role || item.role || (cleanReg === authTeam?.regNum ? 'LEAD' : 'MEMBER');
 
                   const isPresent = item.status === 'PRESENT';
                   const isAbsent = item.status === 'ABSENT';
