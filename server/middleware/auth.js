@@ -117,10 +117,12 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// Require specific role(s)
+// Require specific role(s) (case-insensitive check)
 const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+    const userRole = (req.user?.role || '').trim().toUpperCase();
+    const isAllowed = allowedRoles.some(r => (r || '').trim().toUpperCase() === userRole);
+    if (!req.user || !isAllowed) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.', code: 'FORBIDDEN_ROLE' });
     }
     next();

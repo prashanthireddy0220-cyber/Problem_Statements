@@ -211,7 +211,7 @@ const handleGetEvaluations = async (req, res) => {
 
     const evaluations = await Evaluation.find(query).sort({ updatedAt: -1 });
     
-    // Privacy: Reviewers only see their own raw marks and comments, never other reviewers' or min/max/normalized values
+    // Privacy: If user is REVIEWER, mask raw marks so reviewer cannot see marks once entered
     const sanitizedEvaluations = evaluations.map(ev => ({
       _id: ev._id,
       teamId: ev.teamId,
@@ -219,9 +219,9 @@ const handleGetEvaluations = async (req, res) => {
       teamName: ev.teamName,
       roundNumber: ev.roundNumber,
       reviewerId: ev.reviewerId,
-      rawScore: ev.rawScore !== undefined ? ev.rawScore : ev.totalMarks,
-      totalMarks: ev.rawScore !== undefined ? ev.rawScore : ev.totalMarks,
-      comments: ev.comments || '',
+      rawScore: req.user?.role === 'ADMIN' ? (ev.rawScore !== undefined ? ev.rawScore : ev.totalMarks) : null,
+      totalMarks: req.user?.role === 'ADMIN' ? (ev.rawScore !== undefined ? ev.rawScore : ev.totalMarks) : null,
+      comments: req.user?.role === 'ADMIN' ? (ev.comments || '') : '',
       status: ev.status || 'SUBMITTED',
       submittedAt: ev.submittedAt
     }));
@@ -376,18 +376,19 @@ const handleSubmitEvaluation = async (req, res) => {
       metadata: { rawScore: cleanRawScore, roundNumber: roundNum }
     });
 
-    // Return sanitized response for reviewer (protects privacy)
+    // Return sanitized response for reviewer (protects privacy: reviewer cannot see marks once entered)
+    const isAdmin = req.user?.role === 'ADMIN';
     return res.json({
-      message: `Marks (${cleanRawScore}) for Team ${cleanTeamCode} (Round ${roundNum}) saved successfully!`,
+      message: `Marks for Team ${cleanTeamCode} (Round ${roundNum}) submitted successfully!`,
       evaluation: {
         _id: evaluationDoc._id,
         teamId: evaluationDoc.teamId,
         teamCode: evaluationDoc.teamCode,
         teamName: evaluationDoc.teamName,
         roundNumber: evaluationDoc.roundNumber,
-        rawScore: cleanRawScore,
-        totalMarks: cleanRawScore,
-        comments: evaluationDoc.comments,
+        rawScore: isAdmin ? cleanRawScore : null,
+        totalMarks: isAdmin ? cleanRawScore : null,
+        comments: isAdmin ? evaluationDoc.comments : '',
         status: evaluationDoc.status,
         submittedAt: evaluationDoc.submittedAt
       }

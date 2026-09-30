@@ -158,16 +158,18 @@ export default function AdminDashboard() {
     }
   };
 
-  // Auto-refresh interval
+  // Auto-refresh interval (strictly active only when logged in as ADMIN)
   useEffect(() => {
+    if (!user || user.role !== 'ADMIN') return;
     fetchAllData();
     const interval = setInterval(fetchAllData, 3000);
     return () => clearInterval(interval);
-  }, [activeTab, attSessionFilter, attStatusFilter, attSearchFilter]);
+  }, [user, activeTab, attSessionFilter, attStatusFilter, attSearchFilter]);
 
   useEffect(() => {
+    if (!user || user.role !== 'ADMIN') return;
     fetchSettings();
-  }, [activeTab]);
+  }, [user, activeTab]);
 
   const fetchSettings = async () => {
     try {
@@ -182,10 +184,16 @@ export default function AdminDashboard() {
   };
 
   const fetchAllData = async () => {
+    if (!user || user.role !== 'ADMIN') return;
     try {
       if (activeTab === 'live' || activeTab === 'teams' || activeTab === 'evaluations') {
-        const res = await axios.get('/api/admin/live-activity');
-        if (res.data) {
+        const res = await axios.get('/api/admin/live-activity').catch(err => {
+          if (err.response?.status === 403) {
+            console.warn('Admin live-activity: Access forbidden. Ensure user is logged in as ADMIN.');
+          }
+          return null;
+        });
+        if (res && res.data) {
           setLiveData(res.data);
           if (res.data.teams && res.data.teams.length > 0) {
             setAllTeams(res.data.teams);

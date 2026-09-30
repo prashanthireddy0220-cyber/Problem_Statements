@@ -201,6 +201,10 @@ export default function ReviewerDashboard() {
   // Open Mark Entry Form (Reviewer enters ONLY raw marks 0–100)
   const openEvaluationModal = (team) => {
     const existingEv = getTeamEvaluation(team);
+    if (existingEv && user?.role === 'REVIEWER') {
+      // Reviewers cannot view or edit marks once submitted
+      return;
+    }
     const initialRaw = existingEv ? (existingEv.rawScore !== undefined ? existingEv.rawScore : existingEv.totalMarks) : '';
     setRawMarkInput(initialRaw !== undefined && initialRaw !== null && initialRaw !== '' ? String(initialRaw) : '');
     setCommentsInput(existingEv?.comments || '');
@@ -245,14 +249,14 @@ export default function ReviewerDashboard() {
         teamCode: activeModalTeam.teamCode || activeModalTeam.teamId,
         teamName: activeModalTeam.teamName,
         roundNumber: selectedRoundNum,
-        rawScore: scoreNum,
-        totalMarks: scoreNum,
-        comments: commentsInput,
+        rawScore: user?.role === 'ADMIN' ? scoreNum : null,
+        totalMarks: user?.role === 'ADMIN' ? scoreNum : null,
+        comments: user?.role === 'ADMIN' ? commentsInput : '',
         status: 'SUBMITTED',
         submittedAt: new Date()
       };
 
-      // Optimistically update evaluations state so marks appear immediately!
+      // Optimistically update evaluations state
       setEvaluations(prev => {
         const cleanCode = String(activeModalTeam.teamCode || activeModalTeam.teamId || '').trim().toUpperCase();
         const cleanId = String(activeModalTeam._id || '').trim();
@@ -263,7 +267,7 @@ export default function ReviewerDashboard() {
         return [savedEv, ...filtered];
       });
 
-      setActionMsg(`Marks (${scoreNum} / 100) saved successfully for ${activeModalTeam.teamCode || activeModalTeam.teamId}!`);
+      setActionMsg(`Marks successfully submitted for ${activeModalTeam.teamCode || activeModalTeam.teamId}!`);
       setTimeout(() => setActionMsg(''), 4000);
       
       setActiveModalTeam(null);
@@ -529,7 +533,7 @@ export default function ReviewerDashboard() {
 
                       {/* Total Score */}
                       <td style={{ padding: '0.9rem 1.25rem', textAlign: 'center' }}>
-                        {isSubmitted && scoreVal !== null && scoreVal !== undefined ? (
+                        {isSubmitted && user?.role === 'ADMIN' && scoreVal !== null && scoreVal !== undefined ? (
                           <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                             <span style={{ 
                               background: 'rgba(16, 185, 129, 0.18)', 
@@ -568,27 +572,43 @@ export default function ReviewerDashboard() {
 
                       {/* Action Button */}
                       <td style={{ padding: '0.9rem 1.25rem', textAlign: 'right' }}>
-                        <button
-                          onClick={() => openEvaluationModal(team)}
-                          className={isSubmitted ? (user?.role === 'REVIEWER' ? 'btn-alpha-outline' : 'btn-alpha-cyan') : 'btn-alpha-cyan'}
-                          style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', borderRadius: '8px' }}
-                        >
-                          {isSubmitted ? (
-                            user?.role === 'REVIEWER' ? (
-                              <>
-                                <Eye size={14} /> View Marks ({scoreVal})
-                              </>
-                            ) : (
+                        {isSubmitted && user?.role === 'REVIEWER' ? (
+                          <button
+                            disabled
+                            style={{
+                              padding: '0.45rem 0.9rem',
+                              fontSize: '0.8rem',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(16, 185, 129, 0.35)',
+                              background: 'rgba(16, 185, 129, 0.08)',
+                              color: '#10B981',
+                              fontWeight: 700,
+                              cursor: 'not-allowed',
+                              opacity: 0.85,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            <CheckCircle size={14} color="#10B981" /> Submitted
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => openEvaluationModal(team)}
+                            className="btn-alpha-cyan"
+                            style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', borderRadius: '8px' }}
+                          >
+                            {isSubmitted ? (
                               <>
                                 <Edit3 size={14} /> Edit Marks
                               </>
-                            )
-                          ) : (
-                            <>
-                              <Edit3 size={14} /> Enter Marks
-                            </>
-                          )}
-                        </button>
+                            ) : (
+                              <>
+                                <Edit3 size={14} /> Enter Marks
+                              </>
+                            )}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
