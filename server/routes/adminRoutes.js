@@ -9,6 +9,7 @@ const {
 } = require('../models/Schema');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { validateRawScore, recalculateRoundReviewerNormalization, getLeaderboardData } = require('../services/normalizationService');
+const { getOrUpdateSystemState } = require('../services/systemStateService');
 
 // 1. UPDATE TIMER SETTINGS & MODULE TOGGLES
 router.post('/settings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
@@ -83,17 +84,38 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
       settings.selectionEndsAt = new Date(settings.selectionScheduledStart.getTime() + selDur * 60 * 1000);
 
       settings.roundStatus = 'ACTIVE';
-      settings.problemStatementsReleased = false;
-      settings.releaseManualState = 'NONE';
-      settings.selectionManualState = 'NONE';
-      settings.currentPhase = 'ROUND_STARTED_UNRELEASED';
+
+      if (relDelay <= 0) {
+        settings.problemStatementsReleased = true;
+        settings.releaseManualState = 'RELEASED';
+        if (selDelay <= 0) {
+          settings.selectionManualState = 'OPEN';
+          settings.currentPhase = 'SELECTION_OPEN';
+        } else {
+          settings.selectionManualState = 'NONE';
+          settings.currentPhase = 'RELEASED_LOCKED';
+        }
+      } else {
+        settings.problemStatementsReleased = false;
+        settings.releaseManualState = 'NONE';
+        settings.selectionManualState = 'NONE';
+        settings.currentPhase = 'ROUND_STARTED_UNRELEASED';
+      }
     } else if (action === 'RELEASE_PROBLEMS' || action === 'RELEASE_NOW') {
       settings.releaseManualState = 'RELEASED';
       settings.problemStatementsReleased = true;
+      settings.selectionManualState = 'NONE';
+      settings.selectionScheduledStart = null;
+      if (settings.releaseScheduledAt && new Date(settings.releaseScheduledAt) > now) {
+        settings.releaseScheduledAt = now;
+      }
+      settings.currentPhase = 'RELEASED_LOCKED';
     } else if (action === 'UNRELEASE_PROBLEMS') {
       settings.releaseManualState = 'UNRELEASED';
       settings.problemStatementsReleased = false;
       settings.selectionManualState = 'NONE';
+      settings.currentPhase = 'NOT_RELEASED';
+      settings.roundStatus = 'IDLE';
     } else if (action === 'SCHEDULE_SELECTION') {
       settings.releaseManualState = 'RELEASED';
       settings.problemStatementsReleased = true;
@@ -102,14 +124,23 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
       if (scheduledTime) {
         settings.selectionEndsAt = new Date(new Date(scheduledTime).getTime() + (settings.selectionDurationMinutes || 10) * 60 * 1000);
       }
+      settings.currentPhase = (scheduledTime && now < new Date(scheduledTime)) ? 'RELEASED_LOCKED' : 'SELECTION_OPEN';
     } else if (action === 'OPEN_NOW' || action === 'START_SELECTION') {
+      const selDur = Number(selectionDurationMinutes || settings.selectionDurationMinutes || 10);
       settings.releaseManualState = 'RELEASED';
       settings.problemStatementsReleased = true;
       settings.selectionManualState = 'OPEN';
+      settings.currentPhase = 'SELECTION_OPEN';
       settings.selectionStartedAt = now;
-      settings.selectionEndsAt = new Date(now.getTime() + (settings.selectionDurationMinutes || 10) * 60 * 1000);
+      settings.selectionEndsAt = new Date(now.getTime() + selDur * 60 * 1000);
+      settings.selectionScheduledStart = now;
+      if (settings.releaseScheduledAt && new Date(settings.releaseScheduledAt) > now) {
+        settings.releaseScheduledAt = now;
+      }
     } else if (action === 'CLOSE' || action === 'LOCK' || action === 'END_SESSION') {
       settings.selectionManualState = 'CLOSED';
+      settings.currentPhase = 'SELECTION_CLOSED';
+      settings.selectionEndsAt = now;
     } else if (action === 'RESET') {
       settings.roundStatus = 'IDLE';
       settings.problemStatementsReleased = false;
@@ -135,14 +166,22 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
 
     await settings.save();
 
+    // Centrally re-evaluate system state cleanly
+    const freshState = await getOrUpdateSystemState();
+
     await AuditLog.create({
       actor: req.user.username,
       role: 'ADMIN',
       action: `SESSION_${action}`,
-      target: settings.currentPhase || action
+      target: freshState.currentPhase || action
     });
 
-    return res.json({ message: `Session transition '${action}' applied successfully.`, settings });
+    return res.json({
+      message: `Session transition '${action}' applied successfully.`,
+      settings: freshState.settings,
+      currentPhase: freshState.currentPhase,
+      state: freshState
+    });
   } catch (err) {
     console.error('Session control error:', err);
     return res.status(500).json({ error: 'Failed to update session state.' });
@@ -151,7 +190,8 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
 
 router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const settings = await SystemSettings.findOne() || {};
+    const sysState = await getOrUpdateSystemState();
+    const settings = sysState.settings || {};
     const authorizedTeams = require('../data/teamsData');
     
     const teams = await Team.find();
@@ -237,13 +277,19 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
       selectionsCompleted: activity.filter(a => a.selectionConfirmed).length,
       totalProblems,
       fullProblemsCount,
-      problemStatementsReleased: Boolean(settings.problemStatementsReleased),
+      problemStatementsReleased: Boolean(sysState.problemStatementsReleased),
       selectionScheduledStart: settings.selectionScheduledStart,
       selectionManualState: settings.selectionManualState || 'NONE',
-      currentPhase: settings.currentPhase || 'NOT_RELEASED'
+      releaseManualState: settings.releaseManualState || 'NONE',
+      roundStatus: settings.roundStatus || 'IDLE',
+      currentPhase: sysState.currentPhase || 'NOT_RELEASED',
+      timeUntilReleaseSeconds: sysState.timeUntilReleaseSeconds || 0,
+      timeUntilSelectionStartSeconds: sysState.timeUntilSelectionStartSeconds || 0,
+      selectionTimeRemainingSeconds: sysState.selectionTimeRemainingSeconds || 0,
+      serverTime: sysState.serverTime
     };
 
-    return res.json({ summary, teams: activity, problemStatements });
+    return res.json({ summary, teams: activity, problemStatements, state: sysState });
   } catch (err) {
     console.error('Live activity error:', err);
     return res.status(500).json({ error: 'Failed to fetch live activity data.' });

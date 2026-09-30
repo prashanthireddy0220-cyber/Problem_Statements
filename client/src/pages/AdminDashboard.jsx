@@ -233,16 +233,24 @@ export default function AdminDashboard() {
   };
 
   const [scheduledTimeInput, setScheduledTimeInput] = useState('');
+  const [phaseActionLoading, setPhaseActionLoading] = useState(false);
+  const [timedReleaseMinutes, setTimedReleaseMinutes] = useState(5);
+  const [timedReadMinutes, setTimedReadMinutes] = useState(2);
+  const [timedSelectMinutes, setTimedSelectMinutes] = useState(10);
 
   const handlePhaseAction = async (actionStr, extraData = {}) => {
+    if (phaseActionLoading) return;
+    setPhaseActionLoading(true);
     try {
-      await axios.post('/api/admin/session-control', { action: actionStr, ...extraData });
-      setActionMsg(`Session action '${actionStr}' applied successfully!`);
-      setTimeout(() => setActionMsg(''), 3000);
-      fetchAllData();
-      fetchSettings();
+      const res = await axios.post('/api/admin/session-control', { action: actionStr, ...extraData });
+      setActionMsg(res.data?.message || `Session action '${actionStr}' applied successfully!`);
+      setTimeout(() => setActionMsg(''), 4000);
+      await fetchAllData();
+      await fetchSettings();
     } catch (e) {
-      alert('Failed to update session phase.');
+      alert(e.response?.data?.error || 'Failed to update session phase.');
+    } finally {
+      setPhaseActionLoading(false);
     }
   };
 
@@ -576,37 +584,70 @@ export default function AdminDashboard() {
         <div>
           <div className="glass-panel" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.15rem', color: '#FFD700', fontFamily: 'var(--font-heading)' }}>
-                ⚡ PROBLEM STATEMENT SELECTION CONTROLLER
+              <h3 style={{ fontSize: '1.15rem', color: '#FFD700', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Zap size={18} color="#FFD700" /> PROBLEM STATEMENT SELECTION CONTROLLER
               </h3>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>Problem Statement Status:</span>
-                <span style={{
-                  padding: '0.35rem 0.85rem',
-                  borderRadius: '20px',
-                  fontSize: '0.85rem',
-                  fontWeight: '800',
-                  background: !liveData.summary?.problemStatementsReleased ? 'rgba(255,75,75,0.2)' :
-                              (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION' ? 'rgba(0,230,118,0.2)' :
-                              (liveData.summary?.currentPhase === 'SELECTION_CLOSED' || liveData.summary?.currentPhase === 'CLOSED' ? 'rgba(255,75,75,0.2)' : 'rgba(255,215,0,0.2)')),
-                  color: !liveData.summary?.problemStatementsReleased ? '#FF4B4B' :
-                         (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION' ? '#00E676' :
-                         (liveData.summary?.currentPhase === 'SELECTION_CLOSED' || liveData.summary?.currentPhase === 'CLOSED' ? '#FF4B4B' : '#FFD700')),
-                  border: `1px solid ${!liveData.summary?.problemStatementsReleased ? '#FF4B4B' :
-                          (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION' ? '#00E676' :
-                          (liveData.summary?.currentPhase === 'SELECTION_CLOSED' || liveData.summary?.currentPhase === 'CLOSED' ? '#FF4B4B' : '#FFD700'))}`
-                }}>
-                  {!liveData.summary?.problemStatementsReleased ? '🔴 Not Released' :
-                   (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION' ? '🟢 Selection Open' :
-                   (liveData.summary?.currentPhase === 'SELECTION_CLOSED' || liveData.summary?.currentPhase === 'CLOSED' ? '🔴 Selection Closed' : '🟡 Released / Selection Locked'))}
-                </span>
+                {(() => {
+                  const phase = liveData.summary?.currentPhase;
+                  const isRel = liveData.summary?.problemStatementsReleased;
+
+                  let label = '🔴 Not Released';
+                  let bg = 'rgba(255,75,75,0.2)';
+                  let color = '#FF4B4B';
+                  let border = '#FF4B4B';
+
+                  if (phase === 'ROUND_STARTED_UNRELEASED') {
+                    label = `⏳ Round Started (${liveData.summary?.timeUntilReleaseSeconds > 0 ? `${liveData.summary.timeUntilReleaseSeconds}s` : 'Releasing Soon'})`;
+                    bg = 'rgba(0,242,254,0.2)';
+                    color = '#00F2FE';
+                    border = '#00F2FE';
+                  } else if (phase === 'RELEASED_LOCKED') {
+                    label = '🟡 Released / Selection Locked';
+                    bg = 'rgba(255,215,0,0.2)';
+                    color = '#FFD700';
+                    border = '#FFD700';
+                  } else if (phase === 'SELECTION_OPEN' || phase === 'SELECTION') {
+                    label = `🟢 Selection Open ${liveData.summary?.selectionTimeRemainingSeconds > 0 ? `(${Math.floor(liveData.summary.selectionTimeRemainingSeconds / 60)}m ${liveData.summary.selectionTimeRemainingSeconds % 60}s)` : ''}`;
+                    bg = 'rgba(0,230,118,0.2)';
+                    color = '#00E676';
+                    border = '#00E676';
+                  } else if (phase === 'SELECTION_CLOSED' || phase === 'CLOSED') {
+                    label = '🔴 Selection Closed';
+                    bg = 'rgba(255,75,75,0.2)';
+                    color = '#FF4B4B';
+                    border = '#FF4B4B';
+                  } else if (!isRel) {
+                    label = '🔴 Not Released';
+                    bg = 'rgba(255,75,75,0.2)';
+                    color = '#FF4B4B';
+                    border = '#FF4B4B';
+                  }
+
+                  return (
+                    <span style={{
+                      padding: '0.4rem 1rem',
+                      borderRadius: '20px',
+                      fontSize: '0.88rem',
+                      fontWeight: '800',
+                      background: bg,
+                      color: color,
+                      border: `1px solid ${border}`,
+                      boxShadow: `0 0 15px ${bg}`
+                    }}>
+                      {label}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+              {/* CARD 1: TIMED ROUND */}
               <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #00F2FE' }}>
-                <div style={{ fontSize: '0.8rem', color: '#00F2FE', marginBottom: '0.5rem', fontWeight: '800' }}>1. 🚀 START TIMED ROUND</div>
+                <div style={{ fontSize: '0.82rem', color: '#00F2FE', marginBottom: '0.5rem', fontWeight: '800' }}>1. 🚀 START TIMED ROUND</div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', marginBottom: '0.75rem' }}>
                   <div>
@@ -614,8 +655,8 @@ export default function AdminDashboard() {
                     <input
                       type="number"
                       min="0"
-                      value={settings.releaseDelayMinutes ?? 5}
-                      onChange={(e) => setSettings({ ...settings, releaseDelayMinutes: Number(e.target.value) })}
+                      value={timedReleaseMinutes}
+                      onChange={(e) => setTimedReleaseMinutes(Number(e.target.value))}
                       style={{ width: '100%', padding: '0.35rem 0.45rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#00F2FE', borderRadius: '6px', fontSize: '0.88rem', fontWeight: '800', fontFamily: 'Orbitron, monospace', textAlign: 'center' }}
                     />
                   </div>
@@ -624,8 +665,8 @@ export default function AdminDashboard() {
                     <input
                       type="number"
                       min="0"
-                      value={settings.selectionDelayMinutes ?? settings.readingDurationMinutes ?? 2}
-                      onChange={(e) => setSettings({ ...settings, selectionDelayMinutes: Number(e.target.value), readingDurationMinutes: Number(e.target.value) })}
+                      value={timedReadMinutes}
+                      onChange={(e) => setTimedReadMinutes(Number(e.target.value))}
                       style={{ width: '100%', padding: '0.35rem 0.45rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#FFD700', borderRadius: '6px', fontSize: '0.88rem', fontWeight: '800', fontFamily: 'Orbitron, monospace', textAlign: 'center' }}
                     />
                   </div>
@@ -634,62 +675,110 @@ export default function AdminDashboard() {
                     <input
                       type="number"
                       min="1"
-                      value={settings.selectionDurationMinutes ?? 10}
-                      onChange={(e) => setSettings({ ...settings, selectionDurationMinutes: Number(e.target.value) })}
+                      value={timedSelectMinutes}
+                      onChange={(e) => setTimedSelectMinutes(Number(e.target.value))}
                       style={{ width: '100%', padding: '0.35rem 0.45rem', background: '#0F172A', border: '1px solid var(--border-cyan)', color: '#00E676', borderRadius: '6px', fontSize: '0.88rem', fontWeight: '800', fontFamily: 'Orbitron, monospace', textAlign: 'center' }}
                     />
                   </div>
                 </div>
 
                 <button
+                  disabled={phaseActionLoading}
                   onClick={() => handlePhaseAction('START_ROUND', {
-                    releaseDelayMinutes: settings.releaseDelayMinutes ?? 5,
-                    selectionDelayMinutes: settings.selectionDelayMinutes ?? 2,
-                    selectionDurationMinutes: settings.selectionDurationMinutes ?? 10
+                    releaseDelayMinutes: timedReleaseMinutes,
+                    selectionDelayMinutes: timedReadMinutes,
+                    selectionDurationMinutes: timedSelectMinutes
                   })}
                   className="btn-alpha-cyan"
-                  style={{ width: '100%', justifyContent: 'center', fontWeight: '800', padding: '0.55rem' }}
+                  style={{ width: '100%', justifyContent: 'center', fontWeight: '800', padding: '0.55rem', opacity: phaseActionLoading ? 0.6 : 1 }}
                 >
-                  <Clock size={16} /> Start Timed Round
+                  <Clock size={16} /> {phaseActionLoading ? 'Starting...' : 'Start Timed Round'}
                 </button>
               </div>
 
+              {/* CARD 2: MANUAL RELEASE */}
               <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #FFD700' }}>
-                <div style={{ fontSize: '0.8rem', color: '#FFD700', marginBottom: '0.5rem', fontWeight: '800' }}>2. 🔓 MANUAL RELEASE</div>
+                <div style={{ fontSize: '0.82rem', color: '#FFD700', marginBottom: '0.5rem', fontWeight: '800' }}>2. 🔓 MANUAL RELEASE</div>
                 <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-                  Override timer and immediately release/hide problem statements to all Team Leads.
+                  Override timer and immediately release or hide problem statements to all Team Leads.
                 </p>
                 {liveData.summary?.problemStatementsReleased ? (
-                  <button onClick={() => handlePhaseAction('UNRELEASE_PROBLEMS')} className="btn-alpha-outline" style={{ width: '100%', borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center' }}>
-                    <Lock size={16} /> Unrelease / Hide Problems
+                  <button
+                    disabled={phaseActionLoading}
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to hide problem statements? Team leads will not be able to view them.")) {
+                        handlePhaseAction('UNRELEASE_PROBLEMS');
+                      }
+                    }}
+                    className="btn-alpha-outline"
+                    style={{ width: '100%', borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center', opacity: phaseActionLoading ? 0.6 : 1 }}
+                  >
+                    <Lock size={16} /> {phaseActionLoading ? 'Updating...' : 'Unrelease / Hide Problems'}
                   </button>
                 ) : (
-                  <button onClick={() => handlePhaseAction('RELEASE_PROBLEMS')} className="btn-alpha-gold" style={{ width: '100%', justifyContent: 'center' }}>
-                    <Unlock size={16} /> Release Problems Now
+                  <button
+                    disabled={phaseActionLoading}
+                    onClick={() => handlePhaseAction('RELEASE_PROBLEMS')}
+                    className="btn-alpha-gold"
+                    style={{ width: '100%', justifyContent: 'center', opacity: phaseActionLoading ? 0.6 : 1 }}
+                  >
+                    <Unlock size={16} /> {phaseActionLoading ? 'Updating...' : 'Release Problems Now'}
                   </button>
                 )}
               </div>
 
+              {/* CARD 3: ENABLE SELECTION */}
               <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #00E676' }}>
-                <div style={{ fontSize: '0.8rem', color: '#00E676', marginBottom: '0.5rem', fontWeight: '800' }}>3. ⚡ ENABLE SELECTION</div>
+                <div style={{ fontSize: '0.82rem', color: '#00E676', marginBottom: '0.5rem', fontWeight: '800' }}>3. ⚡ ENABLE SELECTION</div>
                 <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-                  Bypass selection delay and immediately enable "Select Problem Statement" button.
+                  Bypass selection delay and immediately enable "Select Problem Statement" button for teams.
                 </p>
-                <button onClick={() => handlePhaseAction('OPEN_NOW')} className="btn-alpha-cyan" style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)', color: '#0F172A', fontWeight: '900' }}>
-                  <Zap size={16} /> Enable Selection Now
+                <button
+                  disabled={phaseActionLoading}
+                  onClick={() => handlePhaseAction('OPEN_NOW')}
+                  className="btn-alpha-cyan"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center',
+                    background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)',
+                    color: '#0F172A',
+                    fontWeight: '900',
+                    opacity: phaseActionLoading ? 0.6 : 1
+                  }}
+                >
+                  <Zap size={16} /> {(liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 'Selection Active (Click to Extend)' : (phaseActionLoading ? 'Enabling...' : 'Enable Selection Now')}
                 </button>
               </div>
 
+              {/* CARD 4: LOCK & RESET */}
               <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #FF4B4B' }}>
-                <div style={{ fontSize: '0.8rem', color: '#FF4B4B', marginBottom: '0.5rem', fontWeight: '800' }}>4. 🔒 LOCK & RESET</div>
+                <div style={{ fontSize: '0.82rem', color: '#FF4B4B', marginBottom: '0.5rem', fontWeight: '800' }}>4. 🔒 LOCK & RESET</div>
                 <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
                   Close selection or reset system timer state back to unreleased.
                 </p>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={() => handlePhaseAction('CLOSE')} className="btn-alpha-outline" style={{ flex: 1, borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center', padding: '0.45rem' }}>
+                  <button
+                    disabled={phaseActionLoading}
+                    onClick={() => {
+                      if (window.confirm("Close problem selection? This will prevent teams from selecting any new problems.")) {
+                        handlePhaseAction('CLOSE');
+                      }
+                    }}
+                    className="btn-alpha-outline"
+                    style={{ flex: 1, borderColor: '#FF4B4B', color: '#FF4B4B', justifyContent: 'center', padding: '0.45rem', opacity: phaseActionLoading ? 0.6 : 1 }}
+                  >
                     <Lock size={14} /> Close
                   </button>
-                  <button onClick={() => handlePhaseAction('RESET')} className="btn-alpha-outline" style={{ flex: 1, justifyContent: 'center', padding: '0.45rem' }}>
+                  <button
+                    disabled={phaseActionLoading}
+                    onClick={() => {
+                      if (window.confirm("Reset timer to initial unreleased status? (Team selections will remain saved).")) {
+                        handlePhaseAction('RESET');
+                      }
+                    }}
+                    className="btn-alpha-outline"
+                    style={{ flex: 1, justifyContent: 'center', padding: '0.45rem', opacity: phaseActionLoading ? 0.6 : 1 }}
+                  >
                     <RefreshCw size={14} /> Reset
                   </button>
                 </div>
