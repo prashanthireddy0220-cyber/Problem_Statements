@@ -599,4 +599,111 @@ router.get('/evaluations/team/:teamId', authenticateToken, requireRole('ADMIN'),
   }
 });
 
+// 11. ADMIN: SYNC & SEPARATE TEAM 50 AND TEAM 61
+router.all('/sync-teams-50-61', async (req, res) => {
+  try {
+    const team50Members = [
+      { name: 'BOPADALA NAGA SANJAY', registrationNumber: '9824005012', role: 'LEAD' },
+      { name: 'MORUMPALLI BHANUPRAKASH REDDY', registrationNumber: '9824005010', role: 'MEMBER' },
+      { name: 'CHEMBETI VINAY HARSHA', registrationNumber: '9923005067', role: 'MEMBER' },
+      { name: 'Y.PATHIV', registrationNumber: '9923005315', role: 'MEMBER' }
+    ];
+
+    const team61Members = [
+      { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9824005007', role: 'LEAD' },
+      { name: 'RAAVULA VINAY', registrationNumber: '9923005124', role: 'MEMBER' },
+      { name: 'KOLA ADARSH', registrationNumber: '9923005097', role: 'MEMBER' },
+      { name: 'GORLA UPENDRA', registrationNumber: '9923005005', role: 'MEMBER' }
+    ];
+
+    // 1. Ensure Team 50 exists with correct details
+    let t50 = await Team.findOne({ $or: [{ teamId: 'ALPHA-050' }, { name: 'ALPHA-050' }] });
+    if (!t50) {
+      t50 = await Team.create({
+        name: 'ALPHA-050',
+        teamId: 'ALPHA-050',
+        teamName: 'STRANGER THINGS',
+        teamLeadRegNum: '9824005012',
+        college: 'KARE',
+        department: 'CSE',
+        members: team50Members,
+        teamQrToken: 'TQ-ALPHA-050-5012',
+        eventPassQrToken: 'EP-ALPHA-050-5012',
+        registrationStatus: 'CONFIRMED',
+        eventPassStatus: 'ISSUED'
+      });
+    } else {
+      t50.name = 'ALPHA-050';
+      t50.teamId = 'ALPHA-050';
+      t50.teamName = 'STRANGER THINGS';
+      t50.teamLeadRegNum = '9824005012';
+      t50.members = team50Members;
+      t50.teamQrToken = 'TQ-ALPHA-050-5012';
+      t50.eventPassQrToken = 'EP-ALPHA-050-5012';
+      await t50.save();
+    }
+
+    // 2. Ensure Team 61 exists with correct details (as a distinct document from Team 50)
+    let t61 = await Team.findOne({ $or: [{ teamId: 'ALPHA-061' }, { name: 'ALPHA-061' }] });
+    if (!t61 || t61._id.toString() === t50._id.toString()) {
+      t61 = await Team.create({
+        name: 'ALPHA-061',
+        teamId: 'ALPHA-061',
+        teamName: 'TEAM 61',
+        teamLeadRegNum: '9824005007',
+        college: 'KARE',
+        department: 'CSE',
+        members: team61Members,
+        teamQrToken: 'TQ-ALPHA-061-5007',
+        eventPassQrToken: 'EP-ALPHA-061-5007',
+        registrationStatus: 'CONFIRMED',
+        eventPassStatus: 'ISSUED'
+      });
+    } else {
+      t61.name = 'ALPHA-061';
+      t61.teamId = 'ALPHA-061';
+      t61.teamName = 'TEAM 61';
+      t61.teamLeadRegNum = '9824005007';
+      t61.members = team61Members;
+      t61.teamQrToken = 'TQ-ALPHA-061-5007';
+      t61.eventPassQrToken = 'EP-ALPHA-061-5007';
+      await t61.save();
+    }
+
+    // Update Team Leads
+    await TeamLead.findOneAndUpdate(
+      { registrationNumber: '9824005012' },
+      { name: 'BOPADALA NAGA SANJAY', teamId: t50._id, registrationNumber: '9824005012', phone: '9876543210', email: 'alpha-050@hackathon.edu' },
+      { upsert: true, new: true }
+    );
+
+    await TeamLead.findOneAndUpdate(
+      { registrationNumber: '9824005007' },
+      { name: 'VUTAKANTI SREEKANTH REDDY', teamId: t61._id, registrationNumber: '9824005007', phone: '9876543210', email: 'alpha-061@hackathon.edu' },
+      { upsert: true, new: true }
+    );
+
+    return res.json({
+      message: 'Successfully synchronized Team 50 and Team 61',
+      team50: {
+        id: t50._id,
+        teamId: t50.teamId,
+        teamName: t50.teamName,
+        teamLeadRegNum: t50.teamLeadRegNum,
+        members: t50.members
+      },
+      team61: {
+        id: t61._id,
+        teamId: t61.teamId,
+        teamName: t61.teamName,
+        teamLeadRegNum: t61.teamLeadRegNum,
+        members: t61.members
+      }
+    });
+  } catch (err) {
+    console.error('Error syncing teams 50 and 61:', err);
+    return res.status(500).json({ error: 'Failed to sync teams 50 and 61', details: err.message });
+  }
+});
+
 module.exports = router;

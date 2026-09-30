@@ -589,11 +589,11 @@ const AUTHORIZED_TEAMS = [
   },
   {
     teamId: 'ALPHA-050',
-    regNum: '9824005007',
+    regNum: '9824005012',
     teamName: 'STRANGER THINGS',
     leadName: 'BOPADALA NAGA SANJAY',
     members: [
-      { name: 'BOPADALA NAGA SANJAY', registrationNumber: '9824005007', role: 'LEAD' },
+      { name: 'BOPADALA NAGA SANJAY', registrationNumber: '9824005012', role: 'LEAD' },
       { name: 'MORUMPALLI BHANUPRAKASH REDDY', registrationNumber: '9824005010', role: 'MEMBER' },
       { name: 'CHEMBETI VINAY HARSHA', registrationNumber: '9923005067', role: 'MEMBER' },
       { name: 'Y.PATHIV', registrationNumber: '9923005315', role: 'MEMBER' }
@@ -721,11 +721,11 @@ const AUTHORIZED_TEAMS = [
   },
   {
     teamId: 'ALPHA-061',
-    regNum: '9824005012',
+    regNum: '9824005007',
     teamName: 'TEAM 61',
     leadName: 'VUTAKANTI SREEKANTH REDDY',
     members: [
-      { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9824005012', role: 'LEAD' },
+      { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9824005007', role: 'LEAD' },
       { name: 'RAAVULA VINAY', registrationNumber: '9923005124', role: 'MEMBER' },
       { name: 'KOLA ADARSH', registrationNumber: '9923005097', role: 'MEMBER' },
       { name: 'GORLA UPENDRA', registrationNumber: '9923005005', role: 'MEMBER' }

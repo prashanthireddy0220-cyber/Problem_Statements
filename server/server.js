@@ -205,6 +205,73 @@ async function triggerAutoSeed() {
       await ProblemStatement.updateMany({ maxTeamCapacity: { $ne: 2 } }, { $set: { maxTeamCapacity: 2 } });
     }
 
+    // Always ensure Team 50 (9824005012) and Team 61 (9824005007) are properly separated and synchronized
+    const team50Members = [
+      { name: 'BOPADALA NAGA SANJAY', registrationNumber: '9824005012', role: 'LEAD' },
+      { name: 'MORUMPALLI BHANUPRAKASH REDDY', registrationNumber: '9824005010', role: 'MEMBER' },
+      { name: 'CHEMBETI VINAY HARSHA', registrationNumber: '9923005067', role: 'MEMBER' },
+      { name: 'Y.PATHIV', registrationNumber: '9923005315', role: 'MEMBER' }
+    ];
+    const team61Members = [
+      { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9824005007', role: 'LEAD' },
+      { name: 'RAAVULA VINAY', registrationNumber: '9923005124', role: 'MEMBER' },
+      { name: 'KOLA ADARSH', registrationNumber: '9923005097', role: 'MEMBER' },
+      { name: 'GORLA UPENDRA', registrationNumber: '9923005005', role: 'MEMBER' }
+    ];
+
+    let t50 = await Team.findOne({ $or: [{ teamId: 'ALPHA-050' }, { name: 'ALPHA-050' }] });
+    if (t50) {
+      t50.name = 'ALPHA-050';
+      t50.teamId = 'ALPHA-050';
+      t50.teamName = 'STRANGER THINGS';
+      t50.teamLeadRegNum = '9824005012';
+      t50.members = team50Members;
+      t50.teamQrToken = 'TQ-ALPHA-050-5012';
+      t50.eventPassQrToken = 'EP-ALPHA-050-5012';
+      await t50.save();
+    }
+
+    let t61 = await Team.findOne({ $or: [{ teamId: 'ALPHA-061' }, { name: 'ALPHA-061' }] });
+    if (!t61 || (t50 && t61._id.toString() === t50._id.toString())) {
+      t61 = await Team.create({
+        name: 'ALPHA-061',
+        teamId: 'ALPHA-061',
+        teamName: 'TEAM 61',
+        teamLeadRegNum: '9824005007',
+        college: 'KARE',
+        department: 'CSE',
+        members: team61Members,
+        teamQrToken: 'TQ-ALPHA-061-5007',
+        eventPassQrToken: 'EP-ALPHA-061-5007',
+        registrationStatus: 'CONFIRMED',
+        eventPassStatus: 'ISSUED'
+      });
+    } else {
+      t61.name = 'ALPHA-061';
+      t61.teamId = 'ALPHA-061';
+      t61.teamName = 'TEAM 61';
+      t61.teamLeadRegNum = '9824005007';
+      t61.members = team61Members;
+      t61.teamQrToken = 'TQ-ALPHA-061-5007';
+      t61.eventPassQrToken = 'EP-ALPHA-061-5007';
+      await t61.save();
+    }
+
+    if (t50) {
+      await TeamLead.findOneAndUpdate(
+        { registrationNumber: '9824005012' },
+        { name: 'BOPADALA NAGA SANJAY', teamId: t50._id, registrationNumber: '9824005012', phone: '9876543210', email: 'alpha-050@hackathon.edu' },
+        { upsert: true }
+      );
+    }
+    if (t61) {
+      await TeamLead.findOneAndUpdate(
+        { registrationNumber: '9824005007' },
+        { name: 'VUTAKANTI SREEKANTH REDDY', teamId: t61._id, registrationNumber: '9824005007', phone: '9876543210', email: 'alpha-061@hackathon.edu' },
+        { upsert: true }
+      );
+    }
+
     const existingTeamsCount = await Team.countDocuments();
     if (existingTeamsCount >= 60) {
       console.log(`✅ All ${existingTeamsCount} teams already initialized in database. Fast boot enabled.`);

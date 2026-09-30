@@ -35,19 +35,20 @@ const handleTeamLeadLogin = async (req, res) => {
       const matchTeam = (normT === cleanTeamId) || (t.teamName && t.teamName.toUpperCase() === cleanTeamId);
       const matchReg = (t.regNum === cleanRegNum) || 
                        (t.members && t.members.some(m => m.registrationNumber === cleanRegNum)) ||
-                       (normT === 'ALPHA-050' && (cleanRegNum === '9824005007' || cleanRegNum === '9924005012'));
+                       (normT === 'ALPHA-050' && (cleanRegNum === '9824005012' || cleanRegNum === '9924005012')) ||
+                       (normT === 'ALPHA-061' && cleanRegNum === '9824005007');
       return matchTeam && matchReg;
     });
 
     // Explicit fallback for Team 50 & Team 61 to guarantee login regardless of deployment or Node require cache status
-    if (!authItem && (cleanTeamId === 'ALPHA-050' || cleanRegNum === '9824005007' || cleanRegNum === '9924005012')) {
+    if (!authItem && (cleanTeamId === 'ALPHA-050' || cleanRegNum === '9824005012' || cleanRegNum === '9924005012')) {
       authItem = {
         teamId: 'ALPHA-050',
-        regNum: '9824005007',
+        regNum: '9824005012',
         teamName: 'STRANGER THINGS',
         leadName: 'BOPADALA NAGA SANJAY',
         members: [
-          { name: 'BOPADALA NAGA SANJAY', registrationNumber: '9824005007', role: 'LEAD' },
+          { name: 'BOPADALA NAGA SANJAY', registrationNumber: '9824005012', role: 'LEAD' },
           { name: 'MORUMPALLI BHANUPRAKASH REDDY', registrationNumber: '9824005010', role: 'MEMBER' },
           { name: 'CHEMBETI VINAY HARSHA', registrationNumber: '9923005067', role: 'MEMBER' },
           { name: 'Y.PATHIV', registrationNumber: '9923005315', role: 'MEMBER' }
@@ -55,14 +56,14 @@ const handleTeamLeadLogin = async (req, res) => {
       };
     }
 
-    if (!authItem && (cleanTeamId === 'ALPHA-061' || cleanRegNum === '9824005012')) {
+    if (!authItem && (cleanTeamId === 'ALPHA-061' || cleanRegNum === '9824005007')) {
       authItem = {
         teamId: 'ALPHA-061',
-        regNum: '9824005012',
+        regNum: '9824005007',
         teamName: 'TEAM 61',
         leadName: 'VUTAKANTI SREEKANTH REDDY',
         members: [
-          { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9824005012', role: 'LEAD' },
+          { name: 'VUTAKANTI SREEKANTH REDDY', registrationNumber: '9824005007', role: 'LEAD' },
           { name: 'RAAVULA VINAY', registrationNumber: '9923005124', role: 'MEMBER' },
           { name: 'KOLA ADARSH', registrationNumber: '9923005097', role: 'MEMBER' },
           { name: 'GORLA UPENDRA', registrationNumber: '9923005005', role: 'MEMBER' }
