@@ -99,6 +99,17 @@ async function triggerAutoSeed() {
       }
     } catch (e) {}
 
+    // Clean up legacy index regNo_1_checkpoint_1 on attendances collection
+    try {
+      const attIndexes = await Attendance.collection.indexes();
+      for (const idx of attIndexes) {
+        if (idx.name.includes('checkpoint') || idx.name.includes('regNo_1')) {
+          await Attendance.collection.dropIndex(idx.name).catch(() => {});
+          console.log(`🧹 Dropped legacy index '${idx.name}' from attendances collection.`);
+        }
+      }
+    } catch (e) {}
+
     const adminExists = await Admin.findOne({ username: 'admin' });
     if (!adminExists) {
       console.log('🌱 Seeding default Admin (admin / admin123)...');

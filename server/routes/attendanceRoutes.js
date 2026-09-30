@@ -4,6 +4,16 @@ const { json2csv } = require('json2csv');
 const { AttendanceSession, Attendance, Participant, Team, AuditLog } = require('../models/Schema');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
+// Drop obsolete legacy index regNo_1_checkpoint_1 if it exists in MongoDB
+Attendance.collection.indexes().then(indexes => {
+  const bad = indexes.find(i => i.name === 'regNo_1_checkpoint_1' || (i.key && i.key.checkpoint));
+  if (bad) {
+    Attendance.collection.dropIndex(bad.name).then(() => {
+      console.log(`🧹 Dropped legacy index '${bad.name}' from attendances collection.`);
+    }).catch(() => {});
+  }
+}).catch(() => {});
+
 // 1. GET ALL ATTENDANCE SESSIONS (For Volunteers and Admin)
 router.get('/sessions', authenticateToken, async (req, res) => {
   try {
@@ -609,25 +619,45 @@ router.post('/mark-team-attendance', authenticateToken, requireRole('VOLUNTEER',
       const status = item.status === 'PRESENT' ? 'PRESENT' : 'ABSENT';
       const realName = getRealStudentName(regNum, item.name) || regNum;
 
-      const rec = await Attendance.findOneAndUpdate(
-        { sessionId: session.sessionId, participantRegNum: regNum },
-        {
-          $set: {
-            sessionId: session.sessionId,
-            sessionName: session.sessionName || 'Attendance Session',
-            participantRegNum: regNum,
-            participantName: realName,
-            teamName: teamName,
-            teamId: authTeam?.teamId || cleanTeamId || 'ALPHA-001',
-            college: 'KARE',
-            status: status,
-            markedByVolunteer: volunteerName,
-            markedAt: new Date()
-          }
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-      savedRecords.push(rec);
+      const updateFields = {
+        sessionId: session.sessionId,
+        sessionName: session.sessionName || 'Attendance Session',
+        participantRegNum: regNum,
+        participantName: realName,
+        teamName: teamName,
+        teamId: authTeam?.teamId || cleanTeamId || 'ALPHA-001',
+        college: 'KARE',
+        status: status,
+        markedByVolunteer: volunteerName,
+        markedAt: new Date(),
+        // Prevent duplicate key error if legacy index regNo_1_checkpoint_1 exists
+        regNo: regNum,
+        checkpoint: session.sessionId
+      };
+
+      try {
+        const rec = await Attendance.findOneAndUpdate(
+          { sessionId: session.sessionId, participantRegNum: regNum },
+          { $set: updateFields },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        savedRecords.push(rec);
+      } catch (upsertErr) {
+        if (upsertErr.code === 11000 && String(upsertErr.message).includes('regNo_1_checkpoint_1')) {
+          console.warn('⚠️ Legacy index regNo_1_checkpoint_1 detected. Dropping legacy index and retrying...');
+          try {
+            await Attendance.collection.dropIndex('regNo_1_checkpoint_1');
+          } catch (dropErr) {}
+          const rec = await Attendance.findOneAndUpdate(
+            { sessionId: session.sessionId, participantRegNum: regNum },
+            { $set: updateFields },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+          savedRecords.push(rec);
+        } else {
+          throw upsertErr;
+        }
+      }
     }
 
     // Audit logging (non-fatal: should never fail attendance persistence)
@@ -712,24 +742,43 @@ router.post('/scan', authenticateToken, requireRole('VOLUNTEER', 'ADMIN'), async
     const volunteerRole = req.user?.role || 'VOLUNTEER';
     const realName = getRealStudentName(participant.registrationNumber, participant.name);
 
-    const attendanceRecord = await Attendance.findOneAndUpdate(
-      { sessionId: session.sessionId, participantRegNum: participant.registrationNumber },
-      {
-        $set: {
-          sessionId: session.sessionId,
-          sessionName: session.sessionName || 'Attendance Session',
-          participantRegNum: participant.registrationNumber,
-          participantName: realName,
-          teamName: participant.teamName,
-          teamId: participant.teamId,
-          college: participant.college || 'KARE',
-          status: attendanceStatus,
-          markedByVolunteer: volunteerName,
-          markedAt: new Date()
-        }
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+    const updateFields = {
+      sessionId: session.sessionId,
+      sessionName: session.sessionName || 'Attendance Session',
+      participantRegNum: participant.registrationNumber,
+      participantName: realName,
+      teamName: participant.teamName,
+      teamId: participant.teamId,
+      college: participant.college || 'KARE',
+      status: attendanceStatus,
+      markedByVolunteer: volunteerName,
+      markedAt: new Date(),
+      regNo: participant.registrationNumber,
+      checkpoint: session.sessionId
+    };
+
+    let attendanceRecord;
+    try {
+      attendanceRecord = await Attendance.findOneAndUpdate(
+        { sessionId: session.sessionId, participantRegNum: participant.registrationNumber },
+        { $set: updateFields },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    } catch (upsertErr) {
+      if (upsertErr.code === 11000 && String(upsertErr.message).includes('regNo_1_checkpoint_1')) {
+        console.warn('⚠️ Legacy index regNo_1_checkpoint_1 detected in scan. Dropping legacy index and retrying...');
+        try {
+          await Attendance.collection.dropIndex('regNo_1_checkpoint_1');
+        } catch (dropErr) {}
+        attendanceRecord = await Attendance.findOneAndUpdate(
+          { sessionId: session.sessionId, participantRegNum: participant.registrationNumber },
+          { $set: updateFields },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      } else {
+        throw upsertErr;
+      }
+    }
 
     try {
       await AuditLog.create({

@@ -104,7 +104,10 @@ const AttendanceSchema = new mongoose.Schema({
   college: { type: String },
   status: { type: String, enum: ['PRESENT', 'ABSENT'], default: 'PRESENT' },
   markedByVolunteer: { type: String, required: true },
-  markedAt: { type: Date, default: Date.now }
+  markedAt: { type: Date, default: Date.now },
+  // Backward compatibility fields for legacy indexes (e.g. regNo_1_checkpoint_1)
+  regNo: { type: String },
+  checkpoint: { type: String }
 }, { timestamps: true });
 AttendanceSchema.index({ sessionId: 1, participantRegNum: 1 }, { unique: true });
 
