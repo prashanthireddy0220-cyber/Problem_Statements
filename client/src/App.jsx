@@ -51,7 +51,61 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   
-  if (!token || !user) {
+  // Resolve role-aware active user and token to handle multi-tab login smoothly
+  let activeUser = user;
+  let activeToken = token;
+
+  if (allowedRoles && allowedRoles.includes('ADMIN')) {
+    const adminToken = localStorage.getItem('alpha_admin_token');
+    const adminUserStr = localStorage.getItem('alpha_admin_user');
+    if (adminToken && adminUserStr) {
+      try {
+        const parsed = JSON.parse(adminUserStr);
+        if (parsed && (parsed.role === 'ADMIN' || parsed.role === 'SUPERADMIN' || parsed.role === 'ORGANIZER')) {
+          activeUser = parsed;
+          activeToken = adminToken;
+        }
+      } catch (e) {}
+    }
+  } else if (allowedRoles && allowedRoles.includes('REVIEWER')) {
+    const revToken = localStorage.getItem('alpha_reviewer_token');
+    const revUserStr = localStorage.getItem('alpha_reviewer_user');
+    if (revToken && revUserStr) {
+      try {
+        const parsed = JSON.parse(revUserStr);
+        if (parsed && parsed.role === 'REVIEWER') {
+          activeUser = parsed;
+          activeToken = revToken;
+        }
+      } catch (e) {}
+    }
+  } else if (allowedRoles && allowedRoles.includes('VOLUNTEER')) {
+    const volToken = localStorage.getItem('alpha_volunteer_token');
+    const volUserStr = localStorage.getItem('alpha_volunteer_user');
+    if (volToken && volUserStr) {
+      try {
+        const parsed = JSON.parse(volUserStr);
+        if (parsed && parsed.role === 'VOLUNTEER') {
+          activeUser = parsed;
+          activeToken = volToken;
+        }
+      } catch (e) {}
+    }
+  } else if (allowedRoles && allowedRoles.includes('TEAM_LEAD')) {
+    const tlToken = localStorage.getItem('alpha_team_lead_token');
+    const tlUserStr = localStorage.getItem('alpha_team_lead_user');
+    if (tlToken && tlUserStr) {
+      try {
+        const parsed = JSON.parse(tlUserStr);
+        if (parsed && parsed.role === 'TEAM_LEAD') {
+          activeUser = parsed;
+          activeToken = tlToken;
+        }
+      } catch (e) {}
+    }
+  }
+
+  if (!activeToken || !activeUser) {
     const primaryRole = (allowedRoles && allowedRoles.length > 0) ? allowedRoles[0] : 'TEAM_LEAD';
     const loginRoute = primaryRole === 'REVIEWER' ? '/reviewer/login' : 
                        primaryRole === 'ADMIN' ? '/admin/login' : 
@@ -59,8 +113,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to={loginRoute} replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    const userDashboard = getDashboardRoute(user.role);
+  if (allowedRoles && !allowedRoles.includes(activeUser.role)) {
+    const userDashboard = getDashboardRoute(activeUser.role);
     const targetPortal = allowedRoles.join(' / ');
 
     const handleSwitchAccount = async () => {
@@ -79,14 +133,14 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
             403 FORBIDDEN - ACCESS RESTRICTED
           </h2>
           <p style={{ color: '#CBD5E1', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '0.5rem' }}>
-            You are logged in as <strong style={{ color: '#00F2FE' }}>{user.name || user.registrationNumber || user.username}</strong> (<span style={{ color: '#FFD700' }}>{user.role}</span>).
+            You are logged in as <strong style={{ color: '#00F2FE' }}>{activeUser.name || activeUser.registrationNumber || activeUser.username}</strong> (<span style={{ color: '#FFD700' }}>{activeUser.role}</span>).
           </p>
           <p style={{ color: '#94A3B8', fontSize: '0.88rem', marginBottom: '2rem' }}>
             You do not have authorization to access the <strong>{targetPortal}</strong> portal.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             <Link to={userDashboard} className="btn-alpha-cyan" style={{ width: '100%', justifyContent: 'center', padding: '0.85rem', fontSize: '0.95rem' }}>
-              <ArrowLeft size={18} /> Go to My {user.role.replace('_', ' ')} Dashboard
+              <ArrowLeft size={18} /> Go to My {activeUser.role.replace('_', ' ')} Dashboard
             </Link>
             <button onClick={handleSwitchAccount} className="btn-alpha-outline" style={{ width: '100%', justifyContent: 'center', padding: '0.85rem', fontSize: '0.9rem', color: '#FF8585', borderColor: 'rgba(255,75,75,0.4)' }}>
               <LogOut size={16} /> Switch Account / Log in as {targetPortal}

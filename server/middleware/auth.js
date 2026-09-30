@@ -121,9 +121,18 @@ const authenticateToken = async (req, res, next) => {
 const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
     const userRole = (req.user?.role || '').trim().toUpperCase();
-    const isAllowed = allowedRoles.some(r => (r || '').trim().toUpperCase() === userRole);
+    const normalizedAllowed = allowedRoles.map(r => (r || '').trim().toUpperCase());
+    if (normalizedAllowed.includes('ADMIN')) {
+      normalizedAllowed.push('SUPERADMIN', 'ADMINISTRATOR', 'ORGANIZER', 'HEAD_ORGANIZER');
+    }
+    const isAllowed = normalizedAllowed.includes(userRole);
     if (!req.user || !isAllowed) {
-      return res.status(403).json({ error: 'Forbidden: You do not have permission to access this resource.', code: 'FORBIDDEN_ROLE' });
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to access this resource.',
+        code: 'FORBIDDEN_ROLE',
+        currentRole: userRole,
+        requiredRole: allowedRoles.join('/')
+      });
     }
     next();
   };

@@ -34,11 +34,36 @@ const getCleanBaseUrl = (rawUrl) => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('alpha_user');
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    let roleKey = 'alpha_user';
+    if (currentPath.startsWith('/admin') && localStorage.getItem('alpha_admin_user')) {
+      roleKey = 'alpha_admin_user';
+    } else if (currentPath.startsWith('/reviewer') && localStorage.getItem('alpha_reviewer_user')) {
+      roleKey = 'alpha_reviewer_user';
+    } else if (currentPath.startsWith('/volunteer') && localStorage.getItem('alpha_volunteer_user')) {
+      roleKey = 'alpha_volunteer_user';
+    } else if (currentPath.startsWith('/team-lead') && localStorage.getItem('alpha_team_lead_user')) {
+      roleKey = 'alpha_team_lead_user';
+    }
+    const saved = localStorage.getItem(roleKey) || localStorage.getItem('alpha_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [token, setToken] = useState(() => localStorage.getItem('alpha_token') || null);
+  const [token, setToken] = useState(() => {
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    let roleKey = 'alpha_token';
+    if (currentPath.startsWith('/admin') && localStorage.getItem('alpha_admin_token')) {
+      roleKey = 'alpha_admin_token';
+    } else if (currentPath.startsWith('/reviewer') && localStorage.getItem('alpha_reviewer_token')) {
+      roleKey = 'alpha_reviewer_token';
+    } else if (currentPath.startsWith('/volunteer') && localStorage.getItem('alpha_volunteer_token')) {
+      roleKey = 'alpha_volunteer_token';
+    } else if (currentPath.startsWith('/team-lead') && localStorage.getItem('alpha_team_lead_token')) {
+      roleKey = 'alpha_team_lead_token';
+    }
+    return localStorage.getItem(roleKey) || localStorage.getItem('alpha_token') || null;
+  });
+
   const [sessionId, setSessionId] = useState(() => localStorage.getItem('alpha_session_id') || null);
   const [revokedMessage, setRevokedMessage] = useState(null);
 
@@ -66,12 +91,31 @@ export const AuthProvider = ({ children }) => {
   
   axios.defaults.baseURL = resolveBaseUrl();
 
-  // Axios Request Interceptor: Ensure Authorization header is ALWAYS present on outgoing requests
+  // Axios Request Interceptor: Dynamically resolve appropriate role-scoped token to prevent cross-tab permission collision
   useEffect(() => {
     const reqInterceptor = axios.interceptors.request.use((config) => {
-      const storedToken = localStorage.getItem('alpha_token');
-      if (storedToken) {
-        config.headers['Authorization'] = `Bearer ${storedToken}`;
+      let activeToken = null;
+      const url = config.url || '';
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+
+      if (url.includes('/api/admin') || url.includes('/api/problems/admin') || url.includes('/api/attendance/admin') || currentPath.startsWith('/admin')) {
+        activeToken = localStorage.getItem('alpha_admin_token') || localStorage.getItem('alpha_token');
+      } else if (url.includes('/api/reviewer') || currentPath.startsWith('/reviewer')) {
+        activeToken = localStorage.getItem('alpha_reviewer_token') || localStorage.getItem('alpha_token');
+      } else if (url.includes('/api/volunteer') || currentPath.startsWith('/volunteer')) {
+        activeToken = localStorage.getItem('alpha_volunteer_token') || localStorage.getItem('alpha_token');
+      } else if (url.includes('/api/team-lead') || url.includes('/api/team') || currentPath.startsWith('/team-lead')) {
+        activeToken = localStorage.getItem('alpha_team_lead_token') || localStorage.getItem('alpha_token');
+      } else {
+        activeToken = localStorage.getItem('alpha_token') || 
+                      localStorage.getItem('alpha_admin_token') || 
+                      localStorage.getItem('alpha_reviewer_token') || 
+                      localStorage.getItem('alpha_volunteer_token') || 
+                      localStorage.getItem('alpha_team_lead_token');
+      }
+
+      if (activeToken) {
+        config.headers['Authorization'] = `Bearer ${activeToken}`;
       }
       return config;
     }, (error) => Promise.reject(error));
@@ -91,21 +135,30 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const verifySessionOnMount = async () => {
-      const savedToken = localStorage.getItem('alpha_token');
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      let roleToken = null;
+      if (currentPath.startsWith('/admin')) {
+        roleToken = localStorage.getItem('alpha_admin_token');
+      } else if (currentPath.startsWith('/reviewer')) {
+        roleToken = localStorage.getItem('alpha_reviewer_token');
+      } else if (currentPath.startsWith('/volunteer')) {
+        roleToken = localStorage.getItem('alpha_volunteer_token');
+      } else if (currentPath.startsWith('/team-lead')) {
+        roleToken = localStorage.getItem('alpha_team_lead_token');
+      }
+      const savedToken = roleToken || localStorage.getItem('alpha_token');
       if (savedToken) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
         try {
-          const res = await axios.get('/api/auth/me');
+          const res = await axios.get('/api/auth/me', {
+            headers: { Authorization: `Bearer ${savedToken}` }
+          });
           if (res.data && res.data.user) {
             setUser(res.data.user);
-            localStorage.setItem('alpha_user', JSON.stringify(res.data.user));
-          } else {
-            logout(false);
+            setToken(savedToken);
           }
         } catch (err) {
-          if (err.response?.status === 401 || err.response?.status === 403) {
-            logout(false);
-          }
+          // If token verification fails on mount, do not force logout if other role sessions exist
         }
       }
     };
@@ -135,6 +188,8 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.post('/api/auth/team-lead/login', { teamId, registrationNumber, deviceId });
       const { token, user, sessionId } = res.data;
       
+      localStorage.setItem('alpha_team_lead_token', token);
+      localStorage.setItem('alpha_team_lead_user', JSON.stringify(user));
       localStorage.setItem('alpha_token', token);
       localStorage.setItem('alpha_user', JSON.stringify(user));
       localStorage.setItem('alpha_session_id', sessionId);
@@ -154,6 +209,8 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.post('/api/auth/admin/login', { username, password });
       const { token, user, sessionId } = res.data;
       
+      localStorage.setItem('alpha_admin_token', token);
+      localStorage.setItem('alpha_admin_user', JSON.stringify(user));
       localStorage.setItem('alpha_token', token);
       localStorage.setItem('alpha_user', JSON.stringify(user));
       localStorage.setItem('alpha_session_id', sessionId);
@@ -173,6 +230,8 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.post('/api/auth/volunteer/login', { username, password });
       const { token, user, sessionId } = res.data;
       
+      localStorage.setItem('alpha_volunteer_token', token);
+      localStorage.setItem('alpha_volunteer_user', JSON.stringify(user));
       localStorage.setItem('alpha_token', token);
       localStorage.setItem('alpha_user', JSON.stringify(user));
       localStorage.setItem('alpha_session_id', sessionId);
@@ -209,6 +268,8 @@ export const AuthProvider = ({ children }) => {
       }
       const { token, user, sessionId } = res.data;
       
+      localStorage.setItem('alpha_reviewer_token', token);
+      localStorage.setItem('alpha_reviewer_user', JSON.stringify(user));
       localStorage.setItem('alpha_token', token);
       localStorage.setItem('alpha_user', JSON.stringify(user));
       localStorage.setItem('alpha_session_id', sessionId);
@@ -219,19 +280,28 @@ export const AuthProvider = ({ children }) => {
       setRevokedMessage(null);
       return { success: true, user };
     } catch (err) {
-      if (err.response?.status === 404) {
-        return { 
-          success: false, 
-          error: 'Reviewer API service is deploying on Render server. Please trigger/wait 1-2 mins for Render build completion.' 
-        };
-      }
-      return { success: false, error: extractErrorMessage(err, 'Reviewer login failed. Invalid reviewer credentials or server error.') };
+      return { success: false, error: extractErrorMessage(err, 'Reviewer login failed.') };
     }
   };
 
   // Instant synchronous logout (0ms turnaround time)
   const logout = (callApi = true) => {
-    const currentToken = token || localStorage.getItem('alpha_token');
+    const currentToken = token || localStorage.getItem('alpha_token') || localStorage.getItem('alpha_admin_token');
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+
+    if (currentPath.startsWith('/admin')) {
+      localStorage.removeItem('alpha_admin_token');
+      localStorage.removeItem('alpha_admin_user');
+    } else if (currentPath.startsWith('/reviewer')) {
+      localStorage.removeItem('alpha_reviewer_token');
+      localStorage.removeItem('alpha_reviewer_user');
+    } else if (currentPath.startsWith('/volunteer')) {
+      localStorage.removeItem('alpha_volunteer_token');
+      localStorage.removeItem('alpha_volunteer_user');
+    } else if (currentPath.startsWith('/team-lead')) {
+      localStorage.removeItem('alpha_team_lead_token');
+      localStorage.removeItem('alpha_team_lead_user');
+    }
 
     localStorage.removeItem('alpha_token');
     localStorage.removeItem('alpha_user');

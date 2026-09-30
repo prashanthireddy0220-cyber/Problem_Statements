@@ -250,7 +250,11 @@ export default function AdminDashboard() {
       await fetchAllData();
       await fetchSettings();
     } catch (e) {
-      alert(e.response?.data?.error || 'Failed to update session phase.');
+      if (e.response?.status === 403) {
+        alert('Forbidden (403): Your current session is not authenticated as an Admin. If you logged into the Reviewer or Team Lead portal in another tab, please re-login as Admin at /admin/login to refresh your credentials.');
+      } else {
+        alert(e.response?.data?.error || 'Failed to update session phase.');
+      }
     } finally {
       setPhaseActionLoading(false);
     }
