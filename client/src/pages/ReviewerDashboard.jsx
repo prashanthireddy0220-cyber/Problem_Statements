@@ -483,7 +483,6 @@ export default function ReviewerDashboard() {
                   <th style={{ padding: '1rem 1.25rem' }}>Team ID</th>
                   <th style={{ padding: '1rem 1.25rem' }}>Team Name</th>
                   <th style={{ padding: '1rem 1.25rem' }}>Problem Statement</th>
-                  <th style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>Round {selectedRoundNum} Score</th>
                   <th style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>Status</th>
                   <th style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>Action</th>
                 </tr>
@@ -492,7 +491,6 @@ export default function ReviewerDashboard() {
                 {filteredTeams.map((team, idx) => {
                   const ev = getTeamEvaluation(team);
                   const isSubmitted = Boolean(ev);
-                  const scoreVal = ev ? (ev.rawScore !== undefined ? ev.rawScore : ev.totalMarks) : null;
 
                   return (
                     <tr 
@@ -528,32 +526,6 @@ export default function ReviewerDashboard() {
                           </div>
                         ) : (
                           <span style={{ color: '#64748B', fontStyle: 'italic' }}>Not Selected Yet</span>
-                        )}
-                      </td>
-
-                      {/* Total Score */}
-                      <td style={{ padding: '0.9rem 1.25rem', textAlign: 'center' }}>
-                        {isSubmitted && user?.role === 'ADMIN' && scoreVal !== null && scoreVal !== undefined ? (
-                          <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                            <span style={{ 
-                              background: 'rgba(16, 185, 129, 0.18)', 
-                              border: '1.5px solid #10B981', 
-                              color: '#10B981', 
-                              padding: '4px 14px', 
-                              borderRadius: '8px', 
-                              fontWeight: 900, 
-                              fontSize: '1.05rem',
-                              fontFamily: 'var(--font-heading)',
-                              boxShadow: '0 0 10px rgba(16, 185, 129, 0.25)'
-                            }}>
-                              {scoreVal} / 100
-                            </span>
-                            <span style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 700 }}>
-                              ✓ Submitted
-                            </span>
-                          </div>
-                        ) : (
-                          <span style={{ color: '#64748B', fontWeight: 600, fontSize: '0.9rem' }}>-- / 100</span>
                         )}
                       </td>
 
