@@ -65,56 +65,32 @@ export default function AdminDashboard() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [actionMsg, setActionMsg] = useState('');
 
-  // State for Reviewer Evaluations (Admin View & Edit)
-  const [evalData, setEvalData] = useState({ summary: {}, evaluations: [], rounds: [], reviewers: [] });
+  // State for Reviewer Evaluations (Admin View, Automatic Min-Max Normalization & Leaderboard)
+  const [evalData, setEvalData] = useState({ summary: {}, evaluations: [], rounds: [], reviewers: [], normalizationStats: [], leaderboard: [] });
   const [evalSearchTerm, setEvalSearchTerm] = useState('');
   const [evalRoundFilter, setEvalRoundFilter] = useState('ALL');
-  const [evalViewMode, setEvalViewMode] = useState('team'); // 'team' or 'reviewer'
-  
-  // Admin Evaluation Edit & Problem Statement Edit Modal State
+  const [evalViewMode, setEvalViewMode] = useState('team'); // 'team' (Leaderboard Matrix) or 'normalization' (Min-Max Inspector)
+  const [selectedNormRound, setSelectedNormRound] = useState(1);
+  const [selectedNormReviewer, setSelectedNormReviewer] = useState('');
+
+  // Admin Evaluation Edit Modal State (Raw score correction & automatic recalculation)
   const [adminEditEvModal, setAdminEditEvModal] = useState(null);
-  const [adminCriteriaInputs, setAdminCriteriaInputs] = useState({});
+  const [adminRawMarkInput, setAdminRawMarkInput] = useState('');
+  const [adminReviewerSelect, setAdminReviewerSelect] = useState('');
   const [adminCommentsInput, setAdminCommentsInput] = useState('');
   const [adminSubmittingEv, setAdminSubmittingEv] = useState(false);
   const [editingProblem, setEditingProblem] = useState(null);
 
-  const ADMIN_ROUNDS_CONFIG = {
-    1: [
-      { key: 'innovation', name: 'Innovation & Originality', maxMarks: 20 },
-      { key: 'tech_approach', name: 'Technical Approach & Architecture', maxMarks: 20 },
-      { key: 'problem_understanding', name: 'Problem Understanding', maxMarks: 20 },
-      { key: 'feasibility', name: 'Feasibility & Practicality', maxMarks: 15 },
-      { key: 'presentation', name: 'Presentation & Defense', maxMarks: 15 },
-      { key: 'overall_impact', name: 'Overall Impact & Scalability', maxMarks: 10 }
-    ],
-    2: [
-      { key: 'code_quality', name: 'Code Quality & Structure', maxMarks: 25 },
-      { key: 'tech_complexity', name: 'Technical Complexity & Depth', maxMarks: 25 },
-      { key: 'functionality', name: 'Functionality & Working Demo', maxMarks: 25 },
-      { key: 'ui_ux', name: 'UI/UX & User Interface', maxMarks: 25 }
-    ],
-    3: [
-      { key: 'completeness', name: 'Project Completeness & Stability', maxMarks: 35 },
-      { key: 'business_value', name: 'Business Value & Viability', maxMarks: 35 },
-      { key: 'final_pitch', name: 'Final Presentation & Q/A Defense', maxMarks: 30 }
-    ]
-  };
-
-  const openAdminEditEv = (ev, teamObj, roundNum) => {
+  const openAdminEditEv = (ev, teamObj, roundNum, defaultReviewerId) => {
     const rNum = roundNum || ev?.roundNumber || 1;
-    const roundCriteria = ADMIN_ROUNDS_CONFIG[rNum] || ADMIN_ROUNDS_CONFIG[1];
-    const initialInputs = {};
-    
-    roundCriteria.forEach(crit => {
-      const found = ev?.criteriaMarks?.find(c => c.criteriaKey === crit.key || c.name === crit.name);
-      initialInputs[crit.key] = (found !== undefined && found !== null) ? found.mark : '';
-    });
-
-    setAdminCriteriaInputs(initialInputs);
+    const initialRaw = ev?.rawScore !== undefined ? ev.rawScore : (ev?.totalMarks !== undefined ? ev.totalMarks : '');
+    setAdminRawMarkInput(initialRaw !== '' ? String(initialRaw) : '');
+    const revId = ev?.reviewerId || defaultReviewerId || (evalData.reviewers && evalData.reviewers[0]?._id) || 'reviewer1';
+    setAdminReviewerSelect(revId);
     setAdminCommentsInput(ev?.comments || '');
     setAdminEditEvModal({
       evDoc: ev || null,
-      teamCode: teamObj?.teamId || ev?.teamCode,
+      teamCode: teamObj?.teamId || teamObj?.teamCode || ev?.teamCode,
       teamName: teamObj?.teamName || ev?.teamName,
       teamId: teamObj?._id || ev?.teamId,
       roundNumber: rNum
@@ -125,51 +101,60 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!adminEditEvModal) return;
 
-    const roundNum = adminEditEvModal.roundNumber;
-    const roundCriteria = ADMIN_ROUNDS_CONFIG[roundNum] || ADMIN_ROUNDS_CONFIG[1];
-    const formattedMarks = [];
-
-    for (const crit of roundCriteria) {
-      const val = adminCriteriaInputs[crit.key];
-      if (val === '' || val === undefined || val === null) {
-        alert(`Please enter a valid mark for '${crit.name}'.`);
-        return;
-      }
-      formattedMarks.push({
-        criteriaKey: crit.key,
-        name: crit.name,
-        mark: Number(val),
-        maxMark: crit.maxMarks
-      });
+    if (adminRawMarkInput === '' || adminRawMarkInput === null || isNaN(Number(adminRawMarkInput))) {
+      alert('Marks must be between 0 and 100.');
+      return;
+    }
+    const scoreNum = Number(adminRawMarkInput);
+    if (scoreNum < 0 || scoreNum > 100) {
+      alert('Marks must be between 0 and 100.');
+      return;
     }
 
     setAdminSubmittingEv(true);
     try {
       const payload = {
-        teamId: adminEditEvModal.teamId,
         teamCode: adminEditEvModal.teamCode,
-        teamName: adminEditEvModal.teamName,
-        roundNumber: roundNum,
-        criteriaMarks: formattedMarks,
-        comments: adminCommentsInput,
-        status: 'SUBMITTED'
+        roundNumber: adminEditEvModal.roundNumber,
+        reviewerId: adminReviewerSelect || (adminEditEvModal.evDoc?.reviewerId) || (evalData.reviewers[0]?._id),
+        rawScore: scoreNum,
+        comments: adminCommentsInput
       };
 
       if (adminEditEvModal.evDoc?._id) {
-        await axios.put(`/api/reviewer/evaluations/${adminEditEvModal.evDoc._id}`, payload);
+        await axios.put(`/api/admin/evaluations/${adminEditEvModal.evDoc._id}`, payload);
       } else {
-        await axios.post('/api/reviewer/evaluations', payload);
+        await axios.post('/api/admin/evaluations', payload);
       }
 
-      setActionMsg(`Marks saved/updated successfully for Team ${adminEditEvModal.teamCode} (Round ${roundNum})!`);
+      setActionMsg(`Raw score (${scoreNum}) saved & automatically recalculated for Team ${adminEditEvModal.teamCode} (Round ${adminEditEvModal.roundNumber})!`);
       setTimeout(() => setActionMsg(''), 4000);
 
       setAdminEditEvModal(null);
-      fetchAllData();
+      await fetchAllData();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to save evaluation marks.');
     } finally {
       setAdminSubmittingEv(false);
+    }
+  };
+
+  const handleToggleRoundClosure = async (roundNum, isClosed) => {
+    try {
+      if (!isClosed) {
+        if (!window.confirm(`Freeze and close Round ${roundNum}? Reviewers will not be able to submit new marks.`)) {
+          return;
+        }
+        await axios.post(`/api/admin/rounds/${roundNum}/close`);
+        setActionMsg(`Round ${roundNum} closed and frozen. Reviewer mark entry locked.`);
+      } else {
+        await axios.post(`/api/admin/rounds/${roundNum}/open`);
+        setActionMsg(`Round ${roundNum} reopened. Reviewer submissions active.`);
+      }
+      setTimeout(() => setActionMsg(''), 4000);
+      await fetchAllData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update round status.');
     }
   };
 
@@ -887,43 +872,104 @@ export default function AdminDashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
             
             {/* Round 1 Stats */}
-            <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(0, 242, 254, 0.35)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)' }}>
-              <div style={{ fontSize: '0.75rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
-                Round 1 Evaluation
-              </div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0.3rem 0', fontFamily: 'var(--font-heading)' }}>
-                {evalData.summary?.round1Completed || 0} / {evalData.summary?.totalTeams || 60} <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 500 }}>Completed</span>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem' }}>
-                <div style={{ width: `${Math.round(((evalData.summary?.round1Completed || 0) / (evalData.summary?.totalTeams || 60)) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #00F2FE, #4FACFE)' }} />
-              </div>
-            </div>
+            {/* Round 1 Stats */}
+            {(() => {
+              const r1Doc = evalData.rounds?.find(r => r.roundNumber === 1);
+              const r1Closed = r1Doc?.status === 'CLOSED' || r1Doc?.active === false;
+              const r1Count = evalData.summary?.round1Completed || 0;
+              const total = evalData.summary?.totalTeams || 60;
+              return (
+                <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(0, 242, 254, 0.35)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
+                      Round 1 Evaluation
+                    </div>
+                    <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, background: r1Closed ? 'rgba(255,75,75,0.2)' : 'rgba(16,185,129,0.2)', color: r1Closed ? '#FF4B4B' : '#10B981', border: `1px solid ${r1Closed ? '#FF4B4B' : '#10B981'}` }}>
+                      {r1Closed ? '🔒 Frozen / Closed' : '🟢 Open / Active'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0.3rem 0', fontFamily: 'var(--font-heading)' }}>
+                    {r1Count} / {total} <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 500 }}>Completed</span>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem', marginBottom: '0.75rem' }}>
+                    <div style={{ width: `${Math.round((r1Count / total) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #00F2FE, #4FACFE)' }} />
+                  </div>
+                  <button
+                    onClick={() => handleToggleRoundClosure(1, r1Closed)}
+                    className="btn-alpha-outline"
+                    style={{ width: '100%', padding: '0.35rem', fontSize: '0.75rem', justifyContent: 'center', borderColor: r1Closed ? '#10B981' : 'rgba(255,75,75,0.5)', color: r1Closed ? '#10B981' : '#FF8585' }}
+                  >
+                    {r1Closed ? '🔓 Reopen Round 1' : '🔒 Freeze & Close Round 1'}
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Round 2 Stats */}
-            <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(255, 215, 0, 0.35)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)' }}>
-              <div style={{ fontSize: '0.75rem', color: '#FFD700', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
-                Round 2 Evaluation
-              </div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0.3rem 0', fontFamily: 'var(--font-heading)' }}>
-                {evalData.summary?.round2Completed || 0} / {evalData.summary?.totalTeams || 60} <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 500 }}>Completed</span>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem' }}>
-                <div style={{ width: `${Math.round(((evalData.summary?.round2Completed || 0) / (evalData.summary?.totalTeams || 60)) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #FFD700, #FFA500)' }} />
-              </div>
-            </div>
+            {(() => {
+              const r2Doc = evalData.rounds?.find(r => r.roundNumber === 2);
+              const r2Closed = r2Doc?.status === 'CLOSED' || r2Doc?.active === false;
+              const r2Count = evalData.summary?.round2Completed || 0;
+              const total = evalData.summary?.totalTeams || 60;
+              return (
+                <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(255, 215, 0, 0.35)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#FFD700', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
+                      Round 2 Evaluation
+                    </div>
+                    <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, background: r2Closed ? 'rgba(255,75,75,0.2)' : 'rgba(16,185,129,0.2)', color: r2Closed ? '#FF4B4B' : '#10B981', border: `1px solid ${r2Closed ? '#FF4B4B' : '#10B981'}` }}>
+                      {r2Closed ? '🔒 Frozen / Closed' : '🟢 Open / Active'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0.3rem 0', fontFamily: 'var(--font-heading)' }}>
+                    {r2Count} / {total} <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 500 }}>Completed</span>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem', marginBottom: '0.75rem' }}>
+                    <div style={{ width: `${Math.round((r2Count / total) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #FFD700, #FFA500)' }} />
+                  </div>
+                  <button
+                    onClick={() => handleToggleRoundClosure(2, r2Closed)}
+                    className="btn-alpha-outline"
+                    style={{ width: '100%', padding: '0.35rem', fontSize: '0.75rem', justifyContent: 'center', borderColor: r2Closed ? '#10B981' : 'rgba(255,75,75,0.5)', color: r2Closed ? '#10B981' : '#FF8585' }}
+                  >
+                    {r2Closed ? '🔓 Reopen Round 2' : '🔒 Freeze & Close Round 2'}
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Round 3 Stats */}
-            <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(16, 185, 129, 0.35)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)' }}>
-              <div style={{ fontSize: '0.75rem', color: '#10B981', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
-                Round 3 Evaluation
-              </div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0.3rem 0', fontFamily: 'var(--font-heading)' }}>
-                {evalData.summary?.round3Completed || 0} / {evalData.summary?.totalTeams || 60} <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 500 }}>Completed</span>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem' }}>
-                <div style={{ width: `${Math.round(((evalData.summary?.round3Completed || 0) / (evalData.summary?.totalTeams || 60)) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
-              </div>
-            </div>
+            {(() => {
+              const r3Doc = evalData.rounds?.find(r => r.roundNumber === 3);
+              const r3Closed = r3Doc?.status === 'CLOSED' || r3Doc?.active === false;
+              const r3Count = evalData.summary?.round3Completed || 0;
+              const total = evalData.summary?.totalTeams || 60;
+              return (
+                <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(16, 185, 129, 0.35)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#10B981', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
+                      Round 3 Evaluation
+                    </div>
+                    <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, background: r3Closed ? 'rgba(255,75,75,0.2)' : 'rgba(16,185,129,0.2)', color: r3Closed ? '#FF4B4B' : '#10B981', border: `1px solid ${r3Closed ? '#FF4B4B' : '#10B981'}` }}>
+                      {r3Closed ? '🔒 Frozen / Closed' : '🟢 Open / Active'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#F8FAFC', margin: '0.3rem 0', fontFamily: 'var(--font-heading)' }}>
+                    {r3Count} / {total} <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: 500 }}>Completed</span>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem', marginBottom: '0.75rem' }}>
+                    <div style={{ width: `${Math.round((r3Count / total) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
+                  </div>
+                  <button
+                    onClick={() => handleToggleRoundClosure(3, r3Closed)}
+                    className="btn-alpha-outline"
+                    style={{ width: '100%', padding: '0.35rem', fontSize: '0.75rem', justifyContent: 'center', borderColor: r3Closed ? '#10B981' : 'rgba(255,75,75,0.5)', color: r3Closed ? '#10B981' : '#FF8585' }}
+                  >
+                    {r3Closed ? '🔓 Reopen Round 3' : '🔒 Freeze & Close Round 3'}
+                  </button>
+                </div>
+              );
+            })()}
 
           </div>
 
@@ -933,16 +979,21 @@ export default function AdminDashboard() {
               <button
                 onClick={() => setEvalViewMode('team')}
                 className={evalViewMode === 'team' ? 'btn-alpha-cyan' : 'btn-alpha-outline'}
-                style={{ fontSize: '0.82rem', padding: '0.5rem 1rem' }}
+                style={{ fontSize: '0.82rem', padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                Team-wise Leaderboard
+                <Award size={16} /> Team-wise Normalized Leaderboard
               </button>
               <button
-                onClick={() => setEvalViewMode('reviewer')}
-                className={evalViewMode === 'reviewer' ? 'btn-alpha-cyan' : 'btn-alpha-outline'}
-                style={{ fontSize: '0.82rem', padding: '0.5rem 1rem' }}
+                onClick={() => {
+                  setEvalViewMode('normalization');
+                  if (!selectedNormReviewer && evalData.reviewers && evalData.reviewers.length > 0) {
+                    setSelectedNormReviewer(evalData.reviewers[0]._id);
+                  }
+                }}
+                className={evalViewMode === 'normalization' ? 'btn-alpha-cyan' : 'btn-alpha-outline'}
+                style={{ fontSize: '0.82rem', padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                Reviewer Submissions Log
+                <Zap size={16} /> Min-Max Normalization Inspector
               </button>
             </div>
 
@@ -966,39 +1017,23 @@ export default function AdminDashboard() {
                   }}
                 />
               </div>
-
-              {evalViewMode === 'reviewer' && (
-                <select
-                  value={evalRoundFilter}
-                  onChange={(e) => setEvalRoundFilter(e.target.value)}
-                  style={{
-                    padding: '0.45rem 0.85rem',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    border: '1px solid var(--border-cyan)',
-                    borderRadius: '6px',
-                    color: '#FFF',
-                    fontSize: '0.82rem',
-                    outline: 'none'
-                  }}
-                >
-                  <option value="ALL">All Rounds</option>
-                  <option value="1">Round 1</option>
-                  <option value="2">Round 2</option>
-                  <option value="3">Round 3</option>
-                </select>
-              )}
             </div>
           </div>
 
-          {/* VIEW 1: TEAM-WISE LEADERBOARD / MATRIX */}
+          {/* VIEW 1: TEAM-WISE AUTHORITATIVE NORMALIZED LEADERBOARD */}
           {evalViewMode === 'team' ? (
             <div className="glass-panel" style={{ borderRadius: '12px', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '1rem', color: '#00F2FE', fontFamily: 'var(--font-heading)', margin: 0 }}>
-                  ALL 60 TEAMS EVALUATION MATRIX
-                </h3>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', color: '#00F2FE', fontFamily: 'var(--font-heading)', margin: 0 }}>
+                    AUTHORITATIVE NORMALIZED LEADERBOARD & MATRIX
+                  </h3>
+                  <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '2px' }}>
+                    Ranked strictly by normalized team tally: (R1 Normalized + R2 Normalized + R3 Normalized) = Max 300
+                  </div>
+                </div>
                 <span style={{ fontSize: '0.78rem', color: '#FFD700', background: 'rgba(255, 215, 0, 0.1)', border: '1px solid rgba(255, 215, 0, 0.3)', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                  Admin Edit Privileges
+                  ⚡ Auto-Normalized Realtime
                 </span>
               </div>
 
@@ -1006,202 +1041,346 @@ export default function AdminDashboard() {
                 <table className="alpha-table" style={{ width: '100%', fontSize: '0.85rem' }}>
                   <thead>
                     <tr>
+                      <th style={{ width: '60px', textAlign: 'center' }}>Rank</th>
                       <th>Team ID</th>
                       <th>Team Name</th>
-                      <th style={{ textAlign: 'center' }}>Round 1 (Max 100)</th>
-                      <th style={{ textAlign: 'center' }}>Round 2 (Max 100)</th>
-                      <th style={{ textAlign: 'center' }}>Round 3 (Max 100)</th>
-                      <th style={{ textAlign: 'center' }}>Combined Total (Max 300)</th>
+                      <th style={{ textAlign: 'center' }}>Round 1 (Norm / 100)</th>
+                      <th style={{ textAlign: 'center' }}>Round 2 (Norm / 100)</th>
+                      <th style={{ textAlign: 'center' }}>Round 3 (Norm / 100)</th>
+                      <th style={{ textAlign: 'center' }}>Combined Total (/ 300)</th>
                       <th style={{ textAlign: 'center' }}>Admin Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {teamsToDisplay
-                      .filter(t => !evalSearchTerm || t.teamId.toLowerCase().includes(evalSearchTerm.toLowerCase()) || t.teamName.toLowerCase().includes(evalSearchTerm.toLowerCase()))
-                      .map((t) => {
-                        const evs = (evalData.evaluations || []).filter(e => 
-                          (e.teamCode && t.teamId && e.teamCode.trim().toUpperCase() === t.teamId.trim().toUpperCase()) ||
-                          (e.teamId && t._id && String(e.teamId) === String(t._id)) ||
-                          (e.teamCode && t.teamName && e.teamCode.trim().toUpperCase() === t.teamName.trim().toUpperCase())
-                        );
-                        const r1Ev = evs.find(e => e.roundNumber === 1);
-                        const r2Ev = evs.find(e => e.roundNumber === 2);
-                        const r3Ev = evs.find(e => e.roundNumber === 3);
+                    {(() => {
+                      const sourceList = (evalData.leaderboard && evalData.leaderboard.length > 0)
+                        ? evalData.leaderboard
+                        : teamsToDisplay;
 
-                        const r1Score = r1Ev ? r1Ev.totalMarks : null;
-                        const r2Score = r2Ev ? r2Ev.totalMarks : null;
-                        const r3Score = r3Ev ? r3Ev.totalMarks : null;
+                      return sourceList
+                        .filter(t => !evalSearchTerm || (t.teamCode || t.teamId || '').toLowerCase().includes(evalSearchTerm.toLowerCase()) || (t.teamName || '').toLowerCase().includes(evalSearchTerm.toLowerCase()))
+                        .map((team, idx) => {
+                          const teamCode = team.teamCode || team.teamId;
+                          const r1Score = team.round1Score !== undefined ? team.round1Score : null;
+                          const r2Score = team.round2Score !== undefined ? team.round2Score : null;
+                          const r3Score = team.round3Score !== undefined ? team.round3Score : null;
+                          const total = team.combinedTotal !== undefined ? team.combinedTotal : 0;
+                          const rank = team.rank || (idx + 1);
 
-                        let totalCombined = 0;
-                        if (r1Score !== null) totalCombined += r1Score;
-                        if (r2Score !== null) totalCombined += r2Score;
-                        if (r3Score !== null) totalCombined += r3Score;
+                          // Detailed breakdown tooltip
+                          const r1Breakdown = team.rounds?.[1]?.reviewersBreakdown?.map(r => `${r.reviewerName || r.reviewerUsername}: ${r.normalizedScore}`).join(', ');
+                          const r2Breakdown = team.rounds?.[2]?.reviewersBreakdown?.map(r => `${r.reviewerName || r.reviewerUsername}: ${r.normalizedScore}`).join(', ');
+                          const r3Breakdown = team.rounds?.[3]?.reviewersBreakdown?.map(r => `${r.reviewerName || r.reviewerUsername}: ${r.normalizedScore}`).join(', ');
 
-                        return (
-                          <tr key={t.teamId}>
-                            <td style={{ fontWeight: '700', color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>{t.teamId}</td>
-                            <td style={{ fontWeight: '600', color: '#F8FAFC' }}>{t.teamName}</td>
-                            
-                            {/* Round 1 */}
-                            <td style={{ textAlign: 'center' }}>
-                              {r1Ev ? (
-                                <button 
-                                  onClick={() => openAdminEditEv(r1Ev, t, 1)}
-                                  style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#10B981', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                  title="Click to Edit Round 1 Marks"
+                          return (
+                            <tr key={teamCode}>
+                              {/* Rank */}
+                              <td style={{ textAlign: 'center', fontWeight: 800, fontSize: '0.95rem', color: rank === 1 ? '#FFD700' : (rank === 2 ? '#C0C0C0' : (rank === 3 ? '#CD7F32' : '#94A3B8')) }}>
+                                {rank === 1 ? '🥇 #1' : (rank === 2 ? '🥈 #2' : (rank === 3 ? '🥉 #3' : `#${rank}`))}
+                              </td>
+
+                              {/* Team ID */}
+                              <td style={{ fontWeight: '700', color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>
+                                {teamCode}
+                              </td>
+
+                              {/* Team Name */}
+                              <td style={{ fontWeight: '600', color: '#F8FAFC' }}>
+                                {team.teamName}
+                              </td>
+
+                              {/* Round 1 Normalized Score */}
+                              <td style={{ textAlign: 'center' }}>
+                                {r1Score !== null ? (
+                                  <button
+                                    onClick={() => openAdminEditEv(null, team, 1)}
+                                    style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#10B981', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    title={r1Breakdown ? `Reviewers: ${r1Breakdown}` : 'Round 1 Normalized Score'}
+                                  >
+                                    {r1Score} / 100 <Edit size={12} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => openAdminEditEv(null, team, 1)}
+                                    style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                                    title="Click to enter/correct marks"
+                                  >
+                                    + Enter R1
+                                  </button>
+                                )}
+                              </td>
+
+                              {/* Round 2 Normalized Score */}
+                              <td style={{ textAlign: 'center' }}>
+                                {r2Score !== null ? (
+                                  <button
+                                    onClick={() => openAdminEditEv(null, team, 2)}
+                                    style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#10B981', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    title={r2Breakdown ? `Reviewers: ${r2Breakdown}` : 'Round 2 Normalized Score'}
+                                  >
+                                    {r2Score} / 100 <Edit size={12} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => openAdminEditEv(null, team, 2)}
+                                    style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                                    title="Click to enter/correct marks"
+                                  >
+                                    + Enter R2
+                                  </button>
+                                )}
+                              </td>
+
+                              {/* Round 3 Normalized Score */}
+                              <td style={{ textAlign: 'center' }}>
+                                {r3Score !== null ? (
+                                  <button
+                                    onClick={() => openAdminEditEv(null, team, 3)}
+                                    style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#10B981', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    title={r3Breakdown ? `Reviewers: ${r3Breakdown}` : 'Round 3 Normalized Score'}
+                                  >
+                                    {r3Score} / 100 <Edit size={12} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => openAdminEditEv(null, team, 3)}
+                                    style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                                    title="Click to enter/correct marks"
+                                  >
+                                    + Enter R3
+                                  </button>
+                                )}
+                              </td>
+
+                              {/* Combined Total */}
+                              <td style={{ textAlign: 'center', fontWeight: '900', color: total > 0 ? '#FFD700' : '#64748B', fontSize: '1rem', fontFamily: 'var(--font-heading)' }}>
+                                {total > 0 ? `${total} / 300` : '--'}
+                              </td>
+
+                              {/* Admin Action */}
+                              <td style={{ textAlign: 'center' }}>
+                                <button
+                                  onClick={() => openAdminEditEv(null, team, 1)}
+                                  className="btn-alpha-cyan"
+                                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                 >
-                                  {r1Score} / 100 <Edit size={12} />
+                                  <Edit size={13} /> Edit Marks
                                 </button>
-                              ) : (
-                                <button 
-                                  onClick={() => openAdminEditEv(null, t, 1)}
-                                  style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
-                                  title="Click to Enter Round 1 Marks as Admin"
-                                >
-                                  + Enter R1
-                                </button>
-                              )}
-                            </td>
-
-                            {/* Round 2 */}
-                            <td style={{ textAlign: 'center' }}>
-                              {r2Ev ? (
-                                <button 
-                                  onClick={() => openAdminEditEv(r2Ev, t, 2)}
-                                  style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#10B981', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                  title="Click to Edit Round 2 Marks"
-                                >
-                                  {r2Score} / 100 <Edit size={12} />
-                                </button>
-                              ) : (
-                                <button 
-                                  onClick={() => openAdminEditEv(null, t, 2)}
-                                  style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
-                                  title="Click to Enter Round 2 Marks as Admin"
-                                >
-                                  + Enter R2
-                                </button>
-                              )}
-                            </td>
-
-                            {/* Round 3 */}
-                            <td style={{ textAlign: 'center' }}>
-                              {r3Ev ? (
-                                <button 
-                                  onClick={() => openAdminEditEv(r3Ev, t, 3)}
-                                  style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#10B981', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                  title="Click to Edit Round 3 Marks"
-                                >
-                                  {r3Score} / 100 <Edit size={12} />
-                                </button>
-                              ) : (
-                                <button 
-                                  onClick={() => openAdminEditEv(null, t, 3)}
-                                  style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94A3B8', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
-                                  title="Click to Enter Round 3 Marks as Admin"
-                                >
-                                  + Enter R3
-                                </button>
-                              )}
-                            </td>
-
-                            {/* Combined Total */}
-                            <td style={{ textAlign: 'center', fontWeight: '800', color: '#FFD700', fontSize: '0.95rem' }}>
-                              {totalCombined > 0 ? `${totalCombined} Marks` : '--'}
-                            </td>
-
-                            {/* Admin Quick Action */}
-                            <td style={{ textAlign: 'center' }}>
-                              <button 
-                                onClick={() => openAdminEditEv(r1Ev || r2Ev || r3Ev, t, r1Ev ? 1 : (r2Ev ? 2 : 3))}
-                                className="btn-alpha-cyan"
-                                style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <Edit size={13} /> Edit Marks
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                              </td>
+                            </tr>
+                          );
+                        });
+                    })()}
                   </tbody>
                 </table>
               </div>
             </div>
           ) : (
-            /* VIEW 2: REVIEWER SUBMISSION LOGS */
+            /* VIEW 2: REVIEWER MIN-MAX NORMALIZATION INSPECTOR (Section 14 Requirement) */
             <div className="glass-panel" style={{ borderRadius: '12px', padding: '1.25rem' }}>
-              <h3 style={{ fontSize: '1rem', color: '#FFD700', marginBottom: '1rem', fontFamily: 'var(--font-heading)' }}>
-                INDIVIDUAL REVIEWER SUBMISSION LOGS
-              </h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="alpha-table" style={{ width: '100%', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr>
-                      <th>Team ID</th>
-                      <th>Team Name</th>
-                      <th>Round</th>
-                      <th>Reviewer</th>
-                      <th style={{ textAlign: 'center' }}>Total Score</th>
-                      <th>Status</th>
-                      <th>Submitted At</th>
-                      <th style={{ textAlign: 'center' }}>Admin Edit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(evalData.evaluations || [])
-                      .filter(ev => {
-                        if (evalRoundFilter !== 'ALL' && ev.roundNumber !== Number(evalRoundFilter)) return false;
-                        if (evalSearchTerm && !ev.teamCode.toLowerCase().includes(evalSearchTerm.toLowerCase()) && !ev.teamName.toLowerCase().includes(evalSearchTerm.toLowerCase())) return false;
-                        return true;
-                      })
-                      .map(ev => (
-                        <tr key={ev._id}>
-                          <td style={{ fontWeight: '700', color: '#00F2FE' }}>{ev.teamCode}</td>
-                          <td style={{ fontWeight: '600', color: '#F8FAFC' }}>{ev.teamName}</td>
-                          <td style={{ color: '#FFD700', fontWeight: '700' }}>Round {ev.roundNumber}</td>
-                          <td style={{ color: '#E2E8F0' }}>{ev.reviewerName} (<span style={{ color: '#94A3B8' }}>{ev.reviewerUsername}</span>)</td>
-                          <td style={{ textAlign: 'center', fontWeight: '800', color: '#10B981' }}>{ev.totalMarks} Marks</td>
-                          <td>
-                            <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
-                              {ev.status || 'SUBMITTED'}
-                            </span>
-                          </td>
-                          <td style={{ color: '#94A3B8', fontSize: '0.8rem' }}>{new Date(ev.submittedAt || ev.createdAt).toLocaleString()}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button
-                              onClick={() => openAdminEditEv(ev, { teamId: ev.teamCode, teamName: ev.teamName, _id: ev.teamId }, ev.roundNumber)}
-                              className="btn-alpha-cyan"
-                              style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <Edit size={13} /> Edit Marks
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', color: '#00F2FE', fontFamily: 'var(--font-heading)', margin: 0 }}>
+                    SECTION 14: AUTOMATIC MIN-MAX NORMALIZATION INSPECTOR
+                  </h3>
+                  <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '2px' }}>
+                    Independently calculated per Round + Reviewer. Evaluated live from database raw marks.
+                  </div>
+                </div>
+
+                {/* Round Switcher */}
+                <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(15, 23, 42, 0.8)', padding: '0.3rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {[1, 2, 3].map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setSelectedNormRound(r)}
+                      style={{
+                        padding: '0.4rem 0.9rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: selectedNormRound === r ? 'linear-gradient(135deg, #00F2FE, #4FACFE)' : 'transparent',
+                        color: selectedNormRound === r ? '#0F172A' : '#94A3B8',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Round {r}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Reviewer Select Tabs */}
+              <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.25rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+                {(evalData.reviewers || []).map((rev) => {
+                  const revId = rev._id;
+                  const isSelected = selectedNormReviewer === revId || (!selectedNormReviewer && rev.username === 'reviewer1');
+                  return (
+                    <button
+                      key={rev._id}
+                      onClick={() => setSelectedNormReviewer(revId)}
+                      style={{
+                        padding: '0.55rem 1rem',
+                        borderRadius: '8px',
+                        border: '1px solid',
+                        borderColor: isSelected ? '#00F2FE' : 'rgba(255,255,255,0.1)',
+                        background: isSelected ? 'rgba(0, 242, 254, 0.15)' : 'rgba(15, 23, 42, 0.6)',
+                        color: isSelected ? '#00F2FE' : '#CBD5E1',
+                        fontWeight: isSelected ? 800 : 500,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <UserCheck size={15} />
+                      <span>{rev.name} ({rev.username})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Round + Reviewer Live MIN-MAX Metrics Banner */}
+              {(() => {
+                const targetRevId = selectedNormReviewer || (evalData.reviewers && evalData.reviewers[0]?._id);
+                const targetRev = evalData.reviewers?.find(r => r._id === targetRevId || r.username === targetRevId);
+                const evs = (evalData.evaluations || []).filter(e => 
+                  e.roundNumber === selectedNormRound && 
+                  (e.reviewerId === targetRevId || String(e.reviewerId) === String(targetRevId) || e.reviewerUsername === targetRev?.username)
+                );
+
+                const validRawList = evs.map(e => Number(e.rawScore)).filter(n => !isNaN(n) && n >= 0 && n <= 100);
+                const autoMin = validRawList.length > 0 ? Math.min(...validRawList) : '--';
+                const autoMax = validRawList.length > 0 ? Math.max(...validRawList) : '--';
+                const isMinEqualsMax = autoMin !== '--' && autoMin === autoMax;
+
+                return (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+                      <div className="glass-card" style={{ padding: '1rem', border: '1px solid rgba(0, 242, 254, 0.3)' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase' }}>Selected Scope</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#00F2FE', marginTop: '2px' }}>
+                          Round {selectedNormRound} • {targetRev?.name || 'Reviewer'}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#CBD5E1' }}>{evs.length} Teams Evaluated</div>
+                      </div>
+
+                      <div className="glass-card" style={{ padding: '1rem', border: '1px solid rgba(0, 242, 254, 0.3)' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase' }}>Automatic MIN Score</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#00F2FE', fontFamily: 'var(--font-heading)', marginTop: '2px' }}>
+                          {autoMin !== '--' ? `${autoMin} / 100` : '--'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Generated from lowest raw score</div>
+                      </div>
+
+                      <div className="glass-card" style={{ padding: '1rem', border: '1px solid rgba(255, 215, 0, 0.3)' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase' }}>Automatic MAX Score</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#FFD700', fontFamily: 'var(--font-heading)', marginTop: '2px' }}>
+                          {autoMax !== '--' ? `${autoMax} / 100` : '--'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Generated from highest raw score</div>
+                      </div>
+
+                      <div className="glass-card" style={{ padding: '1rem', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase' }}>Applied Formula</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10B981', marginTop: '4px', fontFamily: 'monospace' }}>
+                          {isMinEqualsMax ? 'MIN == MAX → 100.00' : '((raw - MIN) / (MAX - MIN)) × 100'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '2px' }}>Authoritative backend calculation</div>
+                      </div>
+                    </div>
+
+                    {/* Section 14 Table */}
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="alpha-table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr>
+                            <th>Team ID</th>
+                            <th>Team Name</th>
+                            <th style={{ textAlign: 'center' }}>Raw Score</th>
+                            <th style={{ textAlign: 'center' }}>Auto MIN</th>
+                            <th style={{ textAlign: 'center' }}>Auto MAX</th>
+                            <th style={{ textAlign: 'center' }}>Normalized Score</th>
+                            <th>Status</th>
+                            <th>Submitted At</th>
+                            <th style={{ textAlign: 'center' }}>Score Correction</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {evs.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: '#94A3B8' }}>
+                                No raw marks submitted yet by {targetRev?.name || 'this reviewer'} for Round {selectedNormRound}.
+                              </td>
+                            </tr>
+                          ) : (
+                            evs
+                              .filter(ev => !evalSearchTerm || ev.teamCode.toLowerCase().includes(evalSearchTerm.toLowerCase()) || ev.teamName.toLowerCase().includes(evalSearchTerm.toLowerCase()))
+                              .map((ev) => (
+                                <tr key={ev._id}>
+                                  <td style={{ fontWeight: 700, color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>
+                                    {ev.teamCode}
+                                  </td>
+                                  <td style={{ fontWeight: 600, color: '#F8FAFC' }}>
+                                    {ev.teamName}
+                                  </td>
+                                  <td style={{ textAlign: 'center', fontWeight: 800, color: '#F8FAFC' }}>
+                                    {ev.rawScore} / 100
+                                  </td>
+                                  <td style={{ textAlign: 'center', color: '#00F2FE', fontWeight: 700 }}>
+                                    {ev.minimumReviewerScore !== undefined ? ev.minimumReviewerScore : autoMin}
+                                  </td>
+                                  <td style={{ textAlign: 'center', color: '#FFD700', fontWeight: 700 }}>
+                                    {ev.maximumReviewerScore !== undefined ? ev.maximumReviewerScore : autoMax}
+                                  </td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <span style={{ background: 'rgba(0, 242, 254, 0.15)', border: '1px solid #00F2FE', color: '#00F2FE', padding: '3px 9px', borderRadius: '6px', fontWeight: 900, fontFamily: 'var(--font-heading)' }}>
+                                      {ev.normalizedScore !== undefined ? `${ev.normalizedScore}` : '--'}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                      {ev.status || 'SUBMITTED'}
+                                    </span>
+                                  </td>
+                                  <td style={{ color: '#94A3B8', fontSize: '0.8rem' }}>
+                                    {new Date(ev.submittedAt || ev.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <button
+                                      onClick={() => openAdminEditEv(ev, { teamId: ev.teamCode, teamName: ev.teamName, _id: ev.teamId }, ev.roundNumber, targetRevId)}
+                                      className="btn-alpha-cyan"
+                                      style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                      <Edit size={13} /> Correct Mark
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
-          {/* ADMIN EVALUATION EDIT MODAL */}
+          {/* ADMIN SCORE CORRECTION MODAL (Section 10 Requirement) */}
           {adminEditEvModal && (() => {
             const roundNum = adminEditEvModal.roundNumber;
-            const roundCriteria = ADMIN_ROUNDS_CONFIG[roundNum] || ADMIN_ROUNDS_CONFIG[1];
-
-            const calculatedScore = Object.values(adminCriteriaInputs).reduce((acc, curr) => {
-              const val = Number(curr);
-              return acc + (isNaN(val) ? 0 : val);
-            }, 0);
 
             return (
               <div className="modal-overlay">
-                <div className="modal-content" style={{ maxWidth: '640px', padding: '2rem', border: '1px solid #FFD700', boxShadow: '0 0 30px rgba(255, 215, 0, 0.25)' }}>
+                <div className="modal-content" style={{ maxWidth: '540px', padding: '2rem', border: '1px solid #FFD700', boxShadow: '0 0 30px rgba(255, 215, 0, 0.25)' }}>
                   
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#FFD700', textTransform: 'uppercase', fontWeight: 700 }}>
-                        Admin Override Edit • Round {roundNum}
+                        Admin Authorized Score Correction • Round {roundNum}
                       </div>
                       <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', fontWeight: 800, color: '#F8FAFC', margin: '2px 0 0' }}>
                         {adminEditEvModal.teamCode} — {adminEditEvModal.teamName}
@@ -1216,77 +1395,83 @@ export default function AdminDashboard() {
                   </div>
 
                   <form onSubmit={handleAdminSaveEv}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.5rem', marginBottom: '1.5rem' }}>
-                      {roundCriteria.map((crit) => {
-                        const val = adminCriteriaInputs[crit.key] ?? '';
-                        return (
-                          <div 
-                            key={crit.key} 
-                            style={{ 
-                              background: 'rgba(15, 23, 42, 0.8)', 
-                              padding: '0.9rem 1.1rem', 
-                              borderRadius: '10px', 
-                              border: '1px solid rgba(255,255,255,0.08)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justify: 'space-between',
-                              gap: '1rem'
-                            }}
-                          >
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 700, color: '#F8FAFC', fontSize: '0.9rem' }}>
-                                {crit.name}
-                              </div>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                              <input
-                                type="number"
-                                min="0"
-                                max={crit.maxMarks}
-                                step="1"
-                                placeholder="0"
-                                value={val}
-                                onChange={(e) => {
-                                  const inputVal = e.target.value;
-                                  if (inputVal === '') {
-                                    setAdminCriteriaInputs(prev => ({ ...prev, [crit.key]: '' }));
-                                    return;
-                                  }
-                                  const n = Number(inputVal);
-                                  if (!isNaN(n) && n >= 0 && n <= crit.maxMarks) {
-                                    setAdminCriteriaInputs(prev => ({ ...prev, [crit.key]: n }));
-                                  }
-                                }}
-                                style={{
-                                  width: '75px',
-                                  padding: '0.5rem',
-                                  textAlign: 'center',
-                                  background: 'rgba(30, 41, 59, 0.9)',
-                                  border: '1px solid #FFD700',
-                                  borderRadius: '8px',
-                                  color: '#FFD700',
-                                  fontWeight: 800,
-                                  fontSize: '1rem',
-                                  outline: 'none'
-                                }}
-                              />
-                              <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 600 }}>
-                                / {crit.maxMarks}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    {/* Select Reviewer */}
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#CBD5E1', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
+                        Evaluating Reviewer
+                      </label>
+                      <select
+                        value={adminReviewerSelect}
+                        onChange={(e) => setAdminReviewerSelect(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.85rem',
+                          background: 'rgba(15, 23, 42, 0.9)',
+                          border: '1px solid var(--border-cyan)',
+                          borderRadius: '8px',
+                          color: '#FFF',
+                          fontSize: '0.9rem',
+                          outline: 'none'
+                        }}
+                      >
+                        {(evalData.reviewers || []).map(r => (
+                          <option key={r._id} value={r._id}>
+                            {r.name} ({r.username})
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
+                    {/* Raw Mark Input */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '1.25rem', borderRadius: '10px', border: '1px solid rgba(255, 215, 0, 0.3)', marginBottom: '1.25rem', textAlign: 'center' }}>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#FFD700', marginBottom: '0.6rem', textTransform: 'uppercase' }}>
+                        New Raw Marks (0 – 100)
+                      </label>
+                      
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          placeholder="0 - 100"
+                          value={adminRawMarkInput}
+                          onChange={(e) => setAdminRawMarkInput(e.target.value)}
+                          style={{
+                            width: '130px',
+                            padding: '0.75rem 1rem',
+                            textAlign: 'center',
+                            background: 'rgba(30, 41, 59, 0.95)',
+                            border: '2px solid #FFD700',
+                            borderRadius: '10px',
+                            color: '#FFD700',
+                            fontWeight: 900,
+                            fontSize: '1.7rem',
+                            fontFamily: 'var(--font-heading)',
+                            outline: 'none',
+                            boxShadow: '0 0 15px rgba(255, 215, 0, 0.2)'
+                          }}
+                        />
+                        <span style={{ fontSize: '1.2rem', color: '#94A3B8', fontWeight: 700, fontFamily: 'var(--font-heading)' }}>
+                          / 100
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Automatic Recalculation Notice */}
+                    <div style={{ background: 'rgba(0, 242, 254, 0.08)', border: '1px solid rgba(0, 242, 254, 0.25)', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.78rem', color: '#CBD5E1', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Zap size={18} color="#00F2FE" />
+                      <span>Saving will automatically recalculate MIN, MAX, all affected teams' normalized scores, and the leaderboard in realtime.</span>
+                    </div>
+
+                    {/* Admin Reason / Notes */}
                     <div style={{ marginBottom: '1.5rem' }}>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#94A3B8', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-                        Admin Notes / Remarks
+                        Admin Reason / Remarks
                       </label>
                       <textarea
                         rows="2"
-                        placeholder="Add admin notes or reason for mark modification..."
+                        placeholder="Add reason for score modification..."
                         value={adminCommentsInput}
                         onChange={(e) => setAdminCommentsInput(e.target.value)}
                         style={{
@@ -1303,18 +1488,7 @@ export default function AdminDashboard() {
                       />
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255, 215, 0, 0.08)', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid rgba(255, 215, 0, 0.2)', marginBottom: '1.5rem' }}>
-                      <div>
-                        <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Score</div>
-                        <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFD700', fontFamily: 'var(--font-heading)' }}>
-                          {calculatedScore} / 100 Marks
-                        </div>
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: '#FFD700', fontWeight: 600 }}>
-                        ⚡ Admin Edit Mode
-                      </div>
-                    </div>
-
+                    {/* Submit Buttons */}
                     <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                       <button
                         type="button"
@@ -1330,7 +1504,7 @@ export default function AdminDashboard() {
                         className="btn-alpha-gold"
                         style={{ padding: '0.7rem 1.5rem', fontSize: '0.88rem' }}
                       >
-                        {adminSubmittingEv ? 'Saving...' : 'Save & Override Marks'}
+                        {adminSubmittingEv ? 'Saving...' : 'Save & Recalculate'}
                       </button>
                     </div>
                   </form>

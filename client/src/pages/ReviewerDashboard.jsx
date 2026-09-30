@@ -75,9 +75,9 @@ export default function ReviewerDashboard() {
   const [actionMsg, setActionMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   
-  // Mark Entry Modal state
+  // Mark Entry Modal state (Section 1: Reviewer enters ONLY raw marks 0–100)
   const [activeModalTeam, setActiveModalTeam] = useState(null);
-  const [criteriaInputs, setCriteriaInputs] = useState({});
+  const [rawMarkInput, setRawMarkInput] = useState('');
   const [commentsInput, setCommentsInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -144,22 +144,45 @@ export default function ReviewerDashboard() {
     ? matchedDbRound
     : fallbackRoundDoc;
 
-  // Map team evaluations for quick lookup
+  // Map team evaluations for quick lookup with all possible keys (teamCode, teamId, _id)
   const evaluationMap = {};
-  evaluations.forEach(ev => {
-    if (ev.roundNumber === selectedRoundNum) {
-      evaluationMap[ev.teamCode] = ev;
-      if (ev.teamId) evaluationMap[ev.teamId] = ev;
+  (evaluations || []).forEach(ev => {
+    if (Number(ev.roundNumber) === Number(selectedRoundNum)) {
+      if (ev.teamCode) {
+        const c = String(ev.teamCode).trim();
+        evaluationMap[c] = ev;
+        evaluationMap[c.toUpperCase()] = ev;
+        evaluationMap[c.toLowerCase()] = ev;
+      }
+      if (ev.teamId) {
+        const id = String(ev.teamId).trim();
+        evaluationMap[id] = ev;
+        evaluationMap[id.toUpperCase()] = ev;
+        evaluationMap[id.toLowerCase()] = ev;
+      }
     }
   });
 
-  const evaluatedCount = teams.filter(t => Boolean(evaluationMap[t.teamCode] || evaluationMap[t._id])).length;
+  const getTeamEvaluation = (team) => {
+    if (!team) return null;
+    const code = String(team.teamCode || team.teamId || '').trim();
+    const id = team._id ? String(team._id).trim() : '';
+    return evaluationMap[code] ||
+           evaluationMap[code.toUpperCase()] ||
+           evaluationMap[code.toLowerCase()] ||
+           (id ? evaluationMap[id] : null) ||
+           (id ? evaluationMap[id.toUpperCase()] : null) ||
+           (team.teamId ? evaluationMap[String(team.teamId).trim()] : null) ||
+           null;
+  };
+
+  const evaluatedCount = teams.filter(t => Boolean(getTeamEvaluation(t))).length;
   const totalTeamsCount = teams.length || AUTHORIZED_TEAMS.length;
   const progressPercent = totalTeamsCount > 0 ? Math.round((evaluatedCount / totalTeamsCount) * 100) : 0;
 
   // Filter teams by search and evaluation status
   const filteredTeams = teams.filter(t => {
-    const isSubmitted = Boolean(evaluationMap[t.teamCode] || evaluationMap[t._id]);
+    const isSubmitted = Boolean(getTeamEvaluation(t));
     
     if (statusFilter === 'SUBMITTED' && !isSubmitted) return false;
     if (statusFilter === 'PENDING' && isSubmitted) return false;
@@ -167,73 +190,37 @@ export default function ReviewerDashboard() {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
     return (
-      t.teamCode.toLowerCase().includes(term) ||
-      t.teamName.toLowerCase().includes(term) ||
+      (t.teamCode || '').toLowerCase().includes(term) ||
+      (t.teamId || '').toLowerCase().includes(term) ||
+      (t.teamName || '').toLowerCase().includes(term) ||
       (t.selectedProblemCode && t.selectedProblemCode.toLowerCase().includes(term)) ||
       (t.selectedProblemTitle && t.selectedProblemTitle.toLowerCase().includes(term))
     );
   });
 
-  // Open Mark Entry Form
+  // Open Mark Entry Form (Reviewer enters ONLY raw marks 0–100)
   const openEvaluationModal = (team) => {
-    const existingEv = evaluationMap[team.teamCode] || evaluationMap[team._id];
-    const initialInputs = {};
-
-    const activeCriteria = (currentRoundDoc.criteria && currentRoundDoc.criteria.length > 0) 
-      ? currentRoundDoc.criteria 
-      : fallbackRoundDoc.criteria;
-
-    activeCriteria.forEach(crit => {
-      const existingMarkObj = existingEv?.criteriaMarks?.find(c => c.criteriaKey === crit.key || c.name === crit.name);
-      initialInputs[crit.key] = (existingMarkObj !== undefined && existingMarkObj !== null) ? existingMarkObj.mark : '';
-    });
-
-    setCriteriaInputs(initialInputs);
+    const existingEv = getTeamEvaluation(team);
+    const initialRaw = existingEv ? (existingEv.rawScore !== undefined ? existingEv.rawScore : existingEv.totalMarks) : '';
+    setRawMarkInput(initialRaw !== undefined && initialRaw !== null && initialRaw !== '' ? String(initialRaw) : '');
     setCommentsInput(existingEv?.comments || '');
     setActiveModalTeam(team);
     setErrorMsg('');
   };
 
-  const handleCriterionChange = (key, value, maxAllowed) => {
-    if (value === '') {
-      setCriteriaInputs(prev => ({ ...prev, [key]: '' }));
-      return;
-    }
-    const num = Number(value);
-    if (isNaN(num)) return;
-    if (num < 0) return;
-    if (num > maxAllowed) return; // Prevent entering > maxMarks
-    
-    setCriteriaInputs(prev => ({ ...prev, [key]: num }));
-  };
-
-  // Calculate live sum total
-  const calculatedTotalScore = Object.values(criteriaInputs).reduce((acc, curr) => {
-    const val = Number(curr);
-    return acc + (isNaN(val) ? 0 : val);
-  }, 0);
-
   const handleSubmitEvaluation = async (e) => {
     e.preventDefault();
     if (!activeModalTeam) return;
 
-    const activeCriteria = (currentRoundDoc.criteria && currentRoundDoc.criteria.length > 0) 
-      ? currentRoundDoc.criteria 
-      : fallbackRoundDoc.criteria;
-    const formattedMarks = [];
-
-    for (const crit of activeCriteria) {
-      const val = criteriaInputs[crit.key];
-      if (val === '' || val === undefined || val === null) {
-        setErrorMsg(`Please enter a mark for '${crit.name}'.`);
-        return;
-      }
-      formattedMarks.push({
-        criteriaKey: crit.key,
-        name: crit.name,
-        mark: Number(val),
-        maxMark: crit.maxMarks
-      });
+    // Section 20: Reject invalid marks with exact message
+    if (rawMarkInput === '' || rawMarkInput === null || rawMarkInput === undefined || isNaN(Number(rawMarkInput))) {
+      setErrorMsg('Marks must be between 0 and 100.');
+      return;
+    }
+    const scoreNum = Number(rawMarkInput);
+    if (scoreNum < 0 || scoreNum > 100) {
+      setErrorMsg('Marks must be between 0 and 100.');
+      return;
     }
 
     setSubmitting(true);
@@ -242,17 +229,41 @@ export default function ReviewerDashboard() {
     try {
       const payload = {
         teamId: activeModalTeam._id,
-        teamCode: activeModalTeam.teamCode,
+        teamCode: activeModalTeam.teamCode || activeModalTeam.teamId,
         teamName: activeModalTeam.teamName,
         roundNumber: selectedRoundNum,
-        criteriaMarks: formattedMarks,
+        rawScore: scoreNum,
         comments: commentsInput,
         status: 'SUBMITTED'
       };
 
       const res = await axios.post('/api/reviewer/evaluations', payload);
       
-      setActionMsg(`Marks saved successfully for ${activeModalTeam.teamCode}!`);
+      const savedEv = res.data?.evaluation || {
+        _id: `ev-${Date.now()}`,
+        teamId: activeModalTeam._id,
+        teamCode: activeModalTeam.teamCode || activeModalTeam.teamId,
+        teamName: activeModalTeam.teamName,
+        roundNumber: selectedRoundNum,
+        rawScore: scoreNum,
+        totalMarks: scoreNum,
+        comments: commentsInput,
+        status: 'SUBMITTED',
+        submittedAt: new Date()
+      };
+
+      // Optimistically update evaluations state so marks appear immediately!
+      setEvaluations(prev => {
+        const cleanCode = String(activeModalTeam.teamCode || activeModalTeam.teamId || '').trim().toUpperCase();
+        const cleanId = String(activeModalTeam._id || '').trim();
+        const filtered = (prev || []).filter(item => !(
+          Number(item.roundNumber) === Number(selectedRoundNum) &&
+          (String(item.teamCode || '').trim().toUpperCase() === cleanCode || String(item.teamId || '').trim() === cleanId)
+        ));
+        return [savedEv, ...filtered];
+      });
+
+      setActionMsg(`Marks (${scoreNum} / 100) saved successfully for ${activeModalTeam.teamCode || activeModalTeam.teamId}!`);
       setTimeout(() => setActionMsg(''), 4000);
       
       setActiveModalTeam(null);
@@ -261,8 +272,6 @@ export default function ReviewerDashboard() {
       let msg = 'Failed to submit marks.';
       if (err.response?.data?.error) {
         msg = err.response.data.error;
-      } else if (err.response?.status === 404) {
-        msg = 'Backend server deployment in progress (HTTP 404). Retrying in progress... Please click Save / Submit Marks again.';
       } else if (err.message) {
         msg = err.message;
       }
@@ -477,13 +486,13 @@ export default function ReviewerDashboard() {
               </thead>
               <tbody>
                 {filteredTeams.map((team, idx) => {
-                  const ev = evaluationMap[team.teamCode] || evaluationMap[team._id];
+                  const ev = getTeamEvaluation(team);
                   const isSubmitted = Boolean(ev);
-                  const totalScore = isSubmitted ? ev.totalMarks : '--';
+                  const scoreVal = ev ? (ev.rawScore !== undefined ? ev.rawScore : ev.totalMarks) : null;
 
                   return (
                     <tr 
-                      key={team._id || team.teamCode} 
+                      key={team._id || team.teamCode || team.teamId} 
                       style={{ 
                         borderBottom: '1px solid rgba(255,255,255,0.05)',
                         background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent',
@@ -492,7 +501,7 @@ export default function ReviewerDashboard() {
                     >
                       {/* Team ID */}
                       <td style={{ padding: '0.9rem 1.25rem', fontWeight: 700, color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>
-                        {team.teamCode}
+                        {team.teamCode || team.teamId}
                       </td>
 
                       {/* Team Name */}
@@ -519,8 +528,29 @@ export default function ReviewerDashboard() {
                       </td>
 
                       {/* Total Score */}
-                      <td style={{ padding: '0.9rem 1.25rem', textAlign: 'center', fontWeight: 800, fontSize: '1rem', color: isSubmitted ? '#10B981' : '#64748B' }}>
-                        {isSubmitted ? `${totalScore} / ${currentRoundDoc.maximumMarks}` : '--'}
+                      <td style={{ padding: '0.9rem 1.25rem', textAlign: 'center' }}>
+                        {isSubmitted && scoreVal !== null && scoreVal !== undefined ? (
+                          <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                            <span style={{ 
+                              background: 'rgba(16, 185, 129, 0.18)', 
+                              border: '1.5px solid #10B981', 
+                              color: '#10B981', 
+                              padding: '4px 14px', 
+                              borderRadius: '8px', 
+                              fontWeight: 900, 
+                              fontSize: '1.05rem',
+                              fontFamily: 'var(--font-heading)',
+                              boxShadow: '0 0 10px rgba(16, 185, 129, 0.25)'
+                            }}>
+                              {scoreVal} / 100
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 700 }}>
+                              ✓ Submitted
+                            </span>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#64748B', fontWeight: 600, fontSize: '0.9rem' }}>-- / 100</span>
+                        )}
                       </td>
 
                       {/* Status Badge */}
@@ -546,7 +576,7 @@ export default function ReviewerDashboard() {
                           {isSubmitted ? (
                             user?.role === 'REVIEWER' ? (
                               <>
-                                <Eye size={14} /> View Marks
+                                <Eye size={14} /> View Marks ({scoreVal})
                               </>
                             ) : (
                               <>
@@ -569,24 +599,25 @@ export default function ReviewerDashboard() {
         )}
       </div>
 
-      {/* 5. MARK ENTRY MODAL */}
+      {/* 5. MARK ENTRY MODAL (Section 1: Reviewer enters ONLY raw marks 0–100) */}
       {activeModalTeam && (() => {
-        const modalEv = evaluationMap[activeModalTeam.teamCode] || evaluationMap[activeModalTeam._id];
+        const modalEv = getTeamEvaluation(activeModalTeam);
         const isEvSubmitted = Boolean(modalEv && modalEv.status === 'SUBMITTED');
         const isLocked = isEvSubmitted && user?.role === 'REVIEWER';
+        const currentScore = modalEv ? (modalEv.rawScore !== undefined ? modalEv.rawScore : modalEv.totalMarks) : null;
 
         return (
           <div className="modal-overlay">
-            <div className="modal-content" style={{ maxWidth: '640px', padding: '2rem', border: '1px solid #00F2FE', boxShadow: '0 0 30px rgba(0, 242, 254, 0.25)' }}>
+            <div className="modal-content" style={{ maxWidth: '560px', padding: '2rem', border: '1px solid #00F2FE', boxShadow: '0 0 30px rgba(0, 242, 254, 0.25)' }}>
               
               {/* Modal Header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: 700 }}>
-                    {isLocked ? 'View Marks (Locked)' : 'Mark Entry'} • Round {selectedRoundNum}
+                    {isLocked ? 'View Submitted Marks' : 'Mark Entry'} • Round {selectedRoundNum}
                   </div>
                   <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', fontWeight: 800, color: '#F8FAFC', margin: '2px 0 0' }}>
-                    {activeModalTeam.teamCode} — {activeModalTeam.teamName}
+                    {activeModalTeam.teamCode || activeModalTeam.teamId} — {activeModalTeam.teamName}
                   </h2>
                 </div>
                 <button 
@@ -596,6 +627,29 @@ export default function ReviewerDashboard() {
                   <X size={22} />
                 </button>
               </div>
+
+              {/* Submitted Marks Banner */}
+              {isEvSubmitted && currentScore !== null && currentScore !== undefined && (
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(0, 242, 254, 0.12) 100%)',
+                  border: '2px solid #10B981',
+                  borderRadius: '12px',
+                  padding: '1.25rem',
+                  marginBottom: '1.25rem',
+                  textAlign: 'center',
+                  boxShadow: '0 0 25px rgba(16, 185, 129, 0.25)'
+                }}>
+                  <div style={{ fontSize: '0.78rem', color: '#10B981', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px' }}>
+                    ✓ Current Submitted Raw Marks
+                  </div>
+                  <div style={{ fontSize: '2.8rem', fontWeight: 900, color: '#10B981', fontFamily: 'var(--font-heading)', margin: '0.25rem 0' }}>
+                    {currentScore} <span style={{ fontSize: '1.3rem', color: '#94A3B8' }}>/ 100</span>
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>
+                    Evaluation Saved & Submitted • Round {selectedRoundNum}
+                  </div>
+                </div>
+              )}
 
               {/* Problem Statement Banner inside Modal */}
               <div style={{ background: 'rgba(255, 215, 0, 0.08)', border: '1px solid rgba(255, 215, 0, 0.3)', padding: '0.85rem 1.1rem', borderRadius: '10px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
@@ -633,67 +687,49 @@ export default function ReviewerDashboard() {
               )}
 
               <form onSubmit={handleSubmitEvaluation}>
-                {/* Criteria Inputs List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.5rem', marginBottom: '1.5rem' }}>
-                  {(currentRoundDoc.criteria || []).map((crit) => {
-                    const val = criteriaInputs[crit.key] ?? '';
-
-                    return (
-                      <div 
-                        key={crit.key} 
-                        style={{ 
-                          background: 'rgba(15, 23, 42, 0.8)', 
-                          padding: '0.9rem 1.1rem', 
-                          borderRadius: '10px', 
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justify: 'space-between',
-                          gap: '1rem'
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, color: '#F8FAFC', fontSize: '0.9rem' }}>
-                            {crit.name}
-                          </div>
-                          {crit.description && (
-                            <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '2px' }}>
-                              {crit.description}
-                            </div>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                          <input
-                            type="number"
-                            min="0"
-                            max={crit.maxMarks}
-                            step="1"
-                            placeholder="0"
-                            disabled={isLocked}
-                            value={val}
-                            onChange={(e) => handleCriterionChange(crit.key, e.target.value, crit.maxMarks)}
-                            style={{
-                              width: '75px',
-                              padding: '0.5rem',
-                              textAlign: 'center',
-                              background: isLocked ? 'rgba(30, 41, 59, 0.5)' : 'rgba(30, 41, 59, 0.9)',
-                              border: '1px solid var(--border-cyan)',
-                              borderRadius: '8px',
-                              color: isLocked ? '#94A3B8' : '#00F2FE',
-                              fontWeight: 800,
-                              fontSize: '1rem',
-                              outline: 'none',
-                              cursor: isLocked ? 'not-allowed' : 'text'
-                            }}
-                          />
-                          <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: 600 }}>
-                            / {crit.maxMarks}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                {/* SECTION 1: Reviewer enters ONLY raw marks (0–100) */}
+                <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(0, 242, 254, 0.25)', marginBottom: '1.5rem', textAlign: 'center' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800, color: '#00F2FE', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    {isEvSubmitted ? 'Submitted Raw Marks (0 – 100)' : 'Raw Marks (0 – 100)'}
+                  </label>
+                  
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      placeholder="e.g. 82"
+                      disabled={isLocked}
+                      value={rawMarkInput !== '' ? rawMarkInput : (currentScore !== null && currentScore !== undefined ? String(currentScore) : '')}
+                      onChange={(e) => {
+                        setRawMarkInput(e.target.value);
+                        setErrorMsg('');
+                      }}
+                      style={{
+                        width: '140px',
+                        padding: '0.85rem 1rem',
+                        textAlign: 'center',
+                        background: 'rgba(30, 41, 59, 0.95)',
+                        border: '2px solid #00F2FE',
+                        borderRadius: '12px',
+                        color: isLocked ? '#10B981' : '#00F2FE',
+                        fontWeight: 900,
+                        fontSize: '1.8rem',
+                        fontFamily: 'var(--font-heading)',
+                        outline: 'none',
+                        cursor: isLocked ? 'default' : 'text',
+                        boxShadow: '0 0 20px rgba(0, 242, 254, 0.25)'
+                      }}
+                    />
+                    <span style={{ fontSize: '1.3rem', color: '#94A3B8', fontWeight: 800, fontFamily: 'var(--font-heading)' }}>
+                      / 100
+                    </span>
+                  </div>
+                  
+                  <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.85rem' }}>
+                    {isLocked ? 'Submitted marks are recorded on the authoritative server.' : 'Enter raw evaluation score from 0 to 100.'}
+                  </div>
                 </div>
 
                 {/* Optional Comments */}
@@ -703,7 +739,7 @@ export default function ReviewerDashboard() {
                   </label>
                   <textarea
                     rows="2"
-                    placeholder="Add feedback or key observations for this team..."
+                    placeholder="Add optional notes or feedback for this team..."
                     disabled={isLocked}
                     value={commentsInput}
                     onChange={(e) => setCommentsInput(e.target.value)}
@@ -720,20 +756,6 @@ export default function ReviewerDashboard() {
                       cursor: isLocked ? 'not-allowed' : 'text'
                     }}
                   />
-                </div>
-
-                {/* Total Summary Footer */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0, 242, 254, 0.08)', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid rgba(0, 242, 254, 0.2)', marginBottom: '1.5rem' }}>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase' }}>Total Calculated Marks</div>
-                    <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#00F2FE', fontFamily: 'var(--font-heading)' }}>
-                      {calculatedTotalScore} / {currentRoundDoc.maximumMarks}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: isLocked ? '#F59E0B' : '#10B981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    {isLocked ? <Lock size={16} /> : <CheckCircle2 size={16} />} 
-                    {isLocked ? 'Locked for Reviewer' : 'Backend Validated'}
-                  </div>
                 </div>
 
                 {/* Submit Buttons */}
@@ -765,7 +787,7 @@ export default function ReviewerDashboard() {
                       >
                         {submitting ? 'Saving Marks...' : (
                           <>
-                            <Save size={16} /> Save / Submit Marks
+                            <Save size={16} /> SUBMIT MARKS
                           </>
                         )}
                       </button>

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
@@ -177,11 +178,29 @@ router.get('/rounds', authenticateToken, requireRole('REVIEWER', 'ADMIN'), async
   }
 });
 
-// 3. GET EVALUATIONS FOR SPECIFIC ROUND (SUBMITTED BY LOGGED-IN REVIEWER)
+const { validateRawScore, recalculateRoundReviewerNormalization } = require('../services/normalizationService');
+
+// 3. GET EVALUATIONS FOR SPECIFIC ROUND (SUBMITTED BY LOGGED-IN REVIEWER - REVIEWER PRIVACY PROTECTED)
 const handleGetEvaluations = async (req, res) => {
   try {
     const roundParam = req.params.round;
-    const query = { reviewerId: req.user.id };
+    const revQueries = [];
+
+    if (req.user?.id) {
+      revQueries.push({ reviewerId: req.user.id });
+      revQueries.push({ reviewerId: String(req.user.id) });
+      if (mongoose.Types.ObjectId.isValid(req.user.id)) {
+        revQueries.push({ reviewerId: new mongoose.Types.ObjectId(req.user.id) });
+      }
+    }
+    if (req.user?.username) {
+      revQueries.push({ reviewerUsername: req.user.username });
+    }
+
+    let query = {};
+    if (req.user?.role === 'REVIEWER') {
+      query.$or = revQueries;
+    }
 
     if (roundParam && roundParam !== 'all') {
       const roundNum = Number(roundParam);
@@ -191,7 +210,23 @@ const handleGetEvaluations = async (req, res) => {
     }
 
     const evaluations = await Evaluation.find(query).sort({ updatedAt: -1 });
-    return res.json({ evaluations });
+    
+    // Privacy: Reviewers only see their own raw marks and comments, never other reviewers' or min/max/normalized values
+    const sanitizedEvaluations = evaluations.map(ev => ({
+      _id: ev._id,
+      teamId: ev.teamId,
+      teamCode: ev.teamCode,
+      teamName: ev.teamName,
+      roundNumber: ev.roundNumber,
+      reviewerId: ev.reviewerId,
+      rawScore: ev.rawScore !== undefined ? ev.rawScore : ev.totalMarks,
+      totalMarks: ev.rawScore !== undefined ? ev.rawScore : ev.totalMarks,
+      comments: ev.comments || '',
+      status: ev.status || 'SUBMITTED',
+      submittedAt: ev.submittedAt
+    }));
+
+    return res.json({ evaluations: sanitizedEvaluations });
   } catch (err) {
     console.error('Reviewer get evaluations error:', err);
     return res.status(500).json({ error: 'Failed to fetch evaluations.' });
@@ -202,66 +237,66 @@ router.get('/evaluations/:round', authenticateToken, requireRole('REVIEWER', 'AD
 router.get('/evaluations', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleGetEvaluations);
 router.get('/:round', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleGetEvaluations);
 
-// 4. ENTER / SUBMIT EVALUATION FOR A TEAM
+// 4. ENTER / SUBMIT EVALUATION FOR A TEAM (RAW MARKS ONLY, BACKEND AUTOMATIC MIN-MAX NORMALIZATION)
 const handleSubmitEvaluation = async (req, res) => {
   try {
-    const { teamId, teamCode, roundNumber, criteriaMarks, comments, status } = req.body;
-
-    if (!teamCode || !roundNumber || !Array.isArray(criteriaMarks) || criteriaMarks.length === 0) {
-      return res.status(400).json({ error: 'Missing required evaluation fields (teamCode, roundNumber, criteriaMarks).' });
-    }
+    const { teamId, teamCode, teamName, roundNumber, rawScore, marks, criteriaMarks, comments, status } = req.body;
 
     const roundNum = Number(roundNumber);
-    await ensureRoundsExist();
+    if (!roundNumber || isNaN(roundNum)) {
+      return res.status(400).json({ error: `Invalid evaluation round number: ${roundNumber}` });
+    }
 
-    // Verify Evaluation Round Criteria
-    let roundDoc = await EvaluationRound.findOne({ roundNumber: roundNum });
-    const fallbackRound = DEFAULT_ROUNDS.find(r => r.roundNumber === roundNum);
-    const roundCriteria = roundDoc?.criteria || fallbackRound?.criteria || [];
+    const rawTeamIdentifier = teamCode || teamId;
+    if (!rawTeamIdentifier) {
+      return res.status(400).json({ error: 'Team Code or Team ID is required.' });
+    }
 
-    if (roundCriteria.length === 0) {
-      return res.status(400).json({ error: `Invalid evaluation round number: ${roundNum}` });
+    // Section 20: Strict 0-100 Validation
+    let candidateRawScore = rawScore;
+    if (candidateRawScore === undefined || candidateRawScore === null || candidateRawScore === '') {
+      if (marks !== undefined && marks !== null && marks !== '') {
+        candidateRawScore = marks;
+      } else if (Array.isArray(criteriaMarks) && criteriaMarks.length > 0) {
+        candidateRawScore = criteriaMarks.reduce((sum, item) => sum + (Number(item.mark) || 0), 0);
+      }
+    }
+
+    let cleanRawScore;
+    try {
+      cleanRawScore = validateRawScore(candidateRawScore);
+    } catch (valErr) {
+      return res.status(400).json({ error: 'Marks must be between 0 and 100.' });
+    }
+
+    // Section 21: Check if Round is Closed by Admin (Reviewers cannot submit new marks)
+    const roundDoc = await EvaluationRound.findOne({ roundNumber: roundNum });
+    if (req.user.role === 'REVIEWER' && roundDoc && (roundDoc.status === 'CLOSED' || roundDoc.active === false)) {
+      return res.status(403).json({
+        error: `Evaluation Round ${roundNum} is closed and frozen. New mark submissions are not permitted.`,
+        code: 'ROUND_CLOSED'
+      });
     }
 
     // Verify & Match Team
-    const cleanTeamCode = teamCode.trim().toUpperCase();
-    const authTeam = AUTHORIZED_TEAMS.find(t => t.teamId === cleanTeamCode || t.teamName.toUpperCase() === cleanTeamCode);
-    let dbTeam = await Team.findOne({ $or: [{ teamId: cleanTeamCode }, { name: cleanTeamCode }, { teamName: cleanTeamCode }] });
+    let matchedDbTeam = null;
+    if (mongoose.Types.ObjectId.isValid(rawTeamIdentifier)) {
+      matchedDbTeam = await Team.findById(rawTeamIdentifier);
+    }
+    if (!matchedDbTeam) {
+      const cleanIdentifier = String(rawTeamIdentifier).trim().toUpperCase();
+      matchedDbTeam = await Team.findOne({ $or: [{ teamId: cleanIdentifier }, { name: cleanIdentifier }, { teamName: cleanIdentifier }] });
+    }
 
-    if (!dbTeam && !authTeam) {
+    const cleanTeamCode = matchedDbTeam?.teamId || matchedDbTeam?.name || String(rawTeamIdentifier).trim().toUpperCase();
+    const authTeam = AUTHORIZED_TEAMS.find(t => t.teamId === cleanTeamCode || t.teamName?.toUpperCase() === cleanTeamCode);
+
+    if (!matchedDbTeam && !authTeam) {
       return res.status(404).json({ error: `Team ${cleanTeamCode} not found in database.` });
     }
 
-    const matchedTeamId = dbTeam?._id || teamId || cleanTeamCode;
-    const matchedTeamName = authTeam?.teamName || dbTeam?.teamName || dbTeam?.name || cleanTeamCode;
-
-    // Strict Validation & Server-side Total Calculation
-    let calculatedTotal = 0;
-    const validatedCriteriaMarks = [];
-
-    for (const item of criteriaMarks) {
-      const targetCriterion = roundCriteria.find(c => c.key === item.criteriaKey || c.name === item.name);
-      const maxAllowed = targetCriterion ? targetCriterion.maxMarks : (item.maxMark || 10);
-      const rawMark = Number(item.mark);
-
-      if (isNaN(rawMark) || rawMark < 0) {
-        return res.status(400).json({ error: `Mark for '${item.name || item.criteriaKey}' cannot be negative.` });
-      }
-
-      if (rawMark > maxAllowed) {
-        return res.status(400).json({
-          error: `Mark for '${item.name || targetCriterion?.name}' (${rawMark}) exceeds maximum allowed mark (${maxAllowed}).`
-        });
-      }
-
-      calculatedTotal += rawMark;
-      validatedCriteriaMarks.push({
-        criteriaKey: item.criteriaKey || targetCriterion?.key || item.name.toLowerCase().replace(/\s+/g, '_'),
-        name: targetCriterion?.name || item.name,
-        mark: rawMark,
-        maxMark: maxAllowed
-      });
-    }
+    const matchedTeamId = matchedDbTeam?._id || teamId || cleanTeamCode;
+    const matchedTeamName = teamName || authTeam?.teamName || matchedDbTeam?.teamName || matchedDbTeam?.name || cleanTeamCode;
 
     // Get Reviewer Details from Server Session
     let reviewerName = req.user.name || req.user.username;
@@ -276,11 +311,20 @@ const handleSubmitEvaluation = async (req, res) => {
       }
     }
 
-    // Prevent Duplicates / Upsert evaluation for (teamId/teamCode, roundNumber, reviewerId)
+    // Check if an evaluation already exists for (team, round, reviewer)
+    const revMatch = [{ reviewerId: reviewerId }, { reviewerId: String(reviewerId) }];
+    if (mongoose.Types.ObjectId.isValid(reviewerId)) {
+      revMatch.push({ reviewerId: new mongoose.Types.ObjectId(reviewerId) });
+    }
+    if (reviewerUsername) {
+      revMatch.push({ reviewerUsername: reviewerUsername });
+    }
+
     let evaluationDoc = await Evaluation.findOne({
-      $or: [
-        { teamCode: cleanTeamCode, roundNumber: roundNum, reviewerId },
-        { teamId: matchedTeamId, roundNumber: roundNum, reviewerId }
+      roundNumber: roundNum,
+      $or: revMatch,
+      $and: [
+        { $or: [{ teamCode: cleanTeamCode }, { teamId: matchedTeamId }] }
       ]
     });
 
@@ -293,10 +337,11 @@ const handleSubmitEvaluation = async (req, res) => {
         });
       }
 
-      // Update existing evaluation (Admin edit)
-      evaluationDoc.criteriaMarks = validatedCriteriaMarks;
-      evaluationDoc.totalMarks = calculatedTotal;
-      evaluationDoc.comments = comments || evaluationDoc.comments || '';
+      // Update existing evaluation
+      evaluationDoc.rawScore = cleanRawScore;
+      evaluationDoc.totalMarks = cleanRawScore;
+      evaluationDoc.criteriaMarks = [{ criteriaKey: 'raw_score', name: 'Raw Marks', mark: cleanRawScore, maxMark: 100 }];
+      evaluationDoc.comments = comments !== undefined ? comments : evaluationDoc.comments;
       evaluationDoc.status = status || 'SUBMITTED';
       evaluationDoc.submittedAt = new Date();
       await evaluationDoc.save();
@@ -310,25 +355,42 @@ const handleSubmitEvaluation = async (req, res) => {
         reviewerId: reviewerId,
         reviewerUsername: reviewerUsername,
         reviewerName: reviewerName,
-        criteriaMarks: validatedCriteriaMarks,
-        totalMarks: calculatedTotal,
+        rawScore: cleanRawScore,
+        totalMarks: cleanRawScore,
+        criteriaMarks: [{ criteriaKey: 'raw_score', name: 'Raw Marks', mark: cleanRawScore, maxMark: 100 }],
         comments: comments || '',
         status: status || 'SUBMITTED',
         submittedAt: new Date()
       });
     }
 
+    // Section 4 & 7 & 12: AUTOMATIC MIN-MAX RECALCULATION
+    // Recalculate MIN, MAX, and normalized scores for ALL teams evaluated by this reviewer in this round
+    await recalculateRoundReviewerNormalization(roundNum, reviewerId);
+
     await AuditLog.create({
       actor: reviewerUsername,
       role: req.user.role,
-      action: 'SUBMIT_EVALUATION',
+      action: 'SUBMIT_RAW_SCORE',
       target: `Team ${cleanTeamCode} (Round ${roundNum})`,
-      metadata: { totalMarks: calculatedTotal, roundNumber: roundNum }
+      metadata: { rawScore: cleanRawScore, roundNumber: roundNum }
     });
 
+    // Return sanitized response for reviewer (protects privacy)
     return res.json({
-      message: `Evaluation for Team ${cleanTeamCode} (Round ${roundNum}) saved successfully!`,
-      evaluation: evaluationDoc
+      message: `Marks (${cleanRawScore}) for Team ${cleanTeamCode} (Round ${roundNum}) saved successfully!`,
+      evaluation: {
+        _id: evaluationDoc._id,
+        teamId: evaluationDoc.teamId,
+        teamCode: evaluationDoc.teamCode,
+        teamName: evaluationDoc.teamName,
+        roundNumber: evaluationDoc.roundNumber,
+        rawScore: cleanRawScore,
+        totalMarks: cleanRawScore,
+        comments: evaluationDoc.comments,
+        status: evaluationDoc.status,
+        submittedAt: evaluationDoc.submittedAt
+      }
     });
   } catch (err) {
     console.error('Submit evaluation error:', err);
@@ -342,7 +404,7 @@ router.post('/', authenticateToken, requireRole('REVIEWER', 'ADMIN'), handleSubm
 // 5. UPDATE EXISTING EVALUATION BY ID (Admin only or draft update)
 const handleUpdateEvaluation = async (req, res) => {
   try {
-    const { criteriaMarks, comments, status } = req.body;
+    const { rawScore, marks, criteriaMarks, comments, status } = req.body;
     const evaluationDoc = await Evaluation.findById(req.params.id);
 
     if (!evaluationDoc) {
@@ -362,28 +424,32 @@ const handleUpdateEvaluation = async (req, res) => {
       return res.status(403).json({ error: 'You do not have permission to edit another reviewer\'s evaluation.' });
     }
 
-    if (Array.isArray(criteriaMarks)) {
-      let calculatedTotal = 0;
-      const validated = [];
-      for (const item of criteriaMarks) {
-        const rawMark = Number(item.mark);
-        const maxAllowed = Number(item.maxMark) || 10;
+    let updatedRawScore = evaluationDoc.rawScore;
+    let candidateScore = rawScore !== undefined ? rawScore : marks;
 
-        if (isNaN(rawMark) || rawMark < 0 || rawMark > maxAllowed) {
-          return res.status(400).json({ error: `Invalid mark value for ${item.name}` });
-        }
-
-        calculatedTotal += rawMark;
-        validated.push({
-          criteriaKey: item.criteriaKey,
-          name: item.name,
-          mark: rawMark,
-          maxMark: maxAllowed
-        });
+    if (candidateScore !== undefined && candidateScore !== null && candidateScore !== '') {
+      try {
+        updatedRawScore = validateRawScore(candidateScore);
+      } catch (e) {
+        return res.status(400).json({ error: 'Marks must be between 0 and 100.' });
       }
-
-      evaluationDoc.criteriaMarks = validated;
-      evaluationDoc.totalMarks = calculatedTotal;
+      evaluationDoc.rawScore = updatedRawScore;
+      evaluationDoc.totalMarks = updatedRawScore;
+      evaluationDoc.criteriaMarks = [{ criteriaKey: 'raw_score', name: 'Raw Marks', mark: updatedRawScore, maxMark: 100 }];
+    } else if (Array.isArray(criteriaMarks)) {
+      let calculatedTotal = 0;
+      for (const item of criteriaMarks) {
+        const rawMark = Number(item.mark) || 0;
+        calculatedTotal += rawMark;
+      }
+      try {
+        updatedRawScore = validateRawScore(calculatedTotal);
+      } catch (e) {
+        return res.status(400).json({ error: 'Marks must be between 0 and 100.' });
+      }
+      evaluationDoc.rawScore = updatedRawScore;
+      evaluationDoc.totalMarks = updatedRawScore;
+      evaluationDoc.criteriaMarks = criteriaMarks;
     }
 
     if (comments !== undefined) evaluationDoc.comments = comments;
@@ -392,14 +458,19 @@ const handleUpdateEvaluation = async (req, res) => {
 
     await evaluationDoc.save();
 
+    // Trigger normalization recalculation whenever score changes
+    await recalculateRoundReviewerNormalization(evaluationDoc.roundNumber, evaluationDoc.reviewerId);
+
     await AuditLog.create({
       actor: req.user.username,
       role: req.user.role,
       action: 'UPDATE_EVALUATION',
-      target: `Evaluation ID ${evaluationDoc._id}`
+      target: `Team ${evaluationDoc.teamCode} (Round ${evaluationDoc.roundNumber})`,
+      metadata: { rawScore: updatedRawScore }
     });
 
-    return res.json({ message: 'Evaluation updated successfully.', evaluation: evaluationDoc });
+    const refreshedEv = await Evaluation.findById(evaluationDoc._id);
+    return res.json({ message: 'Evaluation updated successfully.', evaluation: refreshedEv });
   } catch (err) {
     console.error('Update evaluation error:', err);
     return res.status(500).json({ error: 'Failed to update evaluation.' });

@@ -176,7 +176,7 @@ const ReviewerSchema = new mongoose.Schema({
   role: { type: String, default: 'REVIEWER' }
 }, { timestamps: true });
 
-// 14. Evaluation Round Schema (Configurable Evaluation Criteria per Round)
+// 14. Evaluation Round Schema (Configurable Evaluation Criteria per Round & Closure)
 const EvaluationRoundSchema = new mongoose.Schema({
   roundNumber: { type: Number, required: true, unique: true, index: true }, // 1, 2, 3
   roundName: { type: String, required: true },
@@ -188,31 +188,53 @@ const EvaluationRoundSchema = new mongoose.Schema({
     description: { type: String, default: '' }
   }],
   maximumMarks: { type: Number, required: true, default: 100 },
-  active: { type: Boolean, default: true }
+  active: { type: Boolean, default: true },
+  status: { type: String, enum: ['ACTIVE', 'CLOSED'], default: 'ACTIVE' },
+  closedAt: { type: Date, default: null }
 }, { timestamps: true });
 
-// 15. Evaluation Schema (Team Marks entered by Reviewers)
+// 15. Evaluation Schema (Team Marks entered by Reviewers & Backend Min-Max Normalized Scores)
 const EvaluationSchema = new mongoose.Schema({
-  teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true, index: true },
+  teamId: { type: mongoose.Schema.Types.Mixed, required: true, index: true },
   teamCode: { type: String, required: true, index: true },
   teamName: { type: String, required: true },
   roundNumber: { type: Number, required: true, index: true },
-  reviewerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Reviewer', required: true, index: true },
+  reviewerId: { type: mongoose.Schema.Types.Mixed, required: true, index: true },
   reviewerUsername: { type: String, required: true },
   reviewerName: { type: String, required: true },
+  rawScore: { type: Number, required: true },
+  minimumReviewerScore: { type: Number, default: 0 },
+  maximumReviewerScore: { type: Number, default: 100 },
+  normalizedScore: { type: Number, default: 0 },
+  calculatedAt: { type: Date, default: Date.now },
   criteriaMarks: [{
-    criteriaKey: { type: String, required: true },
-    name: { type: String, required: true },
-    mark: { type: Number, required: true },
-    maxMark: { type: Number, required: true }
+    criteriaKey: { type: String },
+    name: { type: String },
+    mark: { type: Number },
+    maxMark: { type: Number }
   }],
-  totalMarks: { type: Number, required: true },
+  totalMarks: { type: Number, required: true }, // Retains raw score for backwards compatibility
   comments: { type: String, default: '' },
   status: { type: String, enum: ['DRAFT', 'SUBMITTED'], default: 'SUBMITTED' },
   submittedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-EvaluationSchema.index({ teamId: 1, roundNumber: 1, reviewerId: 1 }, { unique: true });
+EvaluationSchema.index({ teamCode: 1, roundNumber: 1, reviewerId: 1 }, { unique: true });
+
+// 16. Round Reviewer Normalization Metadata Schema
+const RoundReviewerNormalizationSchema = new mongoose.Schema({
+  roundNumber: { type: Number, required: true, index: true },
+  reviewerId: { type: mongoose.Schema.Types.Mixed, required: true, index: true },
+  reviewerUsername: { type: String, default: '' },
+  reviewerName: { type: String, default: '' },
+  minimumScore: { type: Number, default: 0 },
+  maximumScore: { type: Number, default: 100 },
+  totalEvaluated: { type: Number, default: 0 },
+  isFrozen: { type: Boolean, default: false },
+  calculatedAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+RoundReviewerNormalizationSchema.index({ roundNumber: 1, reviewerId: 1 }, { unique: true });
 
 module.exports = {
   Admin: mongoose.model('Admin', AdminSchema),
@@ -229,6 +251,7 @@ module.exports = {
   AuditLog: mongoose.model('AuditLog', AuditLogSchema),
   Reviewer: mongoose.model('Reviewer', ReviewerSchema),
   EvaluationRound: mongoose.model('EvaluationRound', EvaluationRoundSchema),
-  Evaluation: mongoose.model('Evaluation', EvaluationSchema)
+  Evaluation: mongoose.model('Evaluation', EvaluationSchema),
+  RoundReviewerNormalization: mongoose.model('RoundReviewerNormalization', RoundReviewerNormalizationSchema)
 };
 

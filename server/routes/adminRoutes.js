@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { 
   SystemSettings, Team, TeamLead, ProblemStatement, ProblemSelection, 
   Participant, Volunteer, Admin, ActiveSession, AuditLog, AttendanceSession, Attendance,
-  Evaluation, EvaluationRound, Reviewer
+  Evaluation, EvaluationRound, Reviewer, RoundReviewerNormalization
 } = require('../models/Schema');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { validateRawScore, recalculateRoundReviewerNormalization, getLeaderboardData } = require('../services/normalizationService');
 
 // 1. UPDATE TIMER SETTINGS & MODULE TOGGLES
 router.post('/settings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
@@ -534,12 +536,16 @@ router.post('/seed', async (req, res) => {
   }
 });
 
-// 8. ADMIN: GET ALL REVIEWER EVALUATIONS & PROGRESS STATS
+// 8. ADMIN: GET ALL REVIEWER EVALUATIONS, NORMALIZATION STATS & LEADERBOARD
 router.get('/evaluations', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const evaluations = await Evaluation.find().sort({ roundNumber: 1, teamCode: 1 });
-    const rounds = await EvaluationRound.find().sort({ roundNumber: 1 });
-    const reviewers = await Reviewer.find({}, { passwordHash: 0 });
+    const [evaluations, rounds, reviewers, normalizationStats, leaderboard] = await Promise.all([
+      Evaluation.find().sort({ roundNumber: 1, teamCode: 1 }),
+      EvaluationRound.find().sort({ roundNumber: 1 }),
+      Reviewer.find({}, { passwordHash: 0 }),
+      RoundReviewerNormalization.find().sort({ roundNumber: 1, reviewerId: 1 }),
+      getLeaderboardData()
+    ]);
     const authorizedTeams = require('../data/teamsData');
 
     // Round Completion Statistics
@@ -563,11 +569,290 @@ router.get('/evaluations', authenticateToken, requireRole('ADMIN'), async (req, 
       summary,
       evaluations,
       rounds,
-      reviewers
+      reviewers,
+      normalizationStats,
+      leaderboard
     });
   } catch (err) {
     console.error('Admin fetch evaluations error:', err);
     return res.status(500).json({ error: 'Failed to fetch reviewer evaluations.' });
+  }
+});
+
+// 8b. ADMIN: GET NORMALIZATION BREAKDOWN FOR SPECIFIC ROUND & REVIEWER
+router.get('/normalization/:roundNumber/:reviewerId', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const roundNum = Number(req.params.roundNumber);
+    const revId = req.params.reviewerId;
+
+    const revQueries = [{ reviewerId: revId }, { reviewerId: String(revId) }];
+    if (mongoose.Types.ObjectId.isValid(revId)) {
+      revQueries.push({ reviewerId: new mongoose.Types.ObjectId(revId) });
+    }
+
+    const [evaluations, normMeta] = await Promise.all([
+      Evaluation.find({
+        roundNumber: roundNum,
+        $or: revQueries
+      }).sort({ teamCode: 1 }),
+      RoundReviewerNormalization.findOne({
+        roundNumber: roundNum,
+        $or: revQueries
+      })
+    ]);
+
+    const validScores = evaluations.map(e => Number(e.rawScore)).filter(s => !isNaN(s) && s >= 0 && s <= 100);
+    const minScore = validScores.length > 0 ? Math.min(...validScores) : 0;
+    const maxScore = validScores.length > 0 ? Math.max(...validScores) : 0;
+
+    return res.json({
+      roundNumber: roundNum,
+      reviewerId: revId,
+      minimumScore: minScore,
+      maximumScore: maxScore,
+      totalEvaluated: evaluations.length,
+      isFrozen: Boolean(normMeta?.isFrozen),
+      evaluations
+    });
+  } catch (err) {
+    console.error('Fetch normalization error:', err);
+    return res.status(500).json({ error: 'Failed to fetch normalization details.' });
+  }
+});
+
+// 8c. ADMIN: SCORE CORRECTION & MANUAL MARK OVERRIDE (Section 10 Requirement)
+router.post('/evaluations', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { teamCode, teamId, roundNumber, reviewerId, rawScore, comments } = req.body;
+    const rawTeam = teamCode || teamId;
+    if (!rawTeam || !roundNumber || !reviewerId) {
+      return res.status(400).json({ error: 'teamCode or teamId, roundNumber, and reviewerId are required.' });
+    }
+
+    const roundNum = Number(roundNumber);
+    let cleanRawScore;
+    try {
+      cleanRawScore = validateRawScore(rawScore);
+    } catch (e) {
+      return res.status(400).json({ error: 'Marks must be between 0 and 100.' });
+    }
+
+    let matchedDbTeam = null;
+    if (mongoose.Types.ObjectId.isValid(rawTeam)) {
+      matchedDbTeam = await Team.findById(rawTeam);
+    }
+    if (!matchedDbTeam) {
+      const cleanIdentifier = String(rawTeam).trim().toUpperCase();
+      matchedDbTeam = await Team.findOne({ $or: [{ teamId: cleanIdentifier }, { name: cleanIdentifier }, { teamName: cleanIdentifier }] });
+    }
+
+    const cleanTeamCode = matchedDbTeam?.teamId || matchedDbTeam?.name || String(rawTeam).trim().toUpperCase();
+    const authorizedTeams = require('../data/teamsData');
+    const authTeam = authorizedTeams.find(t => t.teamId === cleanTeamCode || t.teamName?.toUpperCase() === cleanTeamCode);
+
+    const matchedTeamId = matchedDbTeam?._id || teamId || cleanTeamCode;
+    const matchedTeamName = authTeam?.teamName || matchedDbTeam?.teamName || matchedDbTeam?.name || cleanTeamCode;
+
+    // Reviewer info
+    const reviewer = await Reviewer.findById(reviewerId).catch(() => null) || await Reviewer.findOne({ username: reviewerId });
+    const reviewerName = reviewer?.name || 'Reviewer';
+    const reviewerUsername = reviewer?.username || String(reviewerId);
+    const matchedRevId = reviewer?._id ? String(reviewer?._id) : String(reviewerId);
+
+    const revMatch = [{ reviewerId: matchedRevId }, { reviewerId: reviewerId }];
+    if (mongoose.Types.ObjectId.isValid(matchedRevId)) {
+      revMatch.push({ reviewerId: new mongoose.Types.ObjectId(matchedRevId) });
+    }
+
+    let evaluationDoc = await Evaluation.findOne({
+      roundNumber: roundNum,
+      $or: revMatch,
+      $and: [
+        { $or: [{ teamCode: cleanTeamCode }, { teamId: matchedTeamId }] }
+      ]
+    });
+
+    const oldRawScore = evaluationDoc?.rawScore;
+
+    if (evaluationDoc) {
+      evaluationDoc.rawScore = cleanRawScore;
+      evaluationDoc.totalMarks = cleanRawScore;
+      evaluationDoc.criteriaMarks = [{ criteriaKey: 'raw_score', name: 'Raw Marks', mark: cleanRawScore, maxMark: 100 }];
+      if (comments !== undefined) evaluationDoc.comments = comments;
+      evaluationDoc.status = 'SUBMITTED';
+      evaluationDoc.submittedAt = new Date();
+      await evaluationDoc.save();
+    } else {
+      evaluationDoc = await Evaluation.create({
+        teamId: matchedTeamId,
+        teamCode: cleanTeamCode,
+        teamName: matchedTeamName,
+        roundNumber: roundNum,
+        reviewerId: matchedRevId,
+        reviewerUsername: reviewerUsername,
+        reviewerName: reviewerName,
+        rawScore: cleanRawScore,
+        totalMarks: cleanRawScore,
+        criteriaMarks: [{ criteriaKey: 'raw_score', name: 'Raw Marks', mark: cleanRawScore, maxMark: 100 }],
+        comments: comments || 'Admin Entered Marks',
+        status: 'SUBMITTED',
+        submittedAt: new Date()
+      });
+    }
+
+    // Recalculate MIN, MAX, and all normalized scores for that round + reviewer
+    const normResult = await recalculateRoundReviewerNormalization(roundNum, matchedRevId);
+
+    // Section 10: Record audit log for score correction
+    await AuditLog.create({
+      actor: req.user.username,
+      role: 'ADMIN',
+      action: 'ADMIN_SCORE_CORRECTION',
+      target: `Team ${cleanTeamCode} (Round ${roundNum}, Reviewer ${reviewerUsername})`,
+      metadata: { oldRawScore, newRawScore: cleanRawScore, minScore: normResult.minScore, maxScore: normResult.maxScore }
+    });
+
+    const refreshedEv = await Evaluation.findById(evaluationDoc._id);
+    return res.json({
+      message: `Score for Team ${cleanTeamCode} updated and normalized successfully!`,
+      evaluation: refreshedEv,
+      normalization: normResult
+    });
+  } catch (err) {
+    console.error('Admin score correction error:', err);
+    return res.status(500).json({ error: 'Failed to update evaluation score.' });
+  }
+});
+
+// 8d. ADMIN: UPDATE EVALUATION BY ID (Score Correction)
+router.put('/evaluations/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { rawScore, comments, status } = req.body;
+    const evaluationDoc = await Evaluation.findById(req.params.id);
+    if (!evaluationDoc) {
+      return res.status(404).json({ error: 'Evaluation record not found.' });
+    }
+
+    let cleanRawScore;
+    try {
+      cleanRawScore = validateRawScore(rawScore);
+    } catch (e) {
+      return res.status(400).json({ error: 'Marks must be between 0 and 100.' });
+    }
+
+    const oldScore = evaluationDoc.rawScore;
+    evaluationDoc.rawScore = cleanRawScore;
+    evaluationDoc.totalMarks = cleanRawScore;
+    evaluationDoc.criteriaMarks = [{ criteriaKey: 'raw_score', name: 'Raw Marks', mark: cleanRawScore, maxMark: 100 }];
+    if (comments !== undefined) evaluationDoc.comments = comments;
+    if (status !== undefined) evaluationDoc.status = status;
+    evaluationDoc.submittedAt = new Date();
+    await evaluationDoc.save();
+
+    const normResult = await recalculateRoundReviewerNormalization(evaluationDoc.roundNumber, evaluationDoc.reviewerId);
+
+    await AuditLog.create({
+      actor: req.user.username,
+      role: 'ADMIN',
+      action: 'ADMIN_SCORE_CORRECTION',
+      target: `Team ${evaluationDoc.teamCode} (Round ${evaluationDoc.roundNumber})`,
+      metadata: { oldScore, newScore: cleanRawScore }
+    });
+
+    const refreshed = await Evaluation.findById(evaluationDoc._id);
+    return res.json({
+      message: 'Evaluation updated and recalculated successfully.',
+      evaluation: refreshed,
+      normalization: normResult
+    });
+  } catch (err) {
+    console.error('Admin update evaluation error:', err);
+    return res.status(500).json({ error: 'Failed to update evaluation.' });
+  }
+});
+
+// 8d. ADMIN: CLEAR/RESET EVALUATIONS (FOR ADMIN MAINTENANCE AND TESTING)
+router.delete('/evaluations/all', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    await Evaluation.deleteMany({});
+    await RoundReviewerNormalization.deleteMany({});
+    return res.json({ message: 'All evaluations and normalization data reset successfully.' });
+  } catch (err) {
+    console.error('Admin reset evaluations error:', err);
+    return res.status(500).json({ error: 'Failed to reset evaluations.' });
+  }
+});
+
+// 8e. ADMIN: CLOSE EVALUATION ROUND (Freeze normalization dataset, stop reviewer submissions)
+router.post('/rounds/:roundNumber/close', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const roundNum = Number(req.params.roundNumber);
+    let roundDoc = await EvaluationRound.findOne({ roundNumber: roundNum });
+    if (!roundDoc) {
+      return res.status(404).json({ error: `Evaluation Round ${roundNum} not found.` });
+    }
+
+    roundDoc.status = 'CLOSED';
+    roundDoc.active = false;
+    roundDoc.closedAt = new Date();
+    await roundDoc.save();
+
+    // Freeze normalization datasets for this round
+    await RoundReviewerNormalization.updateMany({ roundNumber: roundNum }, { $set: { isFrozen: true } });
+
+    await AuditLog.create({
+      actor: req.user.username,
+      role: 'ADMIN',
+      action: 'CLOSE_EVALUATION_ROUND',
+      target: `Round ${roundNum}`,
+      metadata: { closedAt: roundDoc.closedAt }
+    });
+
+    return res.json({ message: `Round ${roundNum} closed and frozen successfully. Reviewer submissions locked.`, round: roundDoc });
+  } catch (err) {
+    console.error('Close round error:', err);
+    return res.status(500).json({ error: 'Failed to close evaluation round.' });
+  }
+});
+
+// 8f. ADMIN: OPEN / REOPEN EVALUATION ROUND
+router.post('/rounds/:roundNumber/open', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const roundNum = Number(req.params.roundNumber);
+    let roundDoc = await EvaluationRound.findOne({ roundNumber: roundNum });
+    if (!roundDoc) {
+      return res.status(404).json({ error: `Evaluation Round ${roundNum} not found.` });
+    }
+
+    roundDoc.status = 'ACTIVE';
+    roundDoc.active = true;
+    roundDoc.closedAt = null;
+    await roundDoc.save();
+
+    await RoundReviewerNormalization.updateMany({ roundNumber: roundNum }, { $set: { isFrozen: false } });
+
+    await AuditLog.create({
+      actor: req.user.username,
+      role: 'ADMIN',
+      action: 'REOPEN_EVALUATION_ROUND',
+      target: `Round ${roundNum}`
+    });
+
+    return res.json({ message: `Round ${roundNum} reopened successfully. Reviewer submissions active.`, round: roundDoc });
+  } catch (err) {
+    console.error('Reopen round error:', err);
+    return res.status(500).json({ error: 'Failed to reopen evaluation round.' });
+  }
+});
+
+// 8g. ADMIN: GET AUTHORITATIVE LEADERBOARD
+router.get('/leaderboard', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const leaderboard = await getLeaderboardData();
+    return res.json({ leaderboard });
+  } catch (err) {
+    console.error('Leaderboard fetch error:', err);
+    return res.status(500).json({ error: 'Failed to fetch leaderboard.' });
   }
 });
 

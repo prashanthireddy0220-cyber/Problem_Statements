@@ -113,17 +113,41 @@ async function triggerAutoSeed() {
       await Volunteer.create({ username: 'volunteer1', passwordHash: volPassHash, name: 'Event Volunteer', phone: '+91 9876543210' });
     }
 
-    // Seed Default Reviewers (reviewer1, reviewer2, reviewer3 / rev123)
-    const revCount = await Reviewer.countDocuments();
-    if (revCount === 0) {
-      console.log('🌱 Seeding default Reviewers (reviewer1, reviewer2, reviewer3 / rev123)...');
-      const revPassHash = await bcrypt.hash('rev123', 10);
-      await Reviewer.create([
-        { username: 'reviewer1', passwordHash: revPassHash, name: 'Dr. Alan Turing', email: 'reviewer1@hackathon.edu', role: 'REVIEWER' },
-        { username: 'reviewer2', passwordHash: revPassHash, name: 'Prof. Ada Lovelace', email: 'reviewer2@hackathon.edu', role: 'REVIEWER' },
-        { username: 'reviewer3', passwordHash: revPassHash, name: 'Dr. Grace Hopper', email: 'reviewer3@hackathon.edu', role: 'REVIEWER' }
-      ]);
+    // Seed / Sync Default Reviewers (reviewer1: GEETHA, reviewer2: DINESH, reviewer3: CHINNASAMY / rev123)
+    console.log('🌱 Seeding / Syncing Reviewers (reviewer1: GEETHA, reviewer2: DINESH, reviewer3: CHINNASAMY)...');
+    const reviewerData = [
+      { username: 'reviewer1', name: 'GEETHA', email: 'reviewer1@hackathon.edu' },
+      { username: 'reviewer2', name: 'DINESH', email: 'reviewer2@hackathon.edu' },
+      { username: 'reviewer3', name: 'CHINNASAMY', email: 'reviewer3@hackathon.edu' }
+    ];
+    for (const rData of reviewerData) {
+      let rDoc = await Reviewer.findOne({ username: rData.username });
+      if (!rDoc) {
+        const revPassHash = await bcrypt.hash('rev123', 10);
+        rDoc = await Reviewer.create({
+          username: rData.username,
+          passwordHash: revPassHash,
+          name: rData.name,
+          email: rData.email,
+          role: 'REVIEWER'
+        });
+      } else if (rDoc.name !== rData.name) {
+        rDoc.name = rData.name;
+        await rDoc.save();
+      }
     }
+
+    // Update reviewerName in any existing evaluations and normalization documents
+    try {
+      const { Evaluation, RoundReviewerNormalization } = require('./models/Schema');
+      await Evaluation.updateMany({ reviewerUsername: 'reviewer1' }, { $set: { reviewerName: 'GEETHA' } });
+      await Evaluation.updateMany({ reviewerUsername: 'reviewer2' }, { $set: { reviewerName: 'DINESH' } });
+      await Evaluation.updateMany({ reviewerUsername: 'reviewer3' }, { $set: { reviewerName: 'CHINNASAMY' } });
+
+      await RoundReviewerNormalization.updateMany({ reviewerUsername: 'reviewer1' }, { $set: { reviewerName: 'GEETHA' } });
+      await RoundReviewerNormalization.updateMany({ reviewerUsername: 'reviewer2' }, { $set: { reviewerName: 'DINESH' } });
+      await RoundReviewerNormalization.updateMany({ reviewerUsername: 'reviewer3' }, { $set: { reviewerName: 'CHINNASAMY' } });
+    } catch (e) {}
 
     // Seed / Update Evaluation Rounds (100 Marks per round)
     const defaultRoundsConfig = [
