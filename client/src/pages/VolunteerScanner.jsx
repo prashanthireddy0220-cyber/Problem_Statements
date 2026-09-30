@@ -289,12 +289,16 @@ export default function VolunteerScanner() {
       ? scannedParticipant.members
       : [{ name: scannedParticipant.name, registrationNumber: scannedParticipant.registrationNumber }];
 
-    const attendanceList = members.map(m => ({
-      registrationNumber: m.registrationNumber,
-      name: m.name,
-      teamName: scannedParticipant.teamName,
-      status: teamToggles[m.registrationNumber] === 'PRESENT' ? 'PRESENT' : 'ABSENT'
-    }));
+    const attendanceList = members.map(m => {
+      const reg = String(m.registrationNumber || m.regNum || m.regNo || '').trim().toUpperCase();
+      const statusVal = teamToggles[m.registrationNumber] || teamToggles[reg];
+      return {
+        registrationNumber: reg || m.registrationNumber,
+        name: m.name,
+        teamName: scannedParticipant.teamName,
+        status: statusVal === 'PRESENT' ? 'PRESENT' : 'ABSENT'
+      };
+    });
 
     try {
       const res = await axios.post('/api/attendance/mark-team-attendance', {
