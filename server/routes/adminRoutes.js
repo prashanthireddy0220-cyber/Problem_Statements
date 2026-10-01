@@ -147,6 +147,7 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
       const selDur = Number(selectionDurationMinutes || settings.selectionDurationMinutes || 10);
       settings.releaseManualState = 'RELEASED';
       settings.problemStatementsReleased = true;
+      settings.problemSelectionEnabled = true;
       settings.selectionManualState = 'OPEN';
       settings.currentPhase = 'SELECTION_OPEN';
       settings.selectionStartedAt = now;
@@ -158,6 +159,7 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
     } else if (action === 'CLOSE' || action === 'LOCK' || action === 'END_SESSION') {
       settings.selectionManualState = 'CLOSED';
       settings.currentPhase = 'SELECTION_CLOSED';
+      settings.problemSelectionEnabled = false;
       settings.selectionEndsAt = now;
     } else if (action === 'RESET') {
       settings.roundStatus = 'IDLE';
