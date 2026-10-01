@@ -41,7 +41,7 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
 // Health check endpoint (Registered BEFORE any route handlers)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', version: '1.0.6-alpha-team50-61-sync', message: 'College Hackathon ALPHA Server Running', time: new Date() });
+  res.json({ status: 'OK', version: '1.0.7-alpha-ps41-42-sync', message: 'College Hackathon ALPHA Server Running', time: new Date() });
 });
 
 // Mount API Routes (Specific path prefixes registered first)

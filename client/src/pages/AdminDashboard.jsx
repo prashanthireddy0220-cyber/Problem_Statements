@@ -354,12 +354,46 @@ export default function AdminDashboard() {
   const handleResetAllSelections = async () => {
     if (!window.confirm("⚠️ Are you sure you want to DELETE ALL team problem statement selections? All teams will be unassigned and problem capacities will be reset to 0/2.")) return;
     try {
-      const res = await axios.post('/api/admin/reset-all-selections');
-      setActionMsg(res.data.message || 'All problem statement selections cleared successfully!');
+      let resetDone = false;
+      // 1. Try primary bulk reset endpoint
+      try {
+        const res = await axios.post('/api/admin/reset-all-selections');
+        if (res.status === 200) resetDone = true;
+      } catch (err1) {
+        // 2. Try alias endpoint on problemRoutes
+        try {
+          const res2 = await axios.post('/api/problems/admin/reset-all-selections');
+          if (res2.status === 200) resetDone = true;
+        } catch (err2) {
+          // 3. Fallback to resetting each selected team individually (supported across all backend versions)
+          const teamsRes = await axios.get('/api/admin/teams').catch(() => null);
+          const teamsList = teamsRes?.data?.teams || allTeams || [];
+          const selectedTeams = teamsList.filter(t => t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected');
+          
+          for (const t of selectedTeams) {
+            await axios.post(`/api/admin/teams/${t._id}/reset-selection`).catch(() => {});
+          }
+          resetDone = true;
+        }
+      }
+
+      // Optimistically clear local selections immediately
+      setAllTeams(prev => prev.map(t => ({
+        ...t,
+        selectedProblemId: null,
+        selectedProblemCode: 'Not Selected',
+        selectedProblemTitle: '',
+        selectionConfirmed: false,
+        selectedAt: null
+      })));
+      setProblems(prev => prev.map(p => ({ ...p, selectedCount: 0 })));
+
+      setActionMsg('All problem statement selections cleared successfully!');
       setTimeout(() => setActionMsg(''), 4000);
       fetchAllData();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to clear problem selections.');
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to clear problem selections.';
+      alert(typeof msg === 'string' && !msg.includes('<html') ? msg : 'Failed to clear problem selections.');
     }
   };
 

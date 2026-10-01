@@ -474,5 +474,38 @@ router.post('/admin/reset-booklet', authenticateToken, requireRole('ADMIN'), asy
   }
 });
 
+// 9. ADMIN: RESET ALL PROBLEM SELECTIONS (Route alias)
+router.post('/admin/reset-all-selections', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const selDeleteResult = await ProblemSelection.deleteMany({});
+    const psUpdateResult = await ProblemStatement.updateMany({}, { $set: { selectedCount: 0 } });
+    const teamUpdateResult = await Team.updateMany({}, {
+      $set: {
+        selectedProblemId: null,
+        selectedProblemCode: 'Not Selected',
+        selectionConfirmed: false,
+        selectedAt: null
+      }
+    });
+
+    await AuditLog.create({
+      actor: req.user.username,
+      role: 'ADMIN',
+      action: 'RESET_ALL_PROBLEM_SELECTIONS',
+      target: 'ALL_TEAMS'
+    });
+
+    return res.json({
+      message: 'All problem statement selections have been successfully cleared.',
+      deletedSelectionsCount: selDeleteResult.deletedCount,
+      resetProblemsCount: psUpdateResult.modifiedCount,
+      resetTeamsCount: teamUpdateResult.modifiedCount
+    });
+  } catch (err) {
+    console.error('Reset all selections error:', err);
+    return res.status(500).json({ error: 'Failed to reset all problem selections.' });
+  }
+});
+
 router.getOrUpdateSystemState = getOrUpdateSystemState;
 module.exports = router;
