@@ -256,59 +256,9 @@ async function triggerAutoSeed() {
       });
     }
 
-    const problemStatementsData = require('./data/problemStatements');
-    const validProblemIds = problemStatementsData.map(p => p.problemId);
-
-    // 1. Remove all old/extra problem statements not in the Top 40 booklet from database
-    const removeResult = await ProblemStatement.deleteMany({ problemId: { $nin: validProblemIds } });
-    if (removeResult.deletedCount > 0) {
-      console.log(`🧹 Removed ${removeResult.deletedCount} outdated problem statements not in Top 40 booklet.`);
-    }
-
-    // 2. Clean up any team selections that pointed to removed problem statements
-    await Team.updateMany(
-      { selectedProblemCode: { $nin: [...validProblemIds, 'Not Selected'] } },
-      { $set: { selectedProblemCode: 'Not Selected', selectionConfirmed: false, problemStatementId: null } }
-    );
-
-    // 3. Upsert and synchronize all 40 problem statements from the Top 40 booklet in bulk
-    const bulkOps = problemStatementsData.map(p => ({
-      updateOne: {
-        filter: { problemId: p.problemId },
-        update: {
-          $set: {
-            title: p.title,
-            description: p.description,
-            background: p.background,
-            expectedSolution: p.expectedSolution,
-            requirements: p.requirements,
-            constraints: p.constraints,
-            domain: p.domain,
-            difficulty: p.difficulty || 'Medium',
-            technologies: p.technologies,
-            maxTeamCapacity: 2,
-            status: 'PUBLISHED'
-          }
-        },
-        upsert: true
-      }
-    }));
-    await ProblemStatement.bulkWrite(bulkOps);
-
-    // 4. Synchronize selectedCount for each problem statement based on active confirmed team selections
-    for (const p of problemStatementsData) {
-      const activeCount = await Team.countDocuments({
-        selectedProblemCode: p.problemId,
-        selectionConfirmed: true
-      });
-      await ProblemStatement.updateOne(
-        { problemId: p.problemId },
-        { $set: { selectedCount: activeCount } }
-      );
-    }
-
-    const currentTotal = await ProblemStatement.countDocuments();
-    console.log(`✅ Synchronized Problem Statements: Exactly ${currentTotal} statements active in database (Top 40 booklet only).`);
+    // Synchronize Fixed Problem Statements (PS-001 to PS-040) & Lock Team Assignments
+    const { syncFixedTeamProblemStatements } = require('./services/fixedTeamAssignmentService');
+    await syncFixedTeamProblemStatements();
 
     // Always ensure Team 50 (9824005012) and Team 61 (9824005007) are properly separated and synchronized
     const team50Members = [

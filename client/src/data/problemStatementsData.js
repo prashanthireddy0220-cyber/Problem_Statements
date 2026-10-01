@@ -1,9 +1,4 @@
-/**
- * Hackathon 2026 - Fixed Problem Statements (PS-001 to PS-040)
- * 60 Teams • 40 Problem Statements • Maximum 2 Teams per Statement
- */
-
-const problemStatements = [
+export const TOP_40_PROBLEMS = [
   {
     "problemId": "PS-001",
     "title": "VoiceSentry: Real-Time Synthetic Voice & Audio Deepfake Detector",
@@ -1428,5 +1423,4 @@ const problemStatements = [
     "status": "PUBLISHED"
   }
 ];
-
-module.exports = problemStatements;
+export default TOP_40_PROBLEMS;

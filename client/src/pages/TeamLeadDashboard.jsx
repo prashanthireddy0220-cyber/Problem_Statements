@@ -9,6 +9,7 @@ import {
 import axios from 'axios';
 import QRCode from 'qrcode';
 import AUTHORIZED_TEAMS from '../data/teamsData.js';
+import { TOP_40_PROBLEMS } from '../data/problemStatementsData.js';
 
 export default function TeamLeadDashboard() {
   const { user, refreshUserSession } = useAuth();
@@ -119,6 +120,23 @@ export default function TeamLeadDashboard() {
   const [selectingLoading, setSelectingLoading] = useState(false);
   const [selectionError, setSelectionError] = useState('');
   const [confirmedData, setConfirmedData] = useState(() => {
+    const fixedCode = authItem?.fixedProblemStatementId;
+    if (fixedCode) {
+      const fixedProb = TOP_40_PROBLEMS.find(p => p.problemId === fixedCode);
+      return {
+        teamName: authItem.teamName || authItem.teamId,
+        problemId: fixedCode,
+        problemCode: fixedCode,
+        problemTitle: fixedProb?.title,
+        domain: fixedProb?.domain,
+        description: fixedProb?.description,
+        requirements: fixedProb?.requirements,
+        expectedSolution: fixedProb?.expectedSolution,
+        technologies: fixedProb?.technologies,
+        selectedProblem: fixedProb,
+        status: 'CONFIRMED'
+      };
+    }
     if (user?.team?.selectionConfirmed && user?.team?.selectedProblemCode && user?.team?.selectedProblemCode !== 'Not Selected') {
       return {
         teamName: user.team.name || user.team.teamName,
@@ -149,11 +167,12 @@ export default function TeamLeadDashboard() {
     }
   }, [confirmedData]);
 
-  // Authoritative check: A selection is confirmed IF AND ONLY IF the server/myTeamData or active user confirms it
+  // Authoritative check: A selection is confirmed IF AND ONLY IF the server/myTeamData or active user confirms it OR the team has a fixed assignment
   const hasConfirmedSelection = Boolean(
-    myTeamData
+    authItem?.fixedProblemStatementId ||
+    (myTeamData
       ? (myTeamData.team?.selectionConfirmed && myTeamData.team?.selectedProblemCode && myTeamData.team?.selectedProblemCode !== 'Not Selected')
-      : (user?.team?.selectionConfirmed && user?.team?.selectedProblemCode && user?.team?.selectedProblemCode !== 'Not Selected' && confirmedData)
+      : (user?.team?.selectionConfirmed && user?.team?.selectedProblemCode && user?.team?.selectedProblemCode !== 'Not Selected' && confirmedData))
   );
 
   const [secondsRemaining, setSecondsRemaining] = useState(() => {
@@ -723,8 +742,8 @@ export default function TeamLeadDashboard() {
 
                 {hasConfirmedSelection ? (
                   (() => {
-                    const selCode = myTeamData?.team?.selectedProblemCode || confirmedData?.problemCode || confirmedData?.problemId || user?.team?.selectedProblemCode;
-                    const selObj = myTeamData?.team?.selectedProblem || problems.find(p => p.problemId === selCode) || confirmedData?.selectedProblem || {};
+                    const selCode = myTeamData?.team?.selectedProblemCode || authItem?.fixedProblemStatementId || confirmedData?.problemCode || confirmedData?.problemId || user?.team?.selectedProblemCode;
+                    const selObj = myTeamData?.team?.selectedProblem || TOP_40_PROBLEMS.find(p => p.problemId === selCode) || problems.find(p => p.problemId === selCode) || confirmedData?.selectedProblem || {};
                     const selTitle = selObj.title || confirmedData?.problemTitle;
                     const selDesc = selObj.description || confirmedData?.description;
 
@@ -764,8 +783,8 @@ export default function TeamLeadDashboard() {
         <div>
           {hasConfirmedSelection ? (
             (() => {
-              const activeSelectedCode = myTeamData?.team?.selectedProblemCode || confirmedData?.problemId || confirmedData?.problemCode || user?.team?.selectedProblemCode;
-              const selectedProblemObj = myTeamData?.team?.selectedProblem || problems.find(p => p.problemId === activeSelectedCode) || confirmedData?.selectedProblem || {};
+              const activeSelectedCode = myTeamData?.team?.selectedProblemCode || authItem?.fixedProblemStatementId || confirmedData?.problemId || confirmedData?.problemCode || user?.team?.selectedProblemCode;
+              const selectedProblemObj = myTeamData?.team?.selectedProblem || TOP_40_PROBLEMS.find(p => p.problemId === activeSelectedCode) || problems.find(p => p.problemId === activeSelectedCode) || confirmedData?.selectedProblem || {};
               const activeProblemTitle = selectedProblemObj?.title || confirmedData?.problemTitle || 'Selected Problem Statement';
               const activeProblemDomain = selectedProblemObj?.domain || confirmedData?.domain || '';
               const activeProblemDesc = selectedProblemObj?.description || confirmedData?.description || 'Your selected problem statement has been confirmed and locked in the database.';

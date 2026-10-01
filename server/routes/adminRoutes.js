@@ -1186,60 +1186,13 @@ router.all('/sync-teams-50-61', async (req, res) => {
 // 26. DIRECT TOP 40 BOOKLET SYNC & PURGE OF OUTDATED PROBLEM STATEMENTS
 router.post('/sync-top40-booklet', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const problemStatementsData = require('../data/problemStatements');
-    const validProblemIds = problemStatementsData.map(p => p.problemId);
+    const { syncFixedTeamProblemStatements } = require('../services/fixedTeamAssignmentService');
+    const syncResult = await syncFixedTeamProblemStatements();
 
-    // 1. Delete all problem statements whose problemId is NOT in the booklet
-    const deleteResult = await ProblemStatement.deleteMany({ problemId: { $nin: validProblemIds } });
-
-    // 2. Clean up team selections pointing to deleted problem statements
-    await Team.updateMany(
-      { selectedProblemCode: { $nin: [...validProblemIds, 'Not Selected'] } },
-      { $set: { selectedProblemCode: 'Not Selected', selectionConfirmed: false, problemStatementId: null } }
-    );
-
-    // 3. Upsert all 40 statements
-    const bulkOps = problemStatementsData.map(p => ({
-      updateOne: {
-        filter: { problemId: p.problemId },
-        update: {
-          $set: {
-            title: p.title,
-            description: p.description,
-            background: p.background,
-            expectedSolution: p.expectedSolution,
-            requirements: p.requirements,
-            constraints: p.constraints,
-            domain: p.domain,
-            difficulty: p.difficulty || 'Medium',
-            technologies: p.technologies,
-            maxTeamCapacity: 2,
-            status: 'PUBLISHED'
-          }
-        },
-        upsert: true
-      }
-    }));
-    await ProblemStatement.bulkWrite(bulkOps);
-
-    // 4. Update selectedCount for each
-    for (const p of problemStatementsData) {
-      const activeCount = await Team.countDocuments({
-        selectedProblemCode: p.problemId,
-        selectionConfirmed: true
-      });
-      await ProblemStatement.updateOne(
-        { problemId: p.problemId },
-        { $set: { selectedCount: activeCount } }
-      );
-    }
-
-    const totalActive = await ProblemStatement.countDocuments();
     return res.json({
       success: true,
-      message: `Top 40 booklet synchronized. Deleted ${deleteResult.deletedCount} outdated statements. Exactly ${totalActive} statements active in DB.`,
-      deletedCount: deleteResult.deletedCount,
-      totalActive
+      message: `Top 40 booklet synchronized. Deleted ${syncResult.deletedOldProblems} outdated statements. Exactly ${syncResult.totalProblems} statements active in DB. Assigned ${syncResult.assignedTeamsCount} teams.`,
+      ...syncResult
     });
   } catch (err) {
     console.error('Error syncing Top 40 booklet:', err);

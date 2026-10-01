@@ -173,19 +173,34 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
 
     const members = sanitizeTeamMembers(team, authItem);
 
+    // Guarantee team always has their assigned fixed problem statement locked
+    const fixedAssignment = authItem?.fixedProblemStatementId;
+    if (team && fixedAssignment && (!team.selectionConfirmed || team.selectedProblemCode !== fixedAssignment)) {
+      const pDoc = await ProblemStatement.findOne({ problemId: fixedAssignment });
+      team.selectedProblemCode = fixedAssignment;
+      if (pDoc) team.selectedProblemId = pDoc._id;
+      team.selectionConfirmed = true;
+      if (!team.selectedAt) team.selectedAt = new Date();
+      await team.save().catch(e => console.warn('Team assignment save warning:', e.message));
+    }
+
     const isSelectionConfirmed = Boolean(
-      team?.selectionConfirmed &&
-      team?.selectedProblemCode &&
-      team?.selectedProblemCode !== 'Not Selected'
+      (team?.selectionConfirmed && team?.selectedProblemCode && team?.selectedProblemCode !== 'Not Selected') ||
+      fixedAssignment
     );
+
+    const activeProblemCode = team?.selectedProblemCode || fixedAssignment;
 
     // Fetch problem details if selected
     let selectedProblem = null;
-    if (isSelectionConfirmed) {
-      const searchOr = [];
-      if (team.selectedProblemCode) searchOr.push({ problemId: team.selectedProblemCode.trim().toUpperCase() });
-      if (team.selectedProblemId) searchOr.push({ _id: team.selectedProblemId });
+    if (activeProblemCode && activeProblemCode !== 'Not Selected') {
+      const searchOr = [{ problemId: activeProblemCode.trim().toUpperCase() }];
+      if (team?.selectedProblemId) searchOr.push({ _id: team.selectedProblemId });
       selectedProblem = await ProblemStatement.findOne({ $or: searchOr });
+      if (!selectedProblem) {
+        const fallbackList = require('../data/problemStatements');
+        selectedProblem = fallbackList.find(p => p.problemId === activeProblemCode.trim().toUpperCase()) || null;
+      }
     }
 
     const teamCode = team?.teamId || team?.name || authItem?.teamId || 'ALPHA-000';
@@ -208,10 +223,10 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
         teamQrToken: qrToken,
         publicQrUrl,
         eventPassQrToken: passToken,
-        selectedProblemCode: isSelectionConfirmed ? team.selectedProblemCode : 'Not Selected',
+        selectedProblemCode: activeProblemCode || 'Not Selected',
         selectionConfirmed: isSelectionConfirmed,
-        selectedAt: isSelectionConfirmed ? (team?.selectedAt || null) : null,
-        selectedProblem: isSelectionConfirmed ? selectedProblem : null
+        selectedAt: team?.selectedAt || new Date(),
+        selectedProblem: selectedProblem
       },
       teamLead: {
         name: teamLead?.name || authItem?.leadName || req.user.name || 'Team Lead',
