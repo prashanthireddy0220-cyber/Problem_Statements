@@ -2135,6 +2135,112 @@ Use sample passenger complaints. Implement a text classification model (Naive Ba
 
 • RECOMMENDED TECH STACK & RESOURCES:
 FastAPI / Node.js, Scikit-learn (NLP Classifier), React, Chart.js, PostgreSQL / Supabase`
+  },
+  {
+    "id": "PS-041",
+    "domain": "Full-Stack Web & Smart Automation",
+    "title": "NSS Blood Connect – Smart Blood Donor & Emergency Coordination System",
+    "coreQuestion": "How can an intelligent digital platform connect blood donors with patients and hospitals in real time to eliminate delays during critical emergencies?",
+    "background": "During critical medical emergencies, finding suitable blood donors quickly is challenging due to limited access to donor information, outdated contact records, and lack of real-time availability tracking.",
+    "description": "During emergencies, finding suitable blood donors quickly can be challenging due to limited access to donor information and availability. Develop a digital platform that connects blood donors with patients, hospitals, and organizations through blood-group matching, location-based donor search, availability tracking, emergency blood requests, donor responses, and request tracking. The system should provide a centralized dashboard for managing donors, blood requests, emergency requirements, donation records, and blood-group statistics.",
+    "scopeGuidance": "Build a responsive web platform featuring real-time donor-patient matching via geolocation radius filtering, live emergency WebSocket request broadcasts, and a centralized management dashboard for donors, requests, and blood inventory statistics.",
+    "requirements": [
+      "Blood-Group Matching & Location-Based Donor Search: Connect patients with eligible donors using blood compatibility and geolocation radius proximity on an interactive map.",
+      "Emergency Blood Requests & Real-Time Tracking: Broadcast urgent SOS requests with instant notifications via WebSockets and live donor acceptance tracking.",
+      "Centralized Management Dashboard: Manage donors, blood requests, emergency requirements, donation records, and blood-group statistics."
+    ],
+    "constraints": [
+      "Exposing donor private contact info without consent.",
+      "Manual phone-based coordination during emergency workflows.",
+      "Unsecured API endpoints without JWT authorization."
+    ],
+    "judgingCriteria": "• Emergency Matching & Notification Latency (40%)\n• Centralized Dashboard & Inventory Analytics (35%)\n• Security, Privacy & JWT Implementation (25%)",
+    "technologies": ["React", "Node.js", "Express.js", "MongoDB", "Google Maps API", "WebSockets", "JWT"],
+    "pdfDescription": `NSS BLOOD CONNECT – SMART BLOOD DONOR & EMERGENCY COORDINATION SYSTEM
+Problem Statement ID: PS-041 | Domain: Full-Stack Web & Smart Automation
+
+• THE CORE QUESTION:
+How can an intelligent digital platform connect blood donors with patients and hospitals in real time to eliminate delays during critical emergencies?
+
+• THE PROBLEM GAP:
+During emergencies, finding suitable blood donors quickly can be challenging due to limited access to donor information and availability. Traditional coordination relies on frantic manual calls and unverified social media messages, losing vital minutes when lives are at risk.
+
+• THE CHALLENGE:
+Develop a digital platform that connects blood donors with patients, hospitals, and organizations through blood-group matching, location-based donor search, availability tracking, emergency blood requests, donor responses, and request tracking. The system should provide a centralized dashboard for managing donors, blood requests, emergency requirements, donation records, and blood-group statistics.
+
+• SCOPE GUIDANCE (24-HR FEASIBILITY):
+Build a responsive full-stack platform using React, Node.js, Express, and MongoDB. Implement geolocation radius searches for donors with Google Maps API, use WebSockets for real-time emergency broadcasts and response tracking, and secure all user and administrative roles with JWT.
+
+• SOLUTION DIRECTIONS:
+• Location-Based Donor Matching: Search and filter available donors based on compatible blood groups and proximity radius.
+• Real-Time Emergency SOS & WebSockets: Broadcast urgent blood requirements with instant notifications and donor response tracking.
+• Centralized Management Dashboard: Track donation records, donor availability status, emergency requirements, and blood-group statistics.
+
+• ANTI-GOALS (WHAT THIS IS NOT):
+• Building automated laboratory blood cross-matching hardware.
+• Exposing unverified personal phone numbers publicly without privacy guards.
+• Ingesting national hospital EHR databases with heavy enterprise compliance overhead.
+
+• JUDGING CRITERIA:
+• Emergency Matching & Notification Latency (40%)
+• Centralized Dashboard & Inventory Analytics (35%)
+• Security, Privacy & JWT Implementation (25%)
+
+• RECOMMENDED TECH STACK & RESOURCES:
+React, Node.js, Express.js, MongoDB, Google Maps API, WebSockets, JWT`
+  },
+  {
+    "id": "PS-042",
+    "domain": "Artificial Intelligence & Machine Learning",
+    "title": "AI-Driven EV Range Prediction & Smart Navigation System",
+    "coreQuestion": "How can an AI navigation system accurately predict electric vehicle battery range under real-world dynamic conditions and recommend energy-optimal charging routes?",
+    "background": "EV users often experience range anxiety due to uncertain battery consumption caused by traffic, driving speed, weather, vehicle load, air-conditioning usage, and vehicle characteristics.",
+    "description": "EV users often experience range anxiety due to uncertain battery consumption caused by traffic, driving speed, weather, vehicle load, air-conditioning usage, and vehicle characteristics. Develop an AI-powered EV navigation system that predicts the vehicle's remaining driving range using real-time and user-provided parameters. The system should recommend energy-efficient routes by considering distance, traffic conditions, estimated energy consumption, and nearby charging-station availability.",
+    "scopeGuidance": "Train a machine learning regression model on simulated or open EV telemetry datasets. Feed real-time speed, weather temperature, elevation profile, and cabin AC settings to compute remaining range, and dynamically map energy-efficient routes with smart charging station waypoints.",
+    "requirements": [
+      "AI/ML Driving Range Prediction: Predict real-time battery consumption and remaining distance factoring in speed, vehicle weight, weather, and climate control.",
+      "Energy-Efficient Smart Navigation: Route planning algorithm that optimizes for minimal battery expenditure rather than just shortest distance.",
+      "Charging Station Integration & Stop Planner: Discover nearby charging points along the route using EV charging APIs with live availability and automated charging stop suggestions."
+    ],
+    "constraints": [
+      "Static linear range estimations without ML regression.",
+      "Hardware OBD-II or CAN-bus reverse-engineering.",
+      "Offline routing without dynamic traffic consideration."
+    ],
+    "judgingCriteria": "• ML Prediction Accuracy & Feature Engineering (40%)\n• Energy-Optimal Route Planning & Efficiency (35%)\n• Navigation UI & Charging Station Integration (25%)",
+    "technologies": ["Python", "Machine Learning", "React", "Node.js", "MongoDB", "Google Maps API", "EV Charging APIs"],
+    "pdfDescription": `AI-DRIVEN EV RANGE PREDICTION & SMART NAVIGATION SYSTEM
+Problem Statement ID: PS-042 | Domain: Artificial Intelligence & Machine Learning
+
+• THE CORE QUESTION:
+How can an AI navigation system accurately predict electric vehicle battery range under real-world dynamic conditions and recommend energy-optimal charging routes?
+
+• THE PROBLEM GAP:
+EV users often experience range anxiety due to uncertain battery consumption caused by traffic, driving speed, weather, vehicle load, air-conditioning usage, and vehicle characteristics. Existing navigation apps calculate routes based purely on distance or time without factoring in vehicle energy dynamics or charger queues.
+
+• THE CHALLENGE:
+Develop an AI-powered EV navigation system that predicts the vehicle's remaining driving range using real-time and user-provided parameters. The system should recommend energy-efficient routes by considering distance, traffic conditions, estimated energy consumption, and nearby charging-station availability.
+
+• SCOPE GUIDANCE (24-HR FEASIBILITY):
+Train or evaluate an ML regression model (e.g. Scikit-learn, XGBoost) using EV driving cycle parameters. Build a full-stack interface using React and Node.js that visualizes estimated battery levels along the route, alerts on critical battery drop, and routes via nearby charging stations using Google Maps API.
+
+• SOLUTION DIRECTIONS:
+• Dynamic ML Range Prediction: Predict real-time energy consumption factoring in speed, payload, HVAC usage, and elevation profile.
+• Energy-Aware Route Optimization: Recommend optimal paths balancing battery longevity, travel time, and live traffic conditions.
+• Smart Charging Corridor Navigation: Integrate EV charging station APIs to schedule automated charging stops when range drops below critical thresholds.
+
+• ANTI-GOALS (WHAT THIS IS NOT):
+• Physical vehicle ECU or CAN-bus reverse-engineering.
+• Designing high-voltage physical charging hardware.
+• Static lookup tables without machine learning regression.
+
+• JUDGING CRITERIA:
+• ML Prediction Accuracy & Feature Engineering (40%)
+• Energy-Optimal Route Planning & Efficiency (35%)
+• Navigation UI & Charging Station Integration (25%)
+
+• RECOMMENDED TECH STACK & RESOURCES:
+Python, Machine Learning, React, Node.js, MongoDB, Google Maps API, EV Charging APIs`
   }
 ];
 
@@ -2147,7 +2253,7 @@ const mappedProblems = rawBooklet.map(item => ({
   requirements: item.requirements,
   constraints: item.constraints,
   domain: item.domain,
-  difficulty: item.id.includes('-03') || item.id.includes('-05') || item.id.includes('-08') ? 'Hard' : 'Medium',
+  difficulty: item.difficulty || (item.id.includes('-03') || item.id.includes('-05') || item.id.includes('-08') ? 'Hard' : 'Medium'),
   technologies: item.technologies,
   maxTeamCapacity: 2,
   selectedCount: 0,
@@ -2156,7 +2262,7 @@ const mappedProblems = rawBooklet.map(item => ({
 
 const fileContent = `/**
  * Hackathon 2026 - Comprehensive Problem Statement Booklet
- * Exactly 40 Problem Statements across 4 Core CSE Domains (10 per domain)
+ * Exactly 42 Problem Statements across Core CSE Domains
  * Strictly enforced 2-team capacity limit per problem statement
  */
 

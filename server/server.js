@@ -229,22 +229,11 @@ async function triggerAutoSeed() {
       });
     }
 
-    const legacyPs = await ProblemStatement.findOne({ problemId: /^PS-/ });
-    const kareCount = await ProblemStatement.countDocuments({ problemId: /^KARE-/ });
+    const problemStatementsData = require('./data/problemStatements');
+    const existingCount = await ProblemStatement.countDocuments();
 
-    if (legacyPs || kareCount < 40) {
-      console.log('🌱 Syncing Problem Statements: Seeding Hackathon 2026 Comprehensive Booklet (40 statements, KARE-AI-01 to KARE-SYS-10 with 2-Team capacity limit)...');
-      await ProblemStatement.deleteMany({});
-      await ProblemSelection.deleteMany({});
-      await Team.updateMany({}, {
-        $set: {
-          selectedProblemId: null,
-          selectedProblemCode: 'Not Selected',
-          selectionConfirmed: false,
-          selectedAt: null
-        }
-      });
-      const problemStatementsData = require('./data/problemStatements');
+    if (existingCount === 0) {
+      console.log('🌱 Syncing Problem Statements: Seeding Hackathon 2026 Comprehensive Booklet (KARE & PS statements with 2-Team capacity limit)...');
       const preparedData = problemStatementsData.map(p => ({
         ...p,
         maxTeamCapacity: 2,
@@ -254,7 +243,24 @@ async function triggerAutoSeed() {
       await ProblemStatement.insertMany(preparedData);
       console.log(`✅ Seeded ${preparedData.length} new problem statements.`);
     } else {
+      // Upsert any missing problem statements from booklet dataset (e.g. PS-041, PS-042)
+      for (const p of problemStatementsData) {
+        await ProblemStatement.updateOne(
+          { problemId: p.problemId },
+          {
+            $setOnInsert: {
+              ...p,
+              maxTeamCapacity: 2,
+              selectedCount: 0,
+              status: 'PUBLISHED'
+            }
+          },
+          { upsert: true }
+        );
+      }
       await ProblemStatement.updateMany({ maxTeamCapacity: { $ne: 2 } }, { $set: { maxTeamCapacity: 2 } });
+      const updatedTotal = await ProblemStatement.countDocuments();
+      console.log(`✅ Synchronized Problem Statements: ${updatedTotal} statements active in database.`);
     }
 
     // Always ensure Team 50 (9824005012) and Team 61 (9824005007) are properly separated and synchronized

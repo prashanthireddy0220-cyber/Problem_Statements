@@ -340,10 +340,10 @@ export default function AdminDashboard() {
   };
 
   const handleResetBooklet = async () => {
-    if (!window.confirm("Are you sure you want to reload all 40 Problem Statements from the 2026 Booklet? This will replace all existing statements in the database and reset team selections.")) return;
+    if (!window.confirm("Are you sure you want to reload all Problem Statements from the 2026 Booklet? This will replace all existing statements in the database and reset team selections.")) return;
     try {
       const res = await axios.post('/api/problems/admin/reset-booklet');
-      setActionMsg(res.data.message || 'Successfully reloaded 40 problem statements from 2026 booklet!');
+      setActionMsg(res.data.message || 'Successfully reloaded problem statements from 2026 booklet!');
       setTimeout(() => setActionMsg(''), 4000);
       fetchAllData();
     } catch (err) {
@@ -1668,7 +1668,7 @@ export default function AdminDashboard() {
             <div>
               <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC', marginBottom: '0.25rem' }}>PROBLEM STATEMENTS MANAGER</h2>
               <p style={{ color: '#94A3B8', fontSize: '0.85rem' }}>
-                Hackathon 2026 Comprehensive Booklet • 4 Core CSE Domains (10 Each) • Strictly 2-Team Capacity Limit
+                Hackathon 2026 Comprehensive Booklet • 4 Core CSE Domains • Strictly 2-Team Capacity Limit
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -1676,9 +1676,9 @@ export default function AdminDashboard() {
                 onClick={handleResetBooklet}
                 className="btn-alpha-gold"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '0.55rem 1.1rem' }}
-                title="Reload all 40 Problem Statements from the 2026 Booklet"
+                title="Reload all Problem Statements from the 2026 Booklet"
               >
-                <RefreshCw size={15} /> Reload 2026 Booklet (40 PS)
+                <RefreshCw size={15} /> Reload 2026 Booklet ({problems.length || 42} PS)
               </button>
               <button
                 onClick={handleResetAllSelections}
