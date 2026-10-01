@@ -409,18 +409,74 @@ export default function AdminDashboard() {
   const handlePhaseAction = async (actionStr, extraData = {}) => {
     if (phaseActionLoading) return;
     setPhaseActionLoading(true);
+
+    // Optimistic instant UI update for immediate admin feedback (<1ms)
+    if (actionStr === 'RELEASE_PROBLEMS' || actionStr === 'RELEASE_NOW' || actionStr === 'RELEASE_PROBLEMS_MANUAL') {
+      setLiveData(prev => ({
+        ...prev,
+        summary: {
+          ...prev.summary,
+          currentPhase: 'RELEASED_LOCKED',
+          problemStatementsReleased: true
+        }
+      }));
+    } else if (actionStr === 'UNRELEASE_PROBLEMS') {
+      setLiveData(prev => ({
+        ...prev,
+        summary: {
+          ...prev.summary,
+          currentPhase: 'NOT_RELEASED',
+          problemStatementsReleased: false
+        }
+      }));
+    } else if (actionStr === 'START_SELECTION_2MIN') {
+      const now = Date.now();
+      setLiveData(prev => ({
+        ...prev,
+        summary: {
+          ...prev.summary,
+          currentPhase: 'RELEASED_LOCKED',
+          problemStatementsReleased: true,
+          selectionScheduledStart: new Date(now + 2 * 60 * 1000).toISOString()
+        }
+      }));
+    }
+
     try {
       const res = await axios.post('/api/admin/session-control', { action: actionStr, ...extraData });
       setActionMsg(res.data?.message || `Session action '${actionStr}' applied successfully!`);
       setTimeout(() => setActionMsg(''), 4000);
-      await fetchAllData();
-      await fetchSettings();
+
+      // Direct synchronous update from authoritative server state
+      if (res.data?.state) {
+        setLiveData(prev => ({
+          ...prev,
+          summary: {
+            ...prev.summary,
+            currentPhase: res.data.state.currentPhase,
+            problemStatementsReleased: res.data.state.problemStatementsReleased,
+            selectionScheduledStart: res.data.state.selectionScheduledStart,
+            selectionEndsAt: res.data.state.selectionEndsAt,
+            roundStartedAt: res.data.state.roundStartedAt,
+            releaseScheduledAt: res.data.state.releaseScheduledAt,
+            roundStatus: res.data.state.roundStatus
+          }
+        }));
+      }
+      if (res.data?.settings) {
+        setSettings(res.data.settings);
+      }
+
+      // Re-fetch remaining non-critical admin tabs in background without blocking UI
+      fetchAllData();
+      fetchSettings();
     } catch (e) {
       if (e.response?.status === 403) {
         alert('Forbidden (403): Your current session is not authenticated as an Admin. If you logged into the Reviewer or Team Lead portal in another tab, please re-login as Admin at /admin/login to refresh your credentials.');
       } else {
         alert(e.response?.data?.error || 'Failed to update session phase.');
       }
+      fetchAllData();
     } finally {
       setPhaseActionLoading(false);
     }

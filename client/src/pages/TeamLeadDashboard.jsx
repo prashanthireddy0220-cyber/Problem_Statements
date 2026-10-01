@@ -93,9 +93,23 @@ export default function TeamLeadDashboard() {
   const qrTokenToUse = myTeamData?.team?.teamQrToken || user?.team?.teamQrToken || (authItem ? `TQ-${authItem.teamId}-${authItem.regNum.slice(-4)}` : `TQ-${displayTeamId}`);
   const passTokenToUse = myTeamData?.team?.eventPassQrToken || user?.team?.eventPassQrToken || (authItem ? `EP-${authItem.teamId}-${authItem.regNum.slice(-4)}` : `EP-${displayTeamId}`);
 
-  // Problem Statements State
-  const [problems, setProblems] = useState([]);
-  const [timerState, setTimerState] = useState(null);
+  // Problem Statements State (Cached in localStorage for instant zero-flash refresh)
+  const [problems, setProblems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('alpha_cached_problems');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [timerState, setTimerState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('alpha_timer_state');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [selectedDomain, setSelectedDomain] = useState('ALL');
   const [selectedDifficulty, setSelectedDifficulty] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
@@ -259,7 +273,7 @@ export default function TeamLeadDashboard() {
     }
   }, [passTokenToUse]);
 
-  // 2. Poll Problem Statements & Timer State
+  // 2. Poll Problem Statements & Timer State with localStorage persistence & instant focus sync
   useEffect(() => {
     let isMounted = true;
     const loadProblems = async () => {
@@ -273,17 +287,40 @@ export default function TeamLeadDashboard() {
         });
 
         if (isMounted && res.data) {
-          setProblems(res.data.problems || []);
-          setTimerState(res.data.timerState);
+          if (res.data.problems) {
+            setProblems(res.data.problems);
+            if (selectedDomain === 'ALL' && selectedDifficulty === 'ALL' && !searchTerm) {
+              try {
+                localStorage.setItem('alpha_cached_problems', JSON.stringify(res.data.problems));
+              } catch (e) {}
+            }
+          }
+          if (res.data.timerState) {
+            setTimerState(res.data.timerState);
+            try {
+              localStorage.setItem('alpha_timer_state', JSON.stringify(res.data.timerState));
+            } catch (e) {}
+          }
         }
       } catch (e) {}
     };
 
     loadProblems();
-    const interval = setInterval(loadProblems, 3000);
+    const interval = setInterval(loadProblems, 2000);
+
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadProblems();
+      }
+    };
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
+      window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
     };
   }, [selectedDomain, selectedDifficulty, searchTerm]);
 
@@ -435,7 +472,8 @@ export default function TeamLeadDashboard() {
 
   const isReleasedLocked = timerState?.problemStatementsReleased && !isSelectionOpen && (timerState?.currentPhase === 'RELEASED_LOCKED' || timerState?.currentPhase === 'READING' || timerState?.currentPhase === 'NOT_STARTED');
   const isSelectionClosed = (timerState?.currentPhase === 'SELECTION_CLOSED' || timerState?.currentPhase === 'CLOSED') && !isSelectionOpen;
-  const isUnreleased = !timerState?.problemStatementsReleased && !isRoundStartedUnreleased;
+  const isUnreleased = timerState !== null ? (!timerState?.problemStatementsReleased && !isRoundStartedUnreleased) : false;
+  const isInitialLoading = timerState === null && problems.length === 0;
 
   const domains = [
     'ALL',
@@ -912,7 +950,17 @@ export default function TeamLeadDashboard() {
                 </div>
               </div>
 
-              {isUnreleased || isRoundStartedUnreleased ? (
+              {isInitialLoading ? (
+                <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', margin: '2rem 0' }}>
+                  <div style={{ width: '36px', height: '36px', border: '3px solid rgba(0, 242, 254, 0.2)', borderTopColor: '#00F2FE', borderRadius: '50%', margin: '0 auto 1rem', animation: 'spin 1s linear infinite' }} />
+                  <h3 style={{ color: '#F8FAFC', fontSize: '1.2rem', marginBottom: '0.4rem' }}>
+                    Loading Problem Statements...
+                  </h3>
+                  <p style={{ color: '#94A3B8', fontSize: '0.88rem' }}>
+                    Connecting to live hackathon session...
+                  </p>
+                </div>
+              ) : isUnreleased || isRoundStartedUnreleased ? (
                 <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', margin: '2rem 0' }}>
                   <Lock size={48} color={isRoundStartedUnreleased ? '#00F2FE' : '#FF4B4B'} style={{ margin: '0 auto 1rem' }} />
                   <h3 style={{ color: '#F8FAFC', fontSize: '1.3rem', marginBottom: '0.5rem' }}>
@@ -973,7 +1021,12 @@ export default function TeamLeadDashboard() {
 
                   {/* PROBLEM STATEMENTS GRID */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
-                    {problems.map((prob) => {
+                    {problems.length === 0 ? (
+                      <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', gridColumn: '1 / -1' }}>
+                        <p style={{ color: '#94A3B8', fontSize: '0.95rem' }}>No problem statements found matching the selected filter.</p>
+                      </div>
+                    ) : (
+                      problems.map((prob) => {
                       const maxCap = prob.maxTeamCapacity || 2;
                       const count = prob.selectedCount || 0;
                       const isFull = count >= maxCap;
@@ -1052,7 +1105,7 @@ export default function TeamLeadDashboard() {
                           </div>
                         </div>
                       );
-                    })}
+                    }))}
                   </div>
                 </>
               )}

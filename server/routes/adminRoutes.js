@@ -107,9 +107,10 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
       settings.problemStatementsReleased = true;
       settings.selectionManualState = 'NONE';
       settings.selectionScheduledStart = null;
-      if (settings.releaseScheduledAt && new Date(settings.releaseScheduledAt) > now) {
-        settings.releaseScheduledAt = now;
-      }
+      settings.selectionEndsAt = null;
+      settings.readingEndsAt = null;
+      settings.releaseScheduledAt = null;
+      settings.roundStatus = 'IDLE';
       settings.currentPhase = 'RELEASED_LOCKED';
       settings.problemSelectionEnabled = true;
     } else if (action === 'START_SELECTION_2MIN' || action === 'MANUAL_SELECTION_RELEASE_2MIN') {

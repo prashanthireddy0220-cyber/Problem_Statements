@@ -104,7 +104,7 @@ async function getOrUpdateSystemState(forceRefresh = false) {
     isReleased = true;
     if (settings.selectionScheduledStart && now < new Date(settings.selectionScheduledStart)) {
       computedPhase = 'RELEASED_LOCKED';
-    } else if (settings.selectionEndsAt && now >= new Date(settings.selectionEndsAt)) {
+    } else if (settings.selectionScheduledStart && settings.selectionEndsAt && now >= new Date(settings.selectionEndsAt)) {
       computedPhase = 'SELECTION_CLOSED';
     } else if (settings.selectionScheduledStart && now >= new Date(settings.selectionScheduledStart)) {
       computedPhase = 'SELECTION_OPEN';
