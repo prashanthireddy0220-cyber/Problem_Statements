@@ -861,14 +861,67 @@ router.put('/evaluations/:id', authenticateToken, requireRole('ADMIN'), async (r
 });
 
 // 8d. ADMIN: CLEAR/RESET EVALUATIONS (FOR ADMIN MAINTENANCE AND TESTING)
-router.delete('/evaluations/all', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+const resetAllEvaluationsHandler = async (req, res) => {
   try {
-    await Evaluation.deleteMany({});
-    await RoundReviewerNormalization.deleteMany({});
-    return res.json({ message: 'All evaluations and normalization data reset successfully.' });
+    const deletedEvaluations = await Evaluation.deleteMany({});
+    const deletedNorm = await RoundReviewerNormalization.deleteMany({});
+
+    await AuditLog.create({
+      actor: req.user?.username || 'ADMIN',
+      role: 'ADMIN',
+      action: 'ADMIN_CLEAR_ALL_EVALUATIONS',
+      target: 'ALL_EVALUATIONS',
+      metadata: {
+        deletedEvaluationsCount: deletedEvaluations.deletedCount,
+        deletedNormCount: deletedNorm.deletedCount,
+        timestamp: new Date()
+      }
+    }).catch(() => null);
+
+    return res.json({
+      message: 'All reviewer evaluations and normalization data reset successfully.',
+      deletedEvaluationsCount: deletedEvaluations.deletedCount,
+      deletedNormCount: deletedNorm.deletedCount
+    });
   } catch (err) {
     console.error('Admin reset evaluations error:', err);
     return res.status(500).json({ error: 'Failed to reset evaluations.' });
+  }
+};
+
+router.delete('/evaluations/all', authenticateToken, requireRole('ADMIN'), resetAllEvaluationsHandler);
+router.delete('/evaluations', authenticateToken, requireRole('ADMIN'), resetAllEvaluationsHandler);
+router.post('/evaluations/reset-all', authenticateToken, requireRole('ADMIN'), resetAllEvaluationsHandler);
+
+// Admin: Delete single evaluation by ID and recalculate normalization
+router.delete('/evaluations/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const ev = await Evaluation.findById(req.params.id);
+    if (!ev) {
+      return res.status(404).json({ error: 'Evaluation not found.' });
+    }
+
+    const roundNumber = ev.roundNumber;
+    const reviewerId = ev.reviewerId;
+    const teamCode = ev.teamCode;
+
+    await Evaluation.findByIdAndDelete(req.params.id);
+
+    // Recalculate normalization for this round & reviewer
+    await recalculateRoundReviewerNormalization(roundNumber, reviewerId);
+
+    await AuditLog.create({
+      actor: req.user?.username || 'ADMIN',
+      role: 'ADMIN',
+      action: 'ADMIN_DELETE_EVALUATION',
+      target: `Team ${teamCode} (Round ${roundNumber})`,
+      metadata: { deletedEvaluationId: req.params.id }
+    }).catch(() => null);
+
+    return res.json({ message: `Evaluation for Team ${teamCode} (Round ${roundNumber}) deleted successfully.` });
+  } catch (err) {
+    console.error('Admin delete evaluation error:', err);
+    return res.status(500).json({ error: 'Failed to delete evaluation.' });
   }
 });
 

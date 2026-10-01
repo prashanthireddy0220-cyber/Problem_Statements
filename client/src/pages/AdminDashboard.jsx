@@ -81,6 +81,7 @@ export default function AdminDashboard() {
   const [adminReviewerSelect, setAdminReviewerSelect] = useState('');
   const [adminCommentsInput, setAdminCommentsInput] = useState('');
   const [adminSubmittingEv, setAdminSubmittingEv] = useState(false);
+  const [isResettingEvaluations, setIsResettingEvaluations] = useState(false);
   const [editingProblem, setEditingProblem] = useState(null);
 
   const openAdminEditEv = (ev, teamObj, roundNum, defaultReviewerId) => {
@@ -157,6 +158,73 @@ export default function AdminDashboard() {
       await fetchAllData();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update round status.');
+    }
+  };
+
+  const handleResetAllEvaluations = async () => {
+    if (!window.confirm('⚠️ ARE YOU SURE you want to delete ALL reviewer evaluations?\n\nThis will permanently delete all raw scores, comments, reviewer entries, and min-max normalization data across ALL rounds (Round 1, Round 2, Round 3). This action cannot be undone.')) {
+      return;
+    }
+
+    setIsResettingEvaluations(true);
+    try {
+      let res;
+      try {
+        res = await axios.delete('/api/admin/evaluations/all');
+      } catch (err1) {
+        try {
+          res = await axios.post('/api/admin/evaluations/reset-all');
+        } catch (err2) {
+          res = await axios.delete('/api/admin/evaluations');
+        }
+      }
+
+      // Optimistically wipe all evaluation data immediately in UI
+      setEvalData(prev => ({
+        ...prev,
+        evaluations: [],
+        normalizationStats: [],
+        leaderboard: (prev.leaderboard || []).map(t => ({
+          ...t,
+          round1Score: null,
+          round2Score: null,
+          round3Score: null,
+          combinedTotal: 0,
+          rounds: {}
+        })),
+        summary: {
+          ...(prev.summary || {}),
+          totalEvaluations: 0,
+          round1Completed: 0,
+          round2Completed: 0,
+          round3Completed: 0
+        }
+      }));
+
+      setActionMsg(res?.data?.message || 'All reviewer evaluations have been deleted successfully.');
+      setTimeout(() => setActionMsg(''), 5000);
+      await fetchAllData();
+    } catch (err) {
+      console.error('Failed to reset evaluations:', err);
+      alert(err.response?.data?.error || 'Failed to delete reviewer evaluations.');
+    } finally {
+      setIsResettingEvaluations(false);
+    }
+  };
+
+  const handleDeleteSingleEvaluation = async (evaluationId, teamCode, roundNumber) => {
+    if (!window.confirm(`Delete evaluation for Team ${teamCode} (Round ${roundNumber})? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await axios.delete(`/api/admin/evaluations/${evaluationId}`);
+      setActionMsg(res?.data?.message || `Evaluation for Team ${teamCode} deleted.`);
+      setTimeout(() => setActionMsg(''), 4000);
+      await fetchAllData();
+    } catch (err) {
+      console.error('Failed to delete evaluation:', err);
+      alert(err.response?.data?.error || 'Failed to delete evaluation.');
     }
   };
 
@@ -1196,6 +1264,29 @@ export default function AdminDashboard() {
                   }}
                 />
               </div>
+
+              {/* DELETE ALL REVIEWER EVALUATIONS BUTTON */}
+              <button
+                onClick={handleResetAllEvaluations}
+                disabled={isResettingEvaluations}
+                className="btn-alpha-outline"
+                title="Permanently remove all reviewer evaluations and reset leaderboard scores"
+                style={{
+                  fontSize: '0.82rem',
+                  padding: '0.45rem 0.95rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: 'rgba(239, 68, 68, 0.6)',
+                  color: '#EF4444',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  cursor: isResettingEvaluations ? 'not-allowed' : 'pointer',
+                  opacity: isResettingEvaluations ? 0.6 : 1
+                }}
+              >
+                <Trash2 size={16} />
+                {isResettingEvaluations ? 'Deleting Evaluations...' : 'Delete All Evaluations'}
+              </button>
             </div>
           </div>
 
@@ -1527,14 +1618,24 @@ export default function AdminDashboard() {
                                   <td style={{ color: '#94A3B8', fontSize: '0.8rem' }}>
                                     {new Date(ev.submittedAt || ev.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </td>
-                                  <td style={{ textAlign: 'center' }}>
-                                    <button
-                                      onClick={() => openAdminEditEv(ev, { teamId: ev.teamCode, teamName: ev.teamName, _id: ev.teamId }, ev.roundNumber, targetRevId)}
-                                      className="btn-alpha-cyan"
-                                      style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                    >
-                                      <Edit size={13} /> Correct Mark
-                                    </button>
+                                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                    <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                                      <button
+                                        onClick={() => openAdminEditEv(ev, { teamId: ev.teamCode, teamName: ev.teamName, _id: ev.teamId }, ev.roundNumber, targetRevId)}
+                                        className="btn-alpha-cyan"
+                                        style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Edit size={13} /> Correct Mark
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteSingleEvaluation(ev._id, ev.teamCode, ev.roundNumber)}
+                                        className="btn-alpha-outline"
+                                        title="Delete this evaluation"
+                                        style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px', borderColor: 'rgba(239, 68, 68, 0.5)', color: '#EF4444', background: 'rgba(239, 68, 68, 0.1)', cursor: 'pointer' }}
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))
@@ -1668,7 +1769,31 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Submit Buttons */}
-                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                      {adminEditEvModal.evDoc?._id && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await handleDeleteSingleEvaluation(adminEditEvModal.evDoc._id, adminEditEvModal.teamCode, adminEditEvModal.roundNumber);
+                            setAdminEditEvModal(null);
+                          }}
+                          style={{
+                            marginRight: 'auto',
+                            padding: '0.65rem 0.95rem',
+                            fontSize: '0.82rem',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(239, 68, 68, 0.5)',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            color: '#EF4444',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <Trash2 size={14} /> Delete Evaluation
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setAdminEditEvModal(null)}

@@ -13,7 +13,8 @@
     "render-build": "npm run install:all && npm run build:client",
     "postinstall": "npm run install:all",
     "seed": "node -e \"require('axios').post('http://localhost:5000/api/admin/seed')\"",
-    "reset-selections": "node scripts/remove_all_selections.js"
+    "reset-selections": "node scripts/remove_all_selections.js",
+    "reset-evaluations": "node scripts/remove_all_evaluations.js"
   },
   "keywords": ["hackathon", "problem-statement", "attendance", "single-device-login", "qr-scanner", "alpha"],
   "author": "Google DeepMind Antigravity Pair Programmer",
