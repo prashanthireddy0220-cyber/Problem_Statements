@@ -4,7 +4,15 @@ const config = require('../config/env');
 const { ProblemStatement, Team, TeamLead, ProblemSelection, SystemSettings, AuditLog } = require('../models/Schema');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
-const { getOrUpdateSystemState } = require('../services/systemStateService');
+const { getOrUpdateSystemState, invalidateSystemStateCache } = require('../services/systemStateService');
+
+let cachedProblems = null;
+let lastProblemsFetchTime = 0;
+
+function invalidateProblemsCache() {
+  cachedProblems = null;
+  lastProblemsFetchTime = 0;
+}
 
 // 1. GET SYSTEM TIMER STATE (Public / Authenticated)
 router.get('/timer-state', async (req, res) => {
@@ -42,23 +50,34 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 
     const { domain, search, difficulty } = req.query;
-    let query = { status: 'PUBLISHED' };
+    const isDefaultQuery = (!domain || domain === 'ALL') && (!difficulty || difficulty === 'ALL') && !search;
 
-    if (domain && domain !== 'ALL') {
-      query.domain = domain;
-    }
-    if (difficulty && difficulty !== 'ALL') {
-      query.difficulty = difficulty;
-    }
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { problemId: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
+    let problems;
+    if (isDefaultQuery && cachedProblems && (Date.now() - lastProblemsFetchTime < 1500)) {
+      problems = cachedProblems;
+    } else {
+      let query = { status: 'PUBLISHED' };
 
-    const problems = await ProblemStatement.find(query).sort({ problemId: 1 });
+      if (domain && domain !== 'ALL') {
+        query.domain = domain;
+      }
+      if (difficulty && difficulty !== 'ALL') {
+        query.difficulty = difficulty;
+      }
+      if (search) {
+        query.$or = [
+          { title: { $regex: search, $options: 'i' } },
+          { problemId: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
+        ];
+      }
+
+      problems = await ProblemStatement.find(query).sort({ problemId: 1 }).lean();
+      if (isDefaultQuery) {
+        cachedProblems = problems;
+        lastProblemsFetchTime = Date.now();
+      }
+    }
 
     return res.json({
       problems,
@@ -301,6 +320,9 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
       console.warn('AuditLog creation warning (non-fatal):', auditErr.message);
     }
 
+    invalidateProblemsCache();
+    invalidateSystemStateCache();
+
     return res.json({
       message: 'Problem Statement selected successfully.',
       selection: {
@@ -487,6 +509,9 @@ router.post('/admin/reset-all-selections', authenticateToken, requireRole('ADMIN
         selectedAt: null
       }
     });
+
+    invalidateProblemsCache();
+    invalidateSystemStateCache();
 
     await AuditLog.create({
       actor: req.user.username,

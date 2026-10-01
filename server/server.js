@@ -238,10 +238,13 @@ async function triggerAutoSeed() {
       await SystemSettings.create({
         readingDurationMinutes: 30,
         selectionDurationMinutes: 5,
-        currentPhase: 'NOT_STARTED',
+        currentPhase: 'NOT_RELEASED',
+        problemStatementsReleased: false,
+        releaseManualState: 'UNRELEASED',
+        selectionManualState: 'CLOSED',
         teamLeadAccessEnabled: true,
         volunteerAccessEnabled: true,
-        problemSelectionEnabled: true,
+        problemSelectionEnabled: false,
         attendanceEnabled: true
       });
     }

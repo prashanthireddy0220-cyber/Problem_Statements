@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, BookOpen, CheckCircle2, Clock, Search, Filter, Lock, 
@@ -231,7 +231,7 @@ export default function TeamLeadDashboard() {
 
   useEffect(() => {
     fetchMyTeam();
-    const pollInterval = setInterval(fetchMyTeam, 3500);
+    const pollInterval = setInterval(fetchMyTeam, 6000);
     return () => clearInterval(pollInterval);
   }, [user]);
 
@@ -280,7 +280,7 @@ export default function TeamLeadDashboard() {
     };
 
     loadProblems();
-    const interval = setInterval(loadProblems, 1500);
+    const interval = setInterval(loadProblems, 3000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -317,7 +317,7 @@ export default function TeamLeadDashboard() {
     };
 
     fetchAttendanceSessions();
-    const interval = setInterval(fetchAttendanceSessions, 3000);
+    const interval = setInterval(fetchAttendanceSessions, 8000);
     return () => clearInterval(interval);
   }, []);
 
@@ -333,14 +333,19 @@ export default function TeamLeadDashboard() {
     }
   }, [selectedAttSession, user, displayTeamId, displayLeadRegNum]);
 
-  // Server-synchronized 1-second countdown ticker
+  // Clock Skew Tracker: accurately records delta between server timestamp and client local clock
+  const clockSkewRef = useRef(0);
+  useEffect(() => {
+    if (timerState?.serverTime) {
+      const serverMs = new Date(timerState.serverTime).getTime();
+      clockSkewRef.current = serverMs - Date.now();
+    }
+  }, [timerState?.serverTime]);
+
+  // Server-synchronized smooth sub-second countdown ticker (250ms interval)
   useEffect(() => {
     const updateCountdown = () => {
-      if (!timerState || !timerState.serverTime) return;
-
-      const serverNow = new Date(timerState.serverTime).getTime();
-      const clientNow = Date.now();
-      const serverOffset = clientNow - serverNow;
+      if (!timerState) return;
 
       let targetEnd = null;
 
@@ -348,11 +353,14 @@ export default function TeamLeadDashboard() {
         targetEnd = timerState.selectionScheduledStart || timerState.readingEndsAt;
       } else if (timerState.currentPhase === 'SELECTION_OPEN' || timerState.currentPhase === 'SELECTION') {
         targetEnd = timerState.selectionEndsAt;
+      } else if (timerState.currentPhase === 'ROUND_STARTED_UNRELEASED') {
+        targetEnd = timerState.releaseScheduledAt;
       }
 
       if (targetEnd) {
-        const adjustedClientNow = Date.now() - serverOffset;
-        const remaining = Math.max(0, Math.floor((new Date(targetEnd).getTime() - adjustedClientNow) / 1000));
+        const estimatedServerNow = Date.now() + clockSkewRef.current;
+        const targetMs = new Date(targetEnd).getTime();
+        const remaining = Math.max(0, Math.ceil((targetMs - estimatedServerNow) / 1000));
         setSecondsRemaining(remaining);
       } else {
         setSecondsRemaining(0);
@@ -360,9 +368,9 @@ export default function TeamLeadDashboard() {
     };
 
     updateCountdown();
-    const ticker = setInterval(updateCountdown, 1000);
+    const ticker = setInterval(updateCountdown, 250);
     return () => clearInterval(ticker);
-  }, [timerState]);
+  }, [timerState?.currentPhase, timerState?.selectionScheduledStart, timerState?.selectionEndsAt, timerState?.releaseScheduledAt, timerState?.readingEndsAt]);
 
   // Format seconds to HH:MM:SS or MM:SS
   const formatTime = (totalSeconds) => {
@@ -421,9 +429,12 @@ export default function TeamLeadDashboard() {
   };
 
   const isRoundStartedUnreleased = timerState?.currentPhase === 'ROUND_STARTED_UNRELEASED';
-  const isReleasedLocked = timerState?.problemStatementsReleased && (timerState?.currentPhase === 'RELEASED_LOCKED' || timerState?.currentPhase === 'READING' || timerState?.currentPhase === 'NOT_STARTED');
-  const isSelectionOpen = timerState?.currentPhase === 'SELECTION_OPEN' || timerState?.currentPhase === 'SELECTION';
-  const isSelectionClosed = timerState?.currentPhase === 'SELECTION_CLOSED' || timerState?.currentPhase === 'CLOSED';
+  const isCountdownZero = Boolean(timerState?.selectionScheduledStart && secondsRemaining === 0);
+  const isSelectionOpen = (timerState?.currentPhase === 'SELECTION_OPEN' || timerState?.currentPhase === 'SELECTION') ||
+    (timerState?.problemStatementsReleased && timerState?.currentPhase === 'RELEASED_LOCKED' && isCountdownZero);
+
+  const isReleasedLocked = timerState?.problemStatementsReleased && !isSelectionOpen && (timerState?.currentPhase === 'RELEASED_LOCKED' || timerState?.currentPhase === 'READING' || timerState?.currentPhase === 'NOT_STARTED');
+  const isSelectionClosed = (timerState?.currentPhase === 'SELECTION_CLOSED' || timerState?.currentPhase === 'CLOSED') && !isSelectionOpen;
   const isUnreleased = !timerState?.problemStatementsReleased && !isRoundStartedUnreleased;
 
   const domains = [
@@ -848,7 +859,11 @@ export default function TeamLeadDashboard() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.4rem' }}>
                       {isUnreleased && <span className="phase-pill closed" style={{ background: 'rgba(255,75,75,0.15)', color: '#FF4B4B' }}>🔴 NOT RELEASED</span>}
                       {isRoundStartedUnreleased && <span className="phase-pill reading" style={{ background: 'rgba(0,242,254,0.15)', color: '#00F2FE' }}>⏳ ROUND STARTED — RELEASING SOON</span>}
-                      {isReleasedLocked && <span className="phase-pill reading" style={{ background: 'rgba(255,215,0,0.15)', color: '#FFD700' }}>🟡 PROBLEM STATEMENTS RELEASED (READ-ONLY)</span>}
+                      {isReleasedLocked && (
+                        <span className="phase-pill reading" style={{ background: timerState?.selectionScheduledStart ? 'rgba(0,242,254,0.15)' : 'rgba(255,215,0,0.15)', color: timerState?.selectionScheduledStart ? '#00F2FE' : '#FFD700' }}>
+                          {timerState?.selectionScheduledStart ? '⏳ 2-MIN SELECTION COUNTDOWN' : '🟡 PROBLEM STATEMENTS RELEASED (READ-ONLY)'}
+                        </span>
+                      )}
                       {isSelectionOpen && <span className="phase-pill selection" style={{ background: 'rgba(0,230,118,0.2)', color: '#00E676' }}>🟢 SELECTION IS OPEN</span>}
                       {isSelectionClosed && <span className="phase-pill closed">🔴 SELECTION CLOSED</span>}
                     </div>
@@ -856,7 +871,7 @@ export default function TeamLeadDashboard() {
                     <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.4rem', color: '#F8FAFC', letterSpacing: '0.5px' }}>
                       {isUnreleased && 'Problem Statements have not been released yet.'}
                       {isRoundStartedUnreleased && 'Problem Statements will be released soon'}
-                      {isReleasedLocked && 'Problem Statements Released — View / Read Only Mode'}
+                      {isReleasedLocked && (timerState?.selectionScheduledStart ? 'Problem Selection Will Open Shortly' : 'Problem Statements Released — View / Read Only Mode')}
                       {isSelectionOpen && 'Selection is OPEN'}
                       {isSelectionClosed && 'Problem Selection Period Ended'}
                     </h2>
@@ -864,7 +879,9 @@ export default function TeamLeadDashboard() {
                     <p style={{ color: '#CBD5E1', fontSize: '0.92rem', marginTop: '0.35rem', lineHeight: '1.5' }}>
                       {isUnreleased && 'The administrator has not released the problem statements yet. Please stand by.'}
                       {isRoundStartedUnreleased && 'The round has been started by the administrator. Problem statements will be automatically published when the countdown reaches 00:00.'}
-                      {isReleasedLocked && 'Problem Statements are released for viewing. Problem selection is currently disabled and will be enabled automatically when the countdown reaches 00:00.'}
+                      {isReleasedLocked && (timerState?.selectionScheduledStart
+                        ? 'Problem statements are now available for reading! Selection buttons will automatically unlock at 00:00 simultaneously for all teams.'
+                        : 'Problem Statements are released for viewing. Problem selection will be enabled by the administrator.')}
                       {isSelectionOpen && 'Selection is OPEN! Note: Each Problem Statement can be selected by a MAXIMUM OF 2 TEAMS (First-Come, First-Served basis).'}
                       {isSelectionClosed && 'The problem selection period is now closed. Unselected teams must contact the event administrator.'}
                     </p>
@@ -880,7 +897,7 @@ export default function TeamLeadDashboard() {
                       boxShadow: `0 0 25px ${isSelectionOpen ? 'rgba(0, 230, 118, 0.35)' : (isReleasedLocked ? 'rgba(255, 215, 0, 0.35)' : 'rgba(0, 242, 254, 0.35)')}`
                     }}>
                       <div style={{ fontSize: '0.75rem', color: isSelectionOpen ? '#00E676' : (isReleasedLocked ? '#FFD700' : '#00F2FE'), textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
-                        {isSelectionOpen ? 'SELECTION TIME REMAINING' : (isReleasedLocked ? 'SELECTION WILL BE ENABLED IN' : 'PROBLEM STATEMENTS WILL BE RELEASED IN')}
+                        {isSelectionOpen ? 'SELECTION TIME REMAINING' : (isReleasedLocked ? (timerState?.selectionScheduledStart ? 'SELECTION OPENS IN' : 'READING TIME') : 'PROBLEM STATEMENTS WILL BE RELEASED IN')}
                       </div>
                       <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '2.5rem', fontWeight: '900', color: '#F8FAFC', letterSpacing: '3px', marginTop: '0.2rem' }}>
                         {formatTime(
@@ -1015,9 +1032,22 @@ export default function TeamLeadDashboard() {
                               onClick={() => setConfirmingProblem(prob)}
                               disabled={!isSelectionOpen || isFull}
                               className="btn-alpha-gold"
-                              style={{ flex: 1, padding: '0.6rem', fontSize: '0.82rem', justifyContent: 'center', opacity: (!isSelectionOpen || isFull) ? 0.45 : 1 }}
+                              style={{
+                                flex: 1,
+                                padding: '0.65rem',
+                                fontSize: '0.85rem',
+                                justifyContent: 'center',
+                                fontWeight: (isSelectionOpen && !isFull) ? '800' : '600',
+                                background: (isSelectionOpen && !isFull) ? 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)' : undefined,
+                                color: (isSelectionOpen && !isFull) ? '#0F172A' : undefined,
+                                opacity: (!isSelectionOpen || isFull) ? 0.45 : 1,
+                                cursor: (!isSelectionOpen || isFull) ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s ease'
+                              }}
                             >
-                              {isReleasedLocked ? 'RELEASE NOT STARTED' : (isFull ? `FULL (${count}/${maxCap})` : (isSelectionClosed ? 'SELECTION CLOSED' : (count === 1 ? 'ALMOST FULL • Select' : 'Select Problem')))}
+                              {isReleasedLocked
+                                ? (secondsRemaining > 0 ? `⏳ Opens in ${formatTime(secondsRemaining)}` : 'Preparing Selection...')
+                                : (isFull ? `FULL (${count}/${maxCap})` : (isSelectionClosed ? 'SELECTION CLOSED' : (count === 1 ? 'ALMOST FULL • Select' : 'Select Problem')))}
                             </button>
                           </div>
                         </div>
@@ -1388,10 +1418,23 @@ export default function TeamLeadDashboard() {
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
-              <button onClick={() => setActiveModalProblem(null)} className="btn-alpha-cyan">
-                Close Problem Details
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+              <button onClick={() => setActiveModalProblem(null)} className="btn-alpha-outline">
+                Close
               </button>
+              {isSelectionOpen && !hasConfirmedSelection && (activeModalProblem.selectedCount || 0) < (activeModalProblem.maxTeamCapacity || 2) && (
+                <button
+                  onClick={() => {
+                    const prob = activeModalProblem;
+                    setActiveModalProblem(null);
+                    setConfirmingProblem(prob);
+                  }}
+                  className="btn-alpha-gold"
+                  style={{ fontWeight: '800' }}
+                >
+                  Select This Problem Statement 🚀
+                </button>
+              )}
             </div>
           </div>
         </div>

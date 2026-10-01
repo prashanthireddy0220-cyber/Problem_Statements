@@ -9,7 +9,7 @@ const {
 } = require('../models/Schema');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { validateRawScore, recalculateRoundReviewerNormalization, getLeaderboardData } = require('../services/normalizationService');
-const { getOrUpdateSystemState } = require('../services/systemStateService');
+const { getOrUpdateSystemState, invalidateSystemStateCache } = require('../services/systemStateService');
 
 // 1. UPDATE TIMER SETTINGS & MODULE TOGGLES
 router.post('/settings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
@@ -44,6 +44,7 @@ router.post('/settings', authenticateToken, requireRole('ADMIN'), async (req, re
     }
 
     await settings.save();
+    invalidateSystemStateCache();
 
     await AuditLog.create({
       actor: req.user.username,
@@ -101,7 +102,7 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
         settings.selectionManualState = 'NONE';
         settings.currentPhase = 'ROUND_STARTED_UNRELEASED';
       }
-    } else if (action === 'RELEASE_PROBLEMS' || action === 'RELEASE_NOW') {
+    } else if (action === 'RELEASE_PROBLEMS' || action === 'RELEASE_NOW' || action === 'RELEASE_PROBLEMS_MANUAL') {
       settings.releaseManualState = 'RELEASED';
       settings.problemStatementsReleased = true;
       settings.selectionManualState = 'NONE';
@@ -110,6 +111,23 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
         settings.releaseScheduledAt = now;
       }
       settings.currentPhase = 'RELEASED_LOCKED';
+      settings.problemSelectionEnabled = true;
+    } else if (action === 'START_SELECTION_2MIN' || action === 'MANUAL_SELECTION_RELEASE_2MIN') {
+      const countdownMinutes = Number(req.body.countdownMinutes || 2);
+      const selDur = Number(selectionDurationMinutes || settings.selectionDurationMinutes || 15);
+
+      settings.releaseManualState = 'RELEASED';
+      settings.problemStatementsReleased = true;
+      settings.problemSelectionEnabled = true;
+      settings.selectionManualState = 'NONE'; // Clear any manual CLOSED override
+
+      const startTime = new Date(now.getTime() + countdownMinutes * 60 * 1000);
+      const endTime = new Date(startTime.getTime() + selDur * 60 * 1000);
+
+      settings.selectionScheduledStart = startTime;
+      settings.selectionEndsAt = endTime;
+      settings.currentPhase = 'RELEASED_LOCKED';
+      settings.roundStatus = 'ACTIVE';
     } else if (action === 'UNRELEASE_PROBLEMS') {
       settings.releaseManualState = 'UNRELEASED';
       settings.problemStatementsReleased = false;
@@ -165,9 +183,10 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
     }
 
     await settings.save();
+    invalidateSystemStateCache();
 
     // Centrally re-evaluate system state cleanly
-    const freshState = await getOrUpdateSystemState();
+    const freshState = await getOrUpdateSystemState(true);
 
     await AuditLog.create({
       actor: req.user.username,
@@ -343,6 +362,8 @@ router.post('/reset-all-selections', authenticateToken, requireRole('ADMIN'), as
         selectedAt: null
       }
     });
+
+    invalidateSystemStateCache();
 
     await AuditLog.create({
       actor: req.user.username,

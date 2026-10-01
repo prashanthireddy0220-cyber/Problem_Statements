@@ -926,11 +926,11 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              {/* CARD 2: MANUAL RELEASE */}
+              {/* CARD 2: MANUAL PROBLEM RELEASE (READ-ONLY) */}
               <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #FFD700' }}>
-                <div style={{ fontSize: '0.82rem', color: '#FFD700', marginBottom: '0.5rem', fontWeight: '800' }}>2. 🔓 MANUAL RELEASE</div>
+                <div style={{ fontSize: '0.82rem', color: '#FFD700', marginBottom: '0.5rem', fontWeight: '800' }}>2. 📖 MANUAL PROBLEM RELEASE</div>
                 <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-                  Override timer and immediately release or hide problem statements to all Team Leads.
+                  Release problem statements for reading. Teams can browse & study problems while selection remains locked.
                 </p>
                 {liveData.summary?.problemStatementsReleased ? (
                   <button
@@ -952,32 +952,60 @@ export default function AdminDashboard() {
                     className="btn-alpha-gold"
                     style={{ width: '100%', justifyContent: 'center', opacity: phaseActionLoading ? 0.6 : 1 }}
                   >
-                    <Unlock size={16} /> {phaseActionLoading ? 'Updating...' : 'Release Problems Now'}
+                    <Unlock size={16} /> {phaseActionLoading ? 'Updating...' : 'Release Problems For Reading Now'}
                   </button>
                 )}
               </div>
 
-              {/* CARD 3: ENABLE SELECTION */}
+              {/* CARD 3: MANUAL SELECTION RELEASE (2-MIN TIMER & SIMULTANEOUS UNLOCK) */}
               <div className="glass-card" style={{ padding: '1.15rem', borderLeft: '4px solid #00E676' }}>
-                <div style={{ fontSize: '0.82rem', color: '#00E676', marginBottom: '0.5rem', fontWeight: '800' }}>3. ⚡ ENABLE SELECTION</div>
+                <div style={{ fontSize: '0.82rem', color: '#00E676', marginBottom: '0.5rem', fontWeight: '800' }}>3. ⏱️ MANUAL SELECTION RELEASE</div>
                 <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-                  Bypass selection delay and immediately enable "Select Problem Statement" button for teams.
+                  Start 2-minute countdown timer. Teams see 2:00 timer, and selection button unlocks simultaneously for all teams at 00:00.
                 </p>
-                <button
-                  disabled={phaseActionLoading}
-                  onClick={() => handlePhaseAction('OPEN_NOW')}
-                  className="btn-alpha-cyan"
-                  style={{
-                    width: '100%',
-                    justifyContent: 'center',
-                    background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)',
-                    color: '#0F172A',
-                    fontWeight: '900',
-                    opacity: phaseActionLoading ? 0.6 : 1
-                  }}
-                >
-                  <Zap size={16} /> {(liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 'Selection Active (Click to Extend)' : (phaseActionLoading ? 'Enabling...' : 'Enable Selection Now')}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <button
+                    disabled={phaseActionLoading}
+                    onClick={() => {
+                      if (window.confirm("Start 2-minute selection countdown? All teams will see a 2:00 timer and selection buttons will unlock simultaneously at 00:00.")) {
+                        handlePhaseAction('START_SELECTION_2MIN', { countdownMinutes: 2 });
+                      }
+                    }}
+                    className="btn-alpha-cyan"
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)',
+                      color: '#0F172A',
+                      fontWeight: '900',
+                      padding: '0.65rem 0.5rem',
+                      opacity: phaseActionLoading ? 0.6 : 1
+                    }}
+                  >
+                    <Clock size={16} /> {phaseActionLoading ? 'Starting...' : '⏱️ Start 2-Min Selection Countdown'}
+                  </button>
+
+                  <button
+                    disabled={phaseActionLoading}
+                    onClick={() => {
+                      if (window.confirm("Enable selection IMMEDIATELY without waiting 2 minutes?")) {
+                        handlePhaseAction('OPEN_NOW');
+                      }
+                    }}
+                    className="btn-alpha-outline"
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      borderColor: '#00E676',
+                      color: '#00E676',
+                      fontSize: '0.78rem',
+                      padding: '0.45rem',
+                      opacity: phaseActionLoading ? 0.6 : 1
+                    }}
+                  >
+                    <Zap size={14} /> {(liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 'Selection Open (Active)' : '⚡ Enable Selection Instantly (Skip 2m)'}
+                  </button>
+                </div>
               </div>
 
               {/* CARD 4: LOCK & RESET */}

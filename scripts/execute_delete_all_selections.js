@@ -46,7 +46,7 @@ function get(path, token) {
 
 async function execute() {
   console.log('1. Admin logging in...');
-  const loginRes = await post('/api/auth/admin/login', { username: 'admin', password: 'admin123' });
+  const loginRes = await post('/api/auth/admin/login', { username: 'Admin', password: 'Admin0509' });
   const token = loginRes.data.token;
   console.log('Admin login status:', loginRes.status);
 

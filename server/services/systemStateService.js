@@ -1,11 +1,63 @@
 const { SystemSettings } = require('../models/Schema');
 
+let stateCache = null;
+let lastStateFetchTime = 0;
+
+function invalidateSystemStateCache() {
+  stateCache = null;
+  lastStateFetchTime = 0;
+}
+
 /**
  * System State Service
  * Centrally manages hackathon selection phases, timer calculations, and manual overrides.
  * Ensures 100% synchronization between Admin Dashboard, Team Lead Portals, and backend APIs.
  */
-async function getOrUpdateSystemState() {
+async function getOrUpdateSystemState(forceRefresh = false) {
+  const now = new Date();
+
+  // Serve from in-memory cache if fresh (<1000ms) with dynamically recalculated countdowns
+  if (!forceRefresh && stateCache && (now.getTime() - lastStateFetchTime < 1000)) {
+    const cached = stateCache;
+    let timeUntilReleaseSeconds = 0;
+    let timeUntilSelectionStartSeconds = 0;
+    let selectionTimeRemainingSeconds = 0;
+
+    let effectivePhase = cached.currentPhase;
+
+    if (effectivePhase === 'ROUND_STARTED_UNRELEASED' && cached.releaseScheduledAt && now < new Date(cached.releaseScheduledAt)) {
+      timeUntilReleaseSeconds = Math.max(0, Math.floor((new Date(cached.releaseScheduledAt) - now) / 1000));
+    }
+    if (cached.selectionScheduledStart) {
+      const startTime = new Date(cached.selectionScheduledStart);
+      if (now < startTime) {
+        effectivePhase = 'RELEASED_LOCKED';
+        timeUntilSelectionStartSeconds = Math.max(0, Math.floor((startTime - now) / 1000));
+      } else if (cached.selectionEndsAt && now < new Date(cached.selectionEndsAt)) {
+        if (cached.selectionManualState !== 'CLOSED') {
+          effectivePhase = 'SELECTION_OPEN';
+          selectionTimeRemainingSeconds = Math.max(0, Math.floor((new Date(cached.selectionEndsAt) - now) / 1000));
+        }
+      } else if (cached.selectionEndsAt && now >= new Date(cached.selectionEndsAt)) {
+        effectivePhase = 'SELECTION_CLOSED';
+      }
+    } else if (effectivePhase === 'RELEASED_LOCKED' && cached.readingEndsAt && now < new Date(cached.readingEndsAt)) {
+      timeUntilSelectionStartSeconds = Math.max(0, Math.floor((new Date(cached.readingEndsAt) - now) / 1000));
+    }
+    if (effectivePhase === 'SELECTION_OPEN' && cached.selectionEndsAt && now < new Date(cached.selectionEndsAt)) {
+      selectionTimeRemainingSeconds = Math.max(0, Math.floor((new Date(cached.selectionEndsAt) - now) / 1000));
+    }
+
+    return {
+      ...cached,
+      currentPhase: effectivePhase,
+      serverTime: now,
+      timeUntilReleaseSeconds,
+      timeUntilSelectionStartSeconds,
+      selectionTimeRemainingSeconds
+    };
+  }
+
   let settings = await SystemSettings.findOne();
   if (!settings) {
     settings = await SystemSettings.create({
@@ -129,7 +181,7 @@ async function getOrUpdateSystemState() {
     selectionTimeRemainingSeconds = Math.max(0, Math.floor((new Date(settings.selectionEndsAt) - now) / 1000));
   }
 
-  return {
+  const result = {
     settings,
     serverTime: now,
     currentPhase: computedPhase,
@@ -147,8 +199,13 @@ async function getOrUpdateSystemState() {
     problemSelectionEnabled: settings.problemSelectionEnabled,
     roundStatus: settings.roundStatus
   };
+
+  stateCache = result;
+  lastStateFetchTime = now.getTime();
+  return result;
 }
 
 module.exports = {
-  getOrUpdateSystemState
+  getOrUpdateSystemState,
+  invalidateSystemStateCache
 };

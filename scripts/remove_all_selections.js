@@ -37,7 +37,7 @@ async function removeAllSelections() {
 
   // Step 1: If local server is running on port 5000, call the admin API endpoint
   try {
-    const loginRes = await post('/api/auth/admin/login', { username: 'admin', password: 'admin123' });
+    const loginRes = await post('/api/auth/admin/login', { username: 'Admin', password: 'Admin0509' });
     if (loginRes.ok && loginRes.data?.token) {
       console.log('📡 Connected to active server on port 5000 as Admin.');
       const resetRes = await post('/api/admin/reset-all-selections', {}, loginRes.data.token);
