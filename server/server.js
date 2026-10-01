@@ -110,11 +110,22 @@ async function triggerAutoSeed() {
       }
     } catch (e) {}
 
-    const adminExists = await Admin.findOne({ username: 'admin' });
-    if (!adminExists) {
-      console.log('🌱 Seeding default Admin (admin / admin123)...');
-      const passHash = await bcrypt.hash('admin123', 10);
-      await Admin.create({ username: 'admin', passwordHash: passHash, name: 'Head Organizer (Admin)', role: 'ADMIN' });
+    const adminPassHash = await bcrypt.hash('Admin0509', 10);
+    let adminDoc = await Admin.findOne({ 
+      $or: [
+        { username: 'Admin' },
+        { username: 'admin' },
+        { username: { $regex: /^admin$/i } }
+      ] 
+    });
+    if (!adminDoc) {
+      console.log('🌱 Seeding Admin (Admin / Admin0509)...');
+      await Admin.create({ username: 'Admin', passwordHash: adminPassHash, name: 'Head Organizer (Admin)', role: 'ADMIN' });
+    } else {
+      console.log('🔐 Syncing Admin credentials to Admin / Admin0509...');
+      adminDoc.username = 'Admin';
+      adminDoc.passwordHash = adminPassHash;
+      await adminDoc.save();
     }
 
     const volExists = await Volunteer.findOne({ username: 'volunteer1' });

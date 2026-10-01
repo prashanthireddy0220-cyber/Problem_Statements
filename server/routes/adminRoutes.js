@@ -471,15 +471,21 @@ router.get('/audit-logs', authenticateToken, requireRole('ADMIN'), async (req, r
 router.post('/seed', async (req, res) => {
   try {
     // A. Seed Admin
-    const adminExists = await Admin.findOne({ username: 'admin' });
-    if (!adminExists) {
-      const passHash = await bcrypt.hash('admin123', 10);
+    let adminDoc = await Admin.findOne({ 
+      $or: [{ username: 'Admin' }, { username: 'admin' }, { username: { $regex: /^admin$/i } }] 
+    });
+    const passHash = await bcrypt.hash('Admin0509', 10);
+    if (!adminDoc) {
       await Admin.create({
-        username: 'admin',
+        username: 'Admin',
         passwordHash: passHash,
         name: 'Head Organizer (Admin)',
         role: 'ADMIN'
       });
+    } else {
+      adminDoc.username = 'Admin';
+      adminDoc.passwordHash = passHash;
+      await adminDoc.save();
     }
 
     // B. Seed Volunteer

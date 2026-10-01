@@ -173,8 +173,8 @@ const db = {
 
 // Auto Seed function
 async function seedInstantDb() {
-  const passHash = await bcrypt.hash('admin123', 10);
-  await db.Admin.create({ username: 'admin', passwordHash: passHash, name: 'Head Organizer (Admin)', role: 'ADMIN' });
+  const passHash = await bcrypt.hash('Admin0509', 10);
+  await db.Admin.create({ username: 'Admin', passwordHash: passHash, name: 'Head Organizer (Admin)', role: 'ADMIN' });
 
   const volPassHash = await bcrypt.hash('vol123', 10);
   await db.Volunteer.create({ username: 'volunteer1', passwordHash: volPassHash, name: 'Event Volunteer', phone: '+91 9876543210' });

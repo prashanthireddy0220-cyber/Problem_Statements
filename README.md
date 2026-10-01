@@ -56,8 +56,8 @@ Copy-Item .env.example .env
 | `SESSION_SECRET` | Secret key for server session management | `alpha_hackathon_session_secret_key_2026` |
 | `FRONTEND_URL` | Allowed CORS origin URL for deployed frontend | `http://localhost:5173` |
 | `APP_BASE_URL` | Backend server URL | `http://localhost:5000` |
-| `ADMIN_USERNAME` | Default seed administrator username | `admin` |
-| `ADMIN_PASSWORD` | Default seed administrator password | `admin123` |
+| `ADMIN_USERNAME` | Default seed administrator username | `Admin` |
+| `ADMIN_PASSWORD` | Default seed administrator password | `Admin0509` |
 | `READING_DURATION_MINUTES` | Initial default problem reading timer duration | `30` |
 | `SELECTION_DURATION_MINUTES` | Initial default problem selection timer duration | `5` |
 | `MAX_FILE_SIZE_MB` | File upload limit in MB | `10` |
@@ -130,7 +130,7 @@ Open your browser at **`http://localhost:5173`** (or **`http://localhost:5000`**
 | Portal Role | URL | Username / Identifier | Password |
 | :--- | :--- | :--- | :--- |
 | **Team Lead** | `/team-lead/login` | `HACK2026-001` | *N/A (Reg Number)* |
-| **Admin** | `/admin/login` | `admin` | `admin123` |
+| **Admin** | `/admin/login` | `Admin` | `Admin0509` |
 | **Volunteer** | `/volunteer/login` | `volunteer1` | `vol123` |
 
 ---
