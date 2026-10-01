@@ -68,6 +68,7 @@ const ProblemStatementSchema = new mongoose.Schema({
   technologies: [{ type: String }],
   maxTeamCapacity: { type: Number, default: 2 },
   selectedCount: { type: Number, default: 0 },
+  assignedTeams: [{ type: String }],
   pdfUrl: { type: String, default: '' },
   status: { type: String, default: 'PUBLISHED' }
 }, { timestamps: true });

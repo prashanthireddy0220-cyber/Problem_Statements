@@ -30,6 +30,7 @@ async function syncFixedTeamProblemStatements() {
           difficulty: p.difficulty || 'Medium',
           technologies: p.technologies,
           maxTeamCapacity: 2,
+          assignedTeams: p.assignedTeams || [],
           status: 'PUBLISHED'
         }
       },
@@ -110,15 +111,23 @@ async function syncFixedTeamProblemStatements() {
   }
   console.log(`✅ Permanently fixed and assigned problem statements for all ${assignedTeamsCount} teams.`);
 
-  // 5. Synchronize selectedCount for each problem statement based on confirmed assignments
+  // 5. Synchronize selectedCount and assignedTeams for each problem statement based on confirmed assignments
   for (const p of problemStatementsData) {
-    const activeCount = await Team.countDocuments({
+    const activeTeams = await Team.find({
       selectedProblemCode: p.problemId,
       selectionConfirmed: true
-    });
+    }).select('teamId name');
+    const assignedTeamIds = activeTeams.map(t => t.teamId || t.name);
+    const resolvedTeams = assignedTeamIds.length > 0 ? assignedTeamIds : (p.assignedTeams || []);
+
     await ProblemStatement.updateOne(
       { problemId: p.problemId },
-      { $set: { selectedCount: activeCount } }
+      { 
+        $set: { 
+          selectedCount: resolvedTeams.length,
+          assignedTeams: resolvedTeams 
+        } 
+      }
     );
   }
 

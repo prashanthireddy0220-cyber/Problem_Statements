@@ -3,6 +3,7 @@ const router = express.Router();
 const config = require('../config/env');
 const { ProblemStatement, Team, TeamLead, ProblemSelection, SystemSettings, AuditLog } = require('../models/Schema');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const problemStatementsData = require('../data/problemStatements');
 
 const { getOrUpdateSystemState, invalidateSystemStateCache } = require('../services/systemStateService');
 
@@ -72,7 +73,19 @@ router.get('/', authenticateToken, async (req, res) => {
         ];
       }
 
-      problems = await ProblemStatement.find(query).sort({ problemId: 1 }).lean();
+      const rawProblems = await ProblemStatement.find(query).sort({ problemId: 1 }).lean();
+      problems = rawProblems.map(p => {
+        const fallback = problemStatementsData.find(d => d.problemId === p.problemId);
+        const assignedTeams = (p.assignedTeams && p.assignedTeams.length > 0)
+          ? p.assignedTeams
+          : (fallback?.assignedTeams || []);
+        return {
+          ...fallback,
+          ...p,
+          assignedTeams,
+          selectedCount: Math.max(p.selectedCount || 0, assignedTeams.length)
+        };
+      });
       if (isDefaultQuery) {
         cachedProblems = problems;
         lastProblemsFetchTime = Date.now();

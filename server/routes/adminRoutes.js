@@ -10,6 +10,8 @@ const {
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { validateRawScore, recalculateRoundReviewerNormalization, getLeaderboardData } = require('../services/normalizationService');
 const { getOrUpdateSystemState, invalidateSystemStateCache } = require('../services/systemStateService');
+const problemStatementsData = require('../data/problemStatements');
+const { parse: json2csv } = require('json2csv');
 
 // 1. UPDATE TIMER SETTINGS & MODULE TOGGLES
 router.post('/settings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
@@ -219,7 +221,19 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
     const teamLeads = await TeamLead.find();
     const activeSessions = await ActiveSession.find({ role: 'TEAM_LEAD' });
     const activeRegNums = new Set((activeSessions || []).map(s => s.userId || s.registrationNumber || s.regNum));
-    const problemStatements = await ProblemStatement.find();
+    const dbProblemStatements = await ProblemStatement.find().lean();
+    const problemStatements = problemStatementsData.map(psData => {
+      const dbPs = dbProblemStatements.find(p => p.problemId === psData.problemId);
+      const assignedTeams = (dbPs?.assignedTeams && dbPs.assignedTeams.length > 0)
+        ? dbPs.assignedTeams
+        : (psData.assignedTeams || []);
+      return {
+        ...psData,
+        ...(dbPs || {}),
+        assignedTeams,
+        selectedCount: Math.max(dbPs?.selectedCount || 0, assignedTeams.length)
+      };
+    });
 
     let attendanceRecords = [];
     try {
@@ -247,15 +261,19 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
       const isOnline = activeRegNums.has(item.regNum);
       const members = (dbTeam?.members && dbTeam.members.length > 0) ? dbTeam.members : (item.members || []);
 
+      const rawProb = dbTeam?.selectedProblemCode;
+      const isValidProb = rawProb && rawProb !== 'null' && rawProb !== 'undefined' && rawProb !== 'Not Selected';
+      const probCode = isValidProb ? rawProb : (item.fixedProblemStatementId || 'Not Selected');
+      const matchedProblem = probCode !== 'Not Selected' 
+        ? (problemStatements.find(p => p.problemId === probCode) || problemStatementsData.find(p => p.problemId === probCode)) 
+        : null;
+
       let statusStr = '⚪ Not Started';
-      if (dbTeam?.selectionConfirmed || dbTeam?.selectedProblemCode) {
-        statusStr = '✅ Selection Completed';
+      if (probCode && probCode !== 'Not Selected') {
+        statusStr = '✅ Assigned & Confirmed';
       } else if (isOnline) {
         statusStr = (settings.currentPhase === 'SELECTION_OPEN' || settings.currentPhase === 'SELECTION') ? '🟠 Selecting' : '🟢 Viewing';
       }
-
-      const probCode = dbTeam?.selectedProblemCode && dbTeam.selectedProblemCode !== 'null' ? dbTeam.selectedProblemCode : 'Not Selected';
-      const matchedProblem = probCode !== 'Not Selected' ? problemStatements.find(p => p.problemId === probCode) : null;
 
       const teamQrToken = dbTeam?.teamQrToken || `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
       const eventPassQrToken = dbTeam?.eventPassQrToken || `EP-${item.teamId}-${item.regNum.slice(-4)}`;
@@ -273,8 +291,10 @@ router.get('/live-activity', authenticateToken, requireRole('ADMIN'), async (req
         statusStr,
         selectedProblemCode: probCode,
         selectedProblemTitle: matchedProblem?.title || '',
+        selectedProblemDomain: matchedProblem?.domain || '',
+        selectedProblemDifficulty: matchedProblem?.difficulty || 'Medium',
         selectedProblem: matchedProblem || null,
-        selectionConfirmed: Boolean(dbTeam?.selectionConfirmed) || (probCode !== 'Not Selected'),
+        selectionConfirmed: probCode !== 'Not Selected',
         selectedAt: dbTeam?.selectedAt || null,
         membersCount: members.length,
         members: members,
@@ -443,6 +463,13 @@ router.get('/teams', authenticateToken, requireRole('ADMIN'), async (req, res) =
       const dbLead = teamLeads.find(l => l.registrationNumber === item.regNum);
       const members = (dbTeam?.members && dbTeam.members.length > 0) ? dbTeam.members : item.members;
       
+      const rawProb = dbTeam?.selectedProblemCode;
+      const isValidProb = rawProb && rawProb !== 'null' && rawProb !== 'undefined' && rawProb !== 'Not Selected';
+      const probCode = isValidProb ? rawProb : (item.fixedProblemStatementId || 'Not Selected');
+      const matchedProblem = probCode !== 'Not Selected' 
+        ? problemStatementsData.find(p => p.problemId === probCode) 
+        : null;
+
       const teamQrToken = dbTeam?.teamQrToken || `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
       const eventPassQrToken = dbTeam?.eventPassQrToken || `EP-${item.teamId}-${item.regNum.slice(-4)}`;
 
@@ -456,8 +483,12 @@ router.get('/teams', authenticateToken, requireRole('ADMIN'), async (req, res) =
         members: members || [],
         college: dbTeam?.college || 'KARE',
         department: dbTeam?.department || 'CSE',
-        selectedProblemCode: dbTeam?.selectedProblemCode || 'Not Selected',
-        selectionConfirmed: Boolean(dbTeam?.selectionConfirmed),
+        selectedProblemCode: probCode,
+        selectedProblemTitle: matchedProblem?.title || '',
+        selectedProblemDomain: matchedProblem?.domain || '',
+        selectedProblemDifficulty: matchedProblem?.difficulty || 'Medium',
+        selectedProblem: matchedProblem || null,
+        selectionConfirmed: probCode !== 'Not Selected',
         teamQrToken: teamQrToken,
         publicQrUrl: `${appBaseUrl}/team/${teamQrToken}`,
         eventPassQrToken: eventPassQrToken,
@@ -478,6 +509,50 @@ router.get('/all-teams', authenticateToken, requireRole('ADMIN'), async (req, re
   const teamsHandler = router.stack.find(r => r.route && r.route.path === '/teams')?.route?.stack[2]?.handle;
   if (teamsHandler) return teamsHandler(req, res);
   return res.redirect('/api/admin/teams');
+});
+
+// 5B. ADMIN: EXPORT PROBLEM ALLOCATIONS TO CSV
+router.get('/export-problem-allocations', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const teams = await Team.find();
+    const teamLeads = await TeamLead.find();
+    const AUTHORIZED_TEAMS = require('../data/teamsData');
+
+    const rows = AUTHORIZED_TEAMS.map((item, idx) => {
+      const dbTeam = teams.find(t => t.name === item.teamId || t.teamId === item.teamId || t.teamLeadRegNum === item.regNum);
+      const dbLead = teamLeads.find(l => l.registrationNumber === item.regNum);
+      const rawProb = dbTeam?.selectedProblemCode;
+      const isValidProb = rawProb && rawProb !== 'null' && rawProb !== 'undefined' && rawProb !== 'Not Selected';
+      const probCode = isValidProb ? rawProb : (item.fixedProblemStatementId || 'Not Selected');
+      const matchedProblem = probCode !== 'Not Selected' 
+        ? problemStatementsData.find(p => p.problemId === probCode) 
+        : null;
+
+      return {
+        'S.No': idx + 1,
+        'Team ID': item.teamId,
+        'Team Name': item.teamName,
+        'Team Lead Name': dbLead?.name || item.leadName,
+        'Team Lead Reg No': item.regNum,
+        'College': dbTeam?.college || 'KARE',
+        'Department': dbTeam?.department || 'CSE',
+        'Members Count': (item.members || []).length || 4,
+        'Problem ID': probCode,
+        'Problem Title': matchedProblem?.title || '',
+        'Domain': matchedProblem?.domain || '',
+        'Difficulty': matchedProblem?.difficulty || 'Medium',
+        'Status': probCode !== 'Not Selected' ? 'Confirmed & Assigned' : 'Unassigned'
+      };
+    });
+
+    const csvData = json2csv(rows);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=ALPHA_Hackathon_Problem_Allocations_${Date.now()}.csv`);
+    return res.status(200).send(csvData);
+  } catch (err) {
+    console.error('Export problem allocations error:', err);
+    return res.status(500).json({ error: 'Failed to export problem statement allocations.' });
+  }
 });
 
 // 6. ADMIN: GET AUDIT LOGS

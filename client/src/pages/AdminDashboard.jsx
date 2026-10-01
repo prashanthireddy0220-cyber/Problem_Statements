@@ -10,6 +10,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
 import axios from 'axios';
 import QRCode from 'qrcode';
 import AUTHORIZED_TEAMS from '../data/teamsData';
+import { TOP_40_PROBLEMS } from '../data/problemStatementsData';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -23,11 +24,12 @@ export default function AdminDashboard() {
   const [allTeams, setAllTeams] = useState([]);
   const [teamSearchTerm, setTeamSearchTerm] = useState('');
   const [selectedTeamDetail, setSelectedTeamDetail] = useState(null);
+  const [selectedProblemDetailModal, setSelectedProblemDetailModal] = useState(null);
   const [qrModalTeam, setQrModalTeam] = useState(null);
   const [adminQrDataUrl, setAdminQrDataUrl] = useState('');
 
-  // State for Problems
-  const [problems, setProblems] = useState([]);
+  // State for Problems (Initialized with all 40 official Problem Statements)
+  const [problems, setProblems] = useState(TOP_40_PROBLEMS);
   const [showAddProblemModal, setShowAddProblemModal] = useState(false);
   const [adminProblemSearch, setAdminProblemSearch] = useState('');
   const [adminProblemDomainFilter, setAdminProblemDomainFilter] = useState('ALL');
@@ -377,8 +379,23 @@ export default function AdminDashboard() {
       }
 
       if (activeTab === 'problems' || activeTab === 'live') {
-        const res = await axios.get('/api/problems?domain=ALL&difficulty=ALL');
-        setProblems(res.data.problems || []);
+        const res = await axios.get('/api/problems?domain=ALL&difficulty=ALL').catch(() => null);
+        const apiProbs = res?.data?.problems || [];
+        if (apiProbs.length > 0) {
+          const merged = TOP_40_PROBLEMS.map(tp => {
+            const apiP = apiProbs.find(p => p.problemId === tp.problemId);
+            const assigned = (apiP?.assignedTeams && apiP.assignedTeams.length > 0) ? apiP.assignedTeams : (tp.assignedTeams || []);
+            return {
+              ...tp,
+              ...(apiP || {}),
+              assignedTeams: assigned,
+              selectedCount: Math.max(apiP?.selectedCount || 0, assigned.length)
+            };
+          });
+          setProblems(merged);
+        } else {
+          setProblems(TOP_40_PROBLEMS);
+        }
       }
       if (activeTab === 'attendance' || activeTab === 'analytics') {
         const sRes = await axios.get('/api/attendance/sessions');
@@ -777,9 +794,13 @@ export default function AdminDashboard() {
       const teamQrToken = existing?.teamQrToken || `TQ-${authItem.teamId}-${authItem.regNum.slice(-4)}`;
       const eventPassQrToken = existing?.eventPassQrToken || `EP-${authItem.teamId}-${authItem.regNum.slice(-4)}`;
 
-      const probCode = existing?.selectedProblemCode && existing.selectedProblemCode !== 'null' ? existing.selectedProblemCode : 'Not Selected';
-      const matchedProblem = problems.find(p => p.problemId === probCode) || existing?.selectedProblem;
+      const rawCode = existing?.selectedProblemCode;
+      const isValidCode = rawCode && rawCode !== 'null' && rawCode !== 'undefined' && rawCode !== 'Not Selected';
+      const probCode = isValidCode ? rawCode : (authItem.fixedProblemStatementId || 'Not Selected');
+      const matchedProblem = TOP_40_PROBLEMS.find(p => p.problemId === probCode) || problems.find(p => p.problemId === probCode) || existing?.selectedProblem;
       const probTitle = matchedProblem?.title || existing?.selectedProblemTitle || '';
+      const probDomain = matchedProblem?.domain || existing?.selectedProblemDomain || '';
+      const probDifficulty = matchedProblem?.difficulty || existing?.selectedProblemDifficulty || 'Medium';
 
       return {
         _id: existing?._id || authItem.teamId,
@@ -793,7 +814,10 @@ export default function AdminDashboard() {
         department: existing?.department || 'CSE',
         selectedProblemCode: probCode,
         selectedProblemTitle: probTitle,
-        selectionConfirmed: Boolean(existing?.selectionConfirmed) || (probCode !== 'Not Selected'),
+        selectedProblemDomain: probDomain,
+        selectedProblemDifficulty: probDifficulty,
+        selectedProblem: matchedProblem || null,
+        selectionConfirmed: probCode !== 'Not Selected',
         teamQrToken: teamQrToken,
         publicQrUrl: existing?.publicQrUrl || `/team/${teamQrToken}`,
         eventPassQrToken: eventPassQrToken,
@@ -812,7 +836,9 @@ export default function AdminDashboard() {
       (t.teamName && t.teamName.toLowerCase().includes(term)) ||
       (t.teamLeadName && t.teamLeadName.toLowerCase().includes(term)) ||
       (t.teamLeadRegNum && t.teamLeadRegNum.toLowerCase().includes(term)) ||
-      (t.selectedProblemCode && t.selectedProblemCode.toLowerCase().includes(term))
+      (t.selectedProblemCode && t.selectedProblemCode.toLowerCase().includes(term)) ||
+      (t.selectedProblemTitle && t.selectedProblemTitle.toLowerCase().includes(term)) ||
+      (t.selectedProblemDomain && t.selectedProblemDomain.toLowerCase().includes(term))
     );
   });
 
@@ -845,6 +871,14 @@ export default function AdminDashboard() {
           </button>
           <button onClick={handleExportCSV} className="btn-alpha-cyan" style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}>
             <Download size={15} /> Export Attendance CSV
+          </button>
+          <button 
+            onClick={() => window.open('/api/admin/export-problem-allocations', '_blank')} 
+            className="btn-alpha-gold" 
+            style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}
+            title="Download full CSV of all 60 teams and their assigned problem statements"
+          >
+            <Download size={15} /> Export Problem Allocations CSV
           </button>
         </div>
       </div>
@@ -1221,7 +1255,9 @@ export default function AdminDashboard() {
                   <th>Team Name</th>
                   <th>Team Lead</th>
                   <th>Members</th>
-                  <th>Problem Statement</th>
+                  <th>Assigned Problem Statement</th>
+                  <th>Domain</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -1234,12 +1270,25 @@ export default function AdminDashboard() {
                       <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontFamily: 'Orbitron, monospace' }}>{t.teamLeadRegNum}</div>
                     </td>
                     <td style={{ fontWeight: '700', color: '#00E676' }}>{t.membersCount} Members</td>
-                    <td style={{ fontFamily: 'Orbitron, monospace', color: (t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected') ? '#FFD700' : '#94A3B8', fontWeight: (t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected') ? '700' : '400' }}>
+                    <td>
                       {t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected' ? (
                         <div>
-                          <div style={{ fontSize: '0.95rem', fontWeight: '800' }}>{t.selectedProblemCode}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '6px',
+                              background: 'rgba(0, 242, 254, 0.15)',
+                              border: '1px solid rgba(0, 242, 254, 0.35)',
+                              color: '#00F2FE',
+                              fontWeight: '800',
+                              fontFamily: 'Orbitron, monospace',
+                              fontSize: '0.88rem'
+                            }}>
+                              {t.selectedProblemCode}
+                            </span>
+                          </div>
                           {t.selectedProblemTitle && (
-                            <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontFamily: 'Inter, sans-serif', fontWeight: 'normal', maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t.selectedProblemTitle}>
+                            <div style={{ fontSize: '0.74rem', color: '#CBD5E1', marginTop: '0.25rem', maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t.selectedProblemTitle}>
                               {t.selectedProblemTitle}
                             </div>
                           )}
@@ -1247,6 +1296,35 @@ export default function AdminDashboard() {
                       ) : (
                         <span style={{ fontSize: '0.85rem', color: '#64748B' }}>Not Selected</span>
                       )}
+                    </td>
+                    <td>
+                      <span style={{
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        background: 'rgba(255, 215, 0, 0.1)',
+                        color: '#FFD700',
+                        border: '1px solid rgba(255, 215, 0, 0.25)',
+                        fontWeight: '600'
+                      }}>
+                        {t.selectedProblemDomain || '—'}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{
+                        padding: '0.22rem 0.6rem',
+                        borderRadius: '12px',
+                        fontSize: '0.72rem',
+                        fontWeight: '800',
+                        background: (t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected') ? 'rgba(0, 230, 118, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                        color: (t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected') ? '#00E676' : '#94A3B8',
+                        border: `1px solid ${(t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected') ? 'rgba(0, 230, 118, 0.35)' : 'rgba(148, 163, 184, 0.3)'}`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        {(t.selectedProblemCode && t.selectedProblemCode !== 'Not Selected') ? '✅ Confirmed' : '⚪ Unassigned'}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -1257,27 +1335,40 @@ export default function AdminDashboard() {
           {/* ADMIN TEAM DETAIL MODAL */}
           {selectedTeamDetail && (
             <div className="modal-overlay">
-              <div className="modal-content" style={{ maxWidth: '700px' }}>
+              <div className="modal-content" style={{ maxWidth: '720px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                   <div>
-                    <span style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800' }}>{selectedTeamDetail.teamId}</span>
+                    <span style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800', fontSize: '1.1rem' }}>{selectedTeamDetail.teamId}</span>
                     <h2 style={{ color: '#F8FAFC', fontSize: '1.4rem', margin: '0.25rem 0' }}>{selectedTeamDetail.teamName}</h2>
                   </div>
                   <button onClick={() => setSelectedTeamDetail(null)} className="btn-alpha-outline" style={{ padding: '0.35rem 0.75rem' }}>✕</button>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '10px', border: '1px solid rgba(0,242,254,0.2)' }}>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>College</div>
-                    <div style={{ fontWeight: '700', color: '#F8FAFC' }}>{selectedTeamDetail.college}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>College & Department</div>
+                    <div style={{ fontWeight: '700', color: '#F8FAFC', marginTop: '0.2rem' }}>{selectedTeamDetail.college} • {selectedTeamDetail.department}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.5rem' }}>Team Lead</div>
+                    <div style={{ fontWeight: '700', color: '#00E676' }}>{selectedTeamDetail.teamLeadName}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontFamily: 'Orbitron, monospace' }}>{selectedTeamDetail.teamLeadRegNum}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Department</div>
-                    <div style={{ fontWeight: '700', color: '#F8FAFC' }}>{selectedTeamDetail.department}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Assigned Problem Statement</div>
+                    <div style={{ fontWeight: '800', color: '#00F2FE', fontFamily: 'Orbitron, monospace', fontSize: '1.15rem', marginTop: '0.2rem' }}>
+                      {selectedTeamDetail.selectedProblemCode}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#CBD5E1', marginTop: '0.25rem', lineHeight: '1.4' }}>
+                      {selectedTeamDetail.selectedProblemTitle}
+                    </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Problem Selection</div>
-                    <div style={{ fontWeight: '800', color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>{selectedTeamDetail.selectedProblemCode}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Domain & Status</div>
+                    <div style={{ fontSize: '0.82rem', color: '#FFD700', fontWeight: '700', marginTop: '0.2rem' }}>
+                      {selectedTeamDetail.selectedProblemDomain || 'General'}
+                    </div>
+                    <span style={{ display: 'inline-block', marginTop: '0.5rem', padding: '0.25rem 0.65rem', borderRadius: '12px', fontSize: '0.74rem', fontWeight: '800', background: 'rgba(0, 230, 118, 0.15)', color: '#00E676', border: '1px solid rgba(0, 230, 118, 0.35)' }}>
+                      ✅ Confirmed & Assigned
+                    </span>
                   </div>
                 </div>
 
@@ -2090,12 +2181,20 @@ export default function AdminDashboard() {
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
-                onClick={handleResetBooklet}
+                onClick={() => window.open('/api/admin/export-problem-allocations', '_blank')}
                 className="btn-alpha-gold"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '0.55rem 1.1rem' }}
+                title="Download CSV report of all problem statements and assigned teams"
+              >
+                <Download size={15} /> Export Allocations CSV
+              </button>
+              <button
+                onClick={handleResetBooklet}
+                className="btn-alpha-outline"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '0.55rem 1.1rem' }}
                 title="Reload all Problem Statements from the 2026 Booklet"
               >
-                <RefreshCw size={15} /> Reload 2026 Booklet ({problems.length || 42} PS)
+                <RefreshCw size={15} /> Reload 2026 Booklet ({problems.length || 40} PS)
               </button>
               <button
                 onClick={handleResetAllSelections}
@@ -2184,8 +2283,8 @@ export default function AdminDashboard() {
                       <th>Problem Title</th>
                       <th>Domain</th>
                       <th>Difficulty</th>
-                      <th>Capacity Limit</th>
-                      <th>Selected Count</th>
+                      <th>Capacity</th>
+                      <th>Assigned Teams</th>
                       <th>Status</th>
                       <th style={{ textAlign: 'center' }}>Actions</th>
                     </tr>
@@ -2198,59 +2297,277 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ) : (
-                      filteredProblems.map((p) => (
-                        <tr key={p._id}>
-                          <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800' }}>{p.problemId}</td>
-                          <td style={{ fontWeight: '700', color: '#F8FAFC' }}>{p.title}</td>
-                          <td style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>{p.domain}</td>
-                          <td>
-                            <span style={{
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: '4px',
-                              fontSize: '0.72rem',
-                              fontWeight: '700',
-                              background: p.difficulty === 'Hard' ? 'rgba(255,75,75,0.15)' : 'rgba(255,215,0,0.15)',
-                              color: p.difficulty === 'Hard' ? '#FF4B4B' : '#FFD700',
-                              border: `1px solid ${p.difficulty === 'Hard' ? 'rgba(255,75,75,0.3)' : 'rgba(255,215,0,0.3)'}`
-                            }}>
-                              {p.difficulty}
-                            </span>
-                          </td>
-                          <td>{p.maxTeamCapacity || 2} Teams</td>
-                          <td style={{ color: p.selectedCount >= (p.maxTeamCapacity || 2) ? '#FF4B4B' : '#00E676', fontWeight: '800' }}>
-                            {p.selectedCount} / {p.maxTeamCapacity || 2}
-                          </td>
-                          <td>
-                            <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(0,242,254,0.15)', color: '#00F2FE' }}>
-                              {p.status}
-                            </span>
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                              <button
-                                onClick={() => setEditingProblem(p)}
-                                className="btn-alpha-cyan"
-                                style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      filteredProblems.map((p) => {
+                        const matchedTeams = teamsToDisplay.filter(t => t.selectedProblemCode === p.problemId);
+                        const assignedTeamIds = matchedTeams.length > 0 
+                          ? matchedTeams.map(t => t.teamId) 
+                          : (p.assignedTeams && p.assignedTeams.length > 0 ? p.assignedTeams : (TOP_40_PROBLEMS.find(tp => tp.problemId === p.problemId)?.assignedTeams || []));
+                        const count = assignedTeamIds.length;
+                        const maxCap = p.maxTeamCapacity || 2;
+                        const isFull = count >= maxCap;
+
+                        return (
+                          <tr key={p._id || p.problemId}>
+                            <td style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800' }}>{p.problemId}</td>
+                            <td>
+                              <div 
+                                onClick={() => setSelectedProblemDetailModal(p)} 
+                                style={{ fontWeight: '700', color: '#F8FAFC', cursor: 'pointer', transition: 'color 0.2s' }}
+                                onMouseEnter={e => e.currentTarget.style.color = '#00F2FE'}
+                                onMouseLeave={e => e.currentTarget.style.color = '#F8FAFC'}
+                                title="Click to view full problem statement details"
                               >
-                                <Edit size={13} /> Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteProblem(p._id, p.problemId)}
-                                className="btn-alpha-outline"
-                                style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', borderColor: '#FF4B4B', color: '#FF4B4B', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <Trash2 size={13} /> Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                                {p.title}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '0.2rem', maxWidth: '320px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {p.description ? p.description.split('\n')[0] : ''}
+                              </div>
+                            </td>
+                            <td style={{ fontSize: '0.82rem', color: '#CBD5E1' }}>{p.domain}</td>
+                            <td>
+                              <span style={{
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.72rem',
+                                fontWeight: '700',
+                                background: p.difficulty === 'Hard' ? 'rgba(255,75,75,0.15)' : 'rgba(255,215,0,0.15)',
+                                color: p.difficulty === 'Hard' ? '#FF4B4B' : '#FFD700',
+                                border: `1px solid ${p.difficulty === 'Hard' ? 'rgba(255,75,75,0.3)' : 'rgba(255,215,0,0.3)'}`
+                              }}>
+                                {p.difficulty || 'Medium'}
+                              </span>
+                            </td>
+                            <td style={{ color: isFull ? '#FF4B4B' : '#00E676', fontWeight: '800', fontFamily: 'Orbitron, monospace' }}>
+                              {count} / {maxCap} {isFull ? <span style={{ fontSize: '0.7rem', color: '#FF4B4B' }}>(Full)</span> : ''}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                {assignedTeamIds.length === 0 ? (
+                                  <span style={{ color: '#64748B', fontSize: '0.75rem' }}>None</span>
+                                ) : (
+                                  assignedTeamIds.map(tid => {
+                                    const tm = teamsToDisplay.find(t => t.teamId === tid);
+                                    return (
+                                      <button
+                                        key={tid}
+                                        type="button"
+                                        onClick={() => tm && setSelectedTeamDetail(tm)}
+                                        style={{
+                                          padding: '0.22rem 0.55rem',
+                                          borderRadius: '6px',
+                                          fontSize: '0.75rem',
+                                          fontWeight: '800',
+                                          fontFamily: 'Orbitron, monospace',
+                                          background: 'rgba(0, 242, 254, 0.12)',
+                                          color: '#00F2FE',
+                                          border: '1px solid rgba(0, 242, 254, 0.35)',
+                                          cursor: tm ? 'pointer' : 'default',
+                                          transition: 'all 0.2s'
+                                        }}
+                                        title={tm ? `Click to inspect Team ${tm.teamId}: ${tm.teamName} (${tm.teamLeadName})` : tid}
+                                      >
+                                        {tid}
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(0,242,254,0.15)', color: '#00F2FE' }}>
+                                {p.status || 'PUBLISHED'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                <button
+                                  onClick={() => setSelectedProblemDetailModal(p)}
+                                  className="btn-alpha-outline"
+                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px', borderColor: '#00F2FE', color: '#00F2FE' }}
+                                  title="View Statement"
+                                >
+                                  <Eye size={13} /> View
+                                </button>
+                                <button
+                                  onClick={() => setEditingProblem(p)}
+                                  className="btn-alpha-cyan"
+                                  style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <Edit size={13} /> Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteProblem(p._id, p.problemId)}
+                                  className="btn-alpha-outline"
+                                  style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px', borderColor: '#FF4B4B', color: '#FF4B4B', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <Trash2 size={13} /> Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
             );
           })()}
+
+          {/* PROBLEM DETAIL MODAL */}
+          {selectedProblemDetailModal && (
+            <div className="modal-overlay">
+              <div className="modal-content" style={{ maxWidth: '850px', maxHeight: '88vh', overflowY: 'auto', border: '1px solid #00F2FE', boxShadow: '0 0 30px rgba(0, 242, 254, 0.25)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+                  <div>
+                    <span style={{ fontFamily: 'Orbitron, monospace', color: '#00F2FE', fontWeight: '800', fontSize: '1.15rem' }}>
+                      {selectedProblemDetailModal.problemId}
+                    </span>
+                    <h2 style={{ color: '#F8FAFC', fontSize: '1.35rem', margin: '0.35rem 0' }}>
+                      {selectedProblemDetailModal.title}
+                    </h2>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                      <span style={{ padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.74rem', background: 'rgba(0, 242, 254, 0.12)', color: '#00F2FE', border: '1px solid rgba(0, 242, 254, 0.3)', fontWeight: '600' }}>
+                        {selectedProblemDetailModal.domain}
+                      </span>
+                      <span style={{ padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.74rem', fontWeight: '700', background: selectedProblemDetailModal.difficulty === 'Hard' ? 'rgba(255,75,75,0.15)' : 'rgba(255,215,0,0.15)', color: selectedProblemDetailModal.difficulty === 'Hard' ? '#FF4B4B' : '#FFD700', border: `1px solid ${selectedProblemDetailModal.difficulty === 'Hard' ? 'rgba(255,75,75,0.3)' : 'rgba(255,215,0,0.3)'}` }}>
+                        {selectedProblemDetailModal.difficulty || 'Medium'}
+                      </span>
+                      <span style={{ padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.74rem', fontWeight: '700', background: 'rgba(0, 230, 118, 0.15)', color: '#00E676', border: '1px solid rgba(0, 230, 118, 0.3)' }}>
+                        Capacity: {selectedProblemDetailModal.maxTeamCapacity || 2} Teams Max
+                      </span>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedProblemDetailModal(null)} className="btn-alpha-outline" style={{ padding: '0.35rem 0.75rem' }}>✕</button>
+                </div>
+
+                {/* Assigned Teams Section */}
+                {(() => {
+                  const mTeams = teamsToDisplay.filter(t => t.selectedProblemCode === selectedProblemDetailModal.problemId);
+                  const aIds = mTeams.length > 0 
+                    ? mTeams.map(t => t.teamId) 
+                    : (selectedProblemDetailModal.assignedTeams || (TOP_40_PROBLEMS.find(tp => tp.problemId === selectedProblemDetailModal.problemId)?.assignedTeams || []));
+
+                  return (
+                    <div style={{ background: 'rgba(0, 242, 254, 0.05)', border: '1px solid rgba(0, 242, 254, 0.25)', borderRadius: '10px', padding: '1rem', marginBottom: '1.25rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#00F2FE', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Users size={16} /> ASSIGNED TEAMS ({aIds.length} of {selectedProblemDetailModal.maxTeamCapacity || 2} slots filled):
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        {aIds.length === 0 ? (
+                          <span style={{ color: '#94A3B8', fontSize: '0.82rem' }}>No teams assigned yet</span>
+                        ) : (
+                          aIds.map(tid => {
+                            const tm = teamsToDisplay.find(t => t.teamId === tid);
+                            return (
+                              <div
+                                key={tid}
+                                onClick={() => {
+                                  if (tm) {
+                                    setSelectedProblemDetailModal(null);
+                                    setSelectedTeamDetail(tm);
+                                  }
+                                }}
+                                style={{
+                                  background: 'rgba(15, 23, 42, 0.9)',
+                                  border: '1px solid #00F2FE',
+                                  padding: '0.5rem 0.85rem',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                title="Click to view full team members list"
+                              >
+                                <span style={{ fontFamily: 'Orbitron, monospace', fontWeight: '800', color: '#00F2FE', fontSize: '0.9rem' }}>{tid}</span>
+                                {tm && <div style={{ fontSize: '0.78rem', color: '#F8FAFC', fontWeight: '600' }}>{tm.teamName}</div>}
+                                {tm && <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Lead: {tm.teamLeadName}</div>}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Description */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <h4 style={{ fontSize: '0.85rem', color: '#00F2FE', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>Problem Overview & Challenge</h4>
+                  <div style={{ color: '#E2E8F0', fontSize: '0.88rem', lineHeight: '1.6', whiteSpace: 'pre-line', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
+                    {selectedProblemDetailModal.description}
+                  </div>
+                </div>
+
+                {/* Background & Scope */}
+                {selectedProblemDetailModal.background && (
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <h4 style={{ fontSize: '0.85rem', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>Core Question & Background</h4>
+                    <div style={{ color: '#CBD5E1', fontSize: '0.85rem', lineHeight: '1.6', whiteSpace: 'pre-line', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
+                      {selectedProblemDetailModal.background}
+                    </div>
+                  </div>
+                )}
+
+                {/* Expected Solution */}
+                {selectedProblemDetailModal.expectedSolution && (
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <h4 style={{ fontSize: '0.85rem', color: '#00E676', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.4rem' }}>Expected Deliverables & Features</h4>
+                    <div style={{ color: '#CBD5E1', fontSize: '0.85rem', lineHeight: '1.6', whiteSpace: 'pre-line', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
+                      {selectedProblemDetailModal.expectedSolution}
+                    </div>
+                  </div>
+                )}
+
+                {/* Requirements & Constraints */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+                  {selectedProblemDetailModal.requirements && selectedProblemDetailModal.requirements.length > 0 && (
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
+                      <h4 style={{ fontSize: '0.82rem', color: '#00F2FE', marginBottom: '0.5rem' }}>🎯 Key Evaluation Requirements</h4>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#CBD5E1', fontSize: '0.82rem', lineHeight: '1.5' }}>
+                        {selectedProblemDetailModal.requirements.map((r, i) => (
+                          <li key={i} style={{ marginBottom: '0.25rem' }}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {selectedProblemDetailModal.constraints && selectedProblemDetailModal.constraints.length > 0 && (
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
+                      <h4 style={{ fontSize: '0.82rem', color: '#FF8585', marginBottom: '0.5rem' }}>⚠️ Constraints & Out-of-Scope</h4>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#CBD5E1', fontSize: '0.82rem', lineHeight: '1.5' }}>
+                        {selectedProblemDetailModal.constraints.map((c, i) => (
+                          <li key={i} style={{ marginBottom: '0.25rem' }}>{c}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Technologies */}
+                {selectedProblemDetailModal.technologies && selectedProblemDetailModal.technologies.length > 0 && (
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <h4 style={{ fontSize: '0.82rem', color: '#94A3B8', marginBottom: '0.4rem' }}>Recommended Technologies & Stack</h4>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      {(Array.isArray(selectedProblemDetailModal.technologies) 
+                        ? selectedProblemDetailModal.technologies 
+                        : String(selectedProblemDetailModal.technologies).split(',')
+                      ).map((tech, i) => (
+                        <span key={i} style={{ padding: '0.2rem 0.55rem', borderRadius: '6px', fontSize: '0.74rem', background: 'rgba(255,255,255,0.05)', color: '#F8FAFC', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          {tech.trim ? tech.trim() : tech}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  <button onClick={() => setSelectedProblemDetailModal(null)} className="btn-alpha-cyan">
+                    Close Details
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {editingProblem && (
             <div className="modal-overlay">

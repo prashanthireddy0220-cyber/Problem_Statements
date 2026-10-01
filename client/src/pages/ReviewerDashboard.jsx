@@ -7,6 +7,7 @@ import {
 import axios from 'axios';
 
 import AUTHORIZED_TEAMS from '../data/teamsData';
+import { TOP_40_PROBLEMS } from '../data/problemStatementsData';
 
 const DEFAULT_FRONTEND_ROUNDS = [
   {
@@ -51,20 +52,26 @@ const DEFAULT_FRONTEND_ROUNDS = [
   }
 ];
 
-const INITIAL_TEAMS_DATA = AUTHORIZED_TEAMS.map(item => ({
-  _id: item.teamId,
-  teamId: item.teamId,
-  teamCode: item.teamId,
-  teamName: item.teamName || item.teamId,
-  teamLeadRegNum: item.regNum,
-  teamLeadName: item.leadName || `Team Lead (${item.teamId})`,
-  college: 'KARE',
-  department: 'CSE',
-  selectedProblemCode: 'Not Selected',
-  selectedProblemTitle: '',
-  membersCount: item.members ? item.members.length : 4,
-  registrationStatus: 'CONFIRMED'
-}));
+const INITIAL_TEAMS_DATA = AUTHORIZED_TEAMS.map(item => {
+  const probId = item.fixedProblemStatementId || 'PS-001';
+  const matched = TOP_40_PROBLEMS.find(p => p.problemId === probId);
+  return {
+    _id: item.teamId,
+    teamId: item.teamId,
+    teamCode: item.teamId,
+    teamName: item.teamName || item.teamId,
+    teamLeadRegNum: item.regNum,
+    teamLeadName: item.leadName || `Team Lead (${item.teamId})`,
+    college: 'KARE',
+    department: 'CSE',
+    selectedProblemCode: probId,
+    selectedProblemTitle: matched?.title || '',
+    selectedProblemDomain: matched?.domain || '',
+    selectedProblemDifficulty: matched?.difficulty || 'Medium',
+    membersCount: item.members ? item.members.length : 4,
+    registrationStatus: 'CONFIRMED'
+  };
+});
 
 export default function ReviewerDashboard() {
   const { user } = useAuth();
@@ -119,7 +126,21 @@ export default function ReviewerDashboard() {
       ]);
 
       if (teamsRes.data && teamsRes.data.teams && teamsRes.data.teams.length > 0) {
-        setTeams(teamsRes.data.teams);
+        const enriched = teamsRes.data.teams.map(t => {
+          const authItem = AUTHORIZED_TEAMS.find(a => a.teamId === (t.teamCode || t.teamId));
+          const rawCode = t.selectedProblemCode;
+          const isValidCode = rawCode && rawCode !== 'null' && rawCode !== 'undefined' && rawCode !== 'Not Selected';
+          const probCode = isValidCode ? rawCode : (authItem?.fixedProblemStatementId || 'PS-001');
+          const matched = TOP_40_PROBLEMS.find(p => p.problemId === probCode);
+          return {
+            ...t,
+            selectedProblemCode: probCode,
+            selectedProblemTitle: t.selectedProblemTitle || matched?.title || '',
+            selectedProblemDomain: t.selectedProblemDomain || matched?.domain || '',
+            selectedProblemDifficulty: t.selectedProblemDifficulty || matched?.difficulty || 'Medium'
+          };
+        });
+        setTeams(enriched);
       }
       if (roundsRes.data && roundsRes.data.rounds) {
         setRounds(roundsRes.data.rounds);
@@ -128,12 +149,12 @@ export default function ReviewerDashboard() {
       await fetchEvaluations(selectedRoundNum);
       setErrorMsg('');
     } catch (err) {
-      console.error('Failed to load reviewer dashboard data:', err);
-      if (retryCount < 2) {
-        setErrorMsg('Connecting to backend server (waking up server engine)... Retrying...');
+      console.warn('Reviewer dashboard initial data attempt failed:', err?.message);
+      if (retryCount < 5) {
+        setErrorMsg(`Connecting to backend server (waking up server engine, attempt ${retryCount + 1}/5)... Retrying in 3s...`);
         setTimeout(() => fetchInitialData(retryCount + 1), 3000);
       } else {
-        setErrorMsg(err.response?.data?.error || err.message || 'Backend server connection delayed. Click Sync Data to retry.');
+        setErrorMsg('Backend server connection delayed (cold start standby). Click "Sync Data" above to retry.');
       }
     } finally {
       setLoading(false);
@@ -608,20 +629,44 @@ export default function ReviewerDashboard() {
 
                       {/* Problem Statement */}
                       <td style={{ padding: '0.9rem 1.25rem', color: '#CBD5E1', fontSize: '0.82rem' }}>
-                        {team.selectedProblemCode && team.selectedProblemCode !== 'Not Selected' ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span style={{ color: '#FFD700', fontWeight: '800', fontFamily: 'Orbitron, monospace', fontSize: '0.9rem' }}>
-                              {team.selectedProblemCode}
-                            </span>
-                            {team.selectedProblemTitle ? (
-                              <span style={{ fontSize: '0.78rem', color: '#94A3B8', maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={team.selectedProblemTitle}>
-                                {team.selectedProblemTitle}
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <span style={{ color: '#64748B', fontStyle: 'italic' }}>Not Selected Yet</span>
-                        )}
+                        {(() => {
+                          const authItem = AUTHORIZED_TEAMS.find(a => a.teamId === (team.teamCode || team.teamId));
+                          const rawCode = team.selectedProblemCode;
+                          const isValidCode = rawCode && rawCode !== 'null' && rawCode !== 'undefined' && rawCode !== 'Not Selected';
+                          const probCode = isValidCode ? rawCode : (authItem?.fixedProblemStatementId || 'PS-001');
+                          const matched = TOP_40_PROBLEMS.find(p => p.problemId === probCode);
+                          const title = team.selectedProblemTitle || matched?.title || '';
+                          const domain = team.selectedProblemDomain || matched?.domain || '';
+
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{
+                                  color: '#00F2FE',
+                                  fontWeight: '800',
+                                  fontFamily: 'Orbitron, monospace',
+                                  fontSize: '0.88rem',
+                                  background: 'rgba(0, 242, 254, 0.12)',
+                                  padding: '2px 7px',
+                                  borderRadius: '5px',
+                                  border: '1px solid rgba(0, 242, 254, 0.25)'
+                                }}>
+                                  {probCode}
+                                </span>
+                                {domain && (
+                                  <span style={{ fontSize: '0.7rem', color: '#FFD700', background: 'rgba(255, 215, 0, 0.1)', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(255, 215, 0, 0.2)' }}>
+                                    {domain.split('&')[0].trim()}
+                                  </span>
+                                )}
+                              </div>
+                              {title ? (
+                                <span style={{ fontSize: '0.76rem', color: '#CBD5E1', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={title}>
+                                  {title}
+                                </span>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Status Badge */}
@@ -779,20 +824,31 @@ export default function ReviewerDashboard() {
               )}
 
               {/* Problem Statement Banner inside Modal */}
-              <div style={{ background: 'rgba(255, 215, 0, 0.08)', border: '1px solid rgba(255, 215, 0, 0.3)', padding: '0.85rem 1.1rem', borderRadius: '10px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+              <div style={{ background: 'rgba(0, 242, 254, 0.06)', border: '1px solid rgba(0, 242, 254, 0.3)', padding: '0.9rem 1.25rem', borderRadius: '10px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: '#FFD700', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>
-                    Selected Problem Statement
+                  <div style={{ fontSize: '0.72rem', color: '#00F2FE', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>
+                    Assigned Problem Statement
                   </div>
-                  <div style={{ fontSize: '0.98rem', fontWeight: '800', color: '#F8FAFC', marginTop: '2px' }}>
-                    {activeModalTeam.selectedProblemCode && activeModalTeam.selectedProblemCode !== 'Not Selected' ? (
-                      <>
-                        <span style={{ color: '#FFD700', fontFamily: 'Orbitron, monospace' }}>{activeModalTeam.selectedProblemCode}</span>
-                        {activeModalTeam.selectedProblemTitle ? ` — ${activeModalTeam.selectedProblemTitle}` : ''}
-                      </>
-                    ) : (
-                      <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not Selected Yet</span>
-                    )}
+                  <div style={{ fontSize: '1rem', fontWeight: '800', color: '#F8FAFC', marginTop: '3px' }}>
+                    {(() => {
+                      const authItem = AUTHORIZED_TEAMS.find(a => a.teamId === (activeModalTeam.teamCode || activeModalTeam.teamId));
+                      const rawCode = activeModalTeam.selectedProblemCode;
+                      const isValidCode = rawCode && rawCode !== 'null' && rawCode !== 'undefined' && rawCode !== 'Not Selected';
+                      const probCode = isValidCode ? rawCode : (authItem?.fixedProblemStatementId || 'PS-001');
+                      const matched = TOP_40_PROBLEMS.find(p => p.problemId === probCode);
+                      const title = activeModalTeam.selectedProblemTitle || matched?.title || '';
+                      const domain = activeModalTeam.selectedProblemDomain || matched?.domain || '';
+
+                      return (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: '#FFD700', fontFamily: 'Orbitron, monospace', fontSize: '1.05rem' }}>{probCode}</span>
+                            {domain && <span style={{ fontSize: '0.72rem', color: '#00F2FE', background: 'rgba(0,242,254,0.1)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(0,242,254,0.2)' }}>{domain}</span>}
+                          </div>
+                          {title && <div style={{ fontSize: '0.82rem', color: '#CBD5E1', marginTop: '4px', fontWeight: '500' }}>{title}</div>}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

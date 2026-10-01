@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const { Team, TeamLead, ProblemStatement, EvaluationRound, Evaluation, Reviewer, AuditLog, ActiveSession } = require('../models/Schema');
 const { authenticateToken, requireRole, JWT_SECRET } = require('../middleware/auth');
 const AUTHORIZED_TEAMS = require('../data/teamsData');
+const problemStatementsData = require('../data/problemStatements');
 
 // Reviewer Direct Login Handler
 const handleReviewerLogin = async (req, res) => {
@@ -148,8 +149,12 @@ router.get('/teams', authenticateToken, requireRole('REVIEWER', 'ADMIN'), async 
 
     const result = AUTHORIZED_TEAMS.map((item) => {
       const dbTeam = teams.find(t => t.name === item.teamId || t.teamId === item.teamId || t.teamLeadRegNum === item.regNum);
-      const probCode = dbTeam?.selectedProblemCode && dbTeam.selectedProblemCode !== 'null' ? dbTeam.selectedProblemCode : 'Not Selected';
-      const matchedProblem = probCode !== 'Not Selected' ? problemStatements.find(p => p.problemId === probCode) : null;
+      const rawProb = dbTeam?.selectedProblemCode;
+      const isValidProb = rawProb && rawProb !== 'null' && rawProb !== 'undefined' && rawProb !== 'Not Selected';
+      const probCode = isValidProb ? rawProb : (item.fixedProblemStatementId || 'Not Selected');
+      const matchedProblem = probCode !== 'Not Selected' 
+        ? (problemStatements.find(p => p.problemId === probCode) || problemStatementsData.find(p => p.problemId === probCode)) 
+        : null;
 
       return {
         _id: dbTeam?._id || item.teamId,
@@ -162,6 +167,8 @@ router.get('/teams', authenticateToken, requireRole('REVIEWER', 'ADMIN'), async 
         department: dbTeam?.department || 'CSE',
         selectedProblemCode: probCode,
         selectedProblemTitle: matchedProblem?.title || '',
+        selectedProblemDomain: matchedProblem?.domain || '',
+        selectedProblemDifficulty: matchedProblem?.difficulty || 'Medium',
         membersCount: item.members ? item.members.length : 0,
         registrationStatus: dbTeam?.registrationStatus || 'CONFIRMED'
       };
