@@ -464,6 +464,10 @@ const handleUpdateEvaluation = async (req, res) => {
 
     if (comments !== undefined) evaluationDoc.comments = comments;
     if (status !== undefined) evaluationDoc.status = status;
+    if (req.user.role === 'ADMIN') {
+      evaluationDoc.adminModified = true;
+      evaluationDoc.normalizedScore = updatedRawScore;
+    }
     evaluationDoc.submittedAt = new Date();
 
     await evaluationDoc.save();

@@ -766,6 +766,8 @@ router.post('/evaluations', authenticateToken, requireRole('ADMIN'), async (req,
     if (evaluationDoc) {
       evaluationDoc.rawScore = cleanRawScore;
       evaluationDoc.totalMarks = cleanRawScore;
+      evaluationDoc.normalizedScore = cleanRawScore;
+      evaluationDoc.adminModified = true;
       evaluationDoc.criteriaMarks = [{ criteriaKey: 'raw_score', name: 'Raw Marks', mark: cleanRawScore, maxMark: 100 }];
       if (comments !== undefined) evaluationDoc.comments = comments;
       evaluationDoc.status = 'SUBMITTED';
@@ -782,6 +784,8 @@ router.post('/evaluations', authenticateToken, requireRole('ADMIN'), async (req,
         reviewerName: reviewerName,
         rawScore: cleanRawScore,
         totalMarks: cleanRawScore,
+        normalizedScore: cleanRawScore,
+        adminModified: true,
         criteriaMarks: [{ criteriaKey: 'raw_score', name: 'Raw Marks', mark: cleanRawScore, maxMark: 100 }],
         comments: comments || 'Admin Entered Marks',
         status: 'SUBMITTED',
@@ -832,6 +836,8 @@ router.put('/evaluations/:id', authenticateToken, requireRole('ADMIN'), async (r
     const oldScore = evaluationDoc.rawScore;
     evaluationDoc.rawScore = cleanRawScore;
     evaluationDoc.totalMarks = cleanRawScore;
+    evaluationDoc.normalizedScore = cleanRawScore;
+    evaluationDoc.adminModified = true;
     evaluationDoc.criteriaMarks = [{ criteriaKey: 'raw_score', name: 'Raw Marks', mark: cleanRawScore, maxMark: 100 }];
     if (comments !== undefined) evaluationDoc.comments = comments;
     if (status !== undefined) evaluationDoc.status = status;

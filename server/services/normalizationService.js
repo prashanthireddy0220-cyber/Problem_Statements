@@ -92,10 +92,15 @@ async function recalculateRoundReviewerNormalization(roundNumber, reviewerId) {
 
   // Recalculate normalized score for EVERY evaluation document
   for (const ev of evaluations) {
-    const norm = calculateNormalizedScore(Number(ev.rawScore), minScore, maxScore);
     ev.minimumReviewerScore = minScore;
     ev.maximumReviewerScore = maxScore;
-    ev.normalizedScore = norm;
+    if (ev.adminModified) {
+      // Direct Admin Mark: DO NOT normalize when admin changes the marks
+      ev.normalizedScore = Number(ev.rawScore);
+    } else {
+      const norm = calculateNormalizedScore(Number(ev.rawScore), minScore, maxScore);
+      ev.normalizedScore = norm;
+    }
     ev.calculatedAt = now;
     await ev.save();
   }
@@ -165,7 +170,8 @@ async function getLeaderboardData() {
       const rEvs = teamEvaluations.filter(e => e.roundNumber === rNum);
       if (rEvs.length > 0) {
         // Collect normalized scores from all reviewers who evaluated this team in this round
-        const normScores = rEvs.map(e => Number(e.normalizedScore) || 0);
+        // If admin modified the score, use rawScore directly without normalization
+        const normScores = rEvs.map(e => (e.adminModified ? Number(e.rawScore) : (Number(e.normalizedScore) !== undefined ? Number(e.normalizedScore) : Number(e.rawScore))));
         const rawScores = rEvs.map(e => Number(e.rawScore) || 0);
 
         // Final round tally = average of reviewer normalized scores
@@ -178,13 +184,15 @@ async function getLeaderboardData() {
           normalizedTally: roundNormalizedTally,
           rawTally: Number((rawScores.reduce((sum, val) => sum + val, 0) / rawScores.length).toFixed(2)),
           reviewersBreakdown: rEvs.map(e => ({
+            _id: e._id,
             reviewerId: e.reviewerId,
             reviewerName: e.reviewerName,
             reviewerUsername: e.reviewerUsername,
             rawScore: e.rawScore,
             minimumScore: e.minimumReviewerScore,
             maximumScore: e.maximumReviewerScore,
-            normalizedScore: e.normalizedScore,
+            normalizedScore: e.adminModified ? e.rawScore : e.normalizedScore,
+            adminModified: Boolean(e.adminModified),
             submittedAt: e.submittedAt
           }))
         };

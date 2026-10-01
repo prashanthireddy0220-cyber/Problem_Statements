@@ -219,6 +219,7 @@ const EvaluationSchema = new mongoose.Schema({
   totalMarks: { type: Number, required: true }, // Retains raw score for backwards compatibility
   comments: { type: String, default: '' },
   status: { type: String, enum: ['DRAFT', 'SUBMITTED'], default: 'SUBMITTED' },
+  adminModified: { type: Boolean, default: false },
   submittedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 

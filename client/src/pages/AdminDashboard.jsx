@@ -86,16 +86,26 @@ export default function AdminDashboard() {
 
   const openAdminEditEv = (ev, teamObj, roundNum, defaultReviewerId) => {
     const rNum = roundNum || ev?.roundNumber || 1;
-    const initialRaw = ev?.rawScore !== undefined ? ev.rawScore : (ev?.totalMarks !== undefined ? ev.totalMarks : '');
+    const teamCode = teamObj?.teamId || teamObj?.teamCode || ev?.teamCode;
+    const teamId = teamObj?._id || ev?.teamId;
+
+    // Auto-discover existing evaluation for this team & round if ev was null
+    const existingEv = ev || (evalData.evaluations || []).find(e => 
+      (e.teamCode === teamCode || (teamId && String(e.teamId) === String(teamId))) && e.roundNumber === rNum
+    ) || null;
+
+    const initialRaw = existingEv?.rawScore !== undefined ? existingEv.rawScore : (existingEv?.totalMarks !== undefined ? existingEv.totalMarks : '');
     setAdminRawMarkInput(initialRaw !== '' ? String(initialRaw) : '');
-    const revId = ev?.reviewerId || defaultReviewerId || (evalData.reviewers && evalData.reviewers[0]?._id) || 'reviewer1';
+
+    const revId = existingEv?.reviewerId || defaultReviewerId || (evalData.reviewers && evalData.reviewers[0]?._id) || 'reviewer1';
     setAdminReviewerSelect(revId);
-    setAdminCommentsInput(ev?.comments || '');
+    setAdminCommentsInput(existingEv?.comments || '');
+
     setAdminEditEvModal({
-      evDoc: ev || null,
-      teamCode: teamObj?.teamId || teamObj?.teamCode || ev?.teamCode,
-      teamName: teamObj?.teamName || ev?.teamName,
-      teamId: teamObj?._id || ev?.teamId,
+      evDoc: existingEv,
+      teamCode: teamCode,
+      teamName: teamObj?.teamName || existingEv?.teamName || teamCode,
+      teamId: teamId || teamCode,
       roundNumber: rNum
     });
   };
@@ -114,31 +124,105 @@ export default function AdminDashboard() {
       return;
     }
 
-    setAdminSubmittingEv(true);
-    try {
-      const payload = {
-        teamCode: adminEditEvModal.teamCode,
-        roundNumber: adminEditEvModal.roundNumber,
-        reviewerId: adminReviewerSelect || (adminEditEvModal.evDoc?.reviewerId) || (evalData.reviewers[0]?._id),
+    const { teamCode, teamName, teamId, roundNumber, evDoc } = adminEditEvModal;
+    const reviewerId = adminReviewerSelect || (evDoc?.reviewerId) || (evalData.reviewers?.[0]?._id) || 'reviewer1';
+    const comments = adminCommentsInput;
+
+    // 1. Instant smooth modal close and optimistic update (0ms lag, no delay)
+    setAdminEditEvModal(null);
+    setActionMsg(`Score (${scoreNum}) saved successfully for Team ${teamCode} (Round ${roundNumber})!`);
+    setTimeout(() => setActionMsg(''), 4000);
+
+    // Optimistically update local evalData so marks reflect smoothly immediately
+    setEvalData(prev => {
+      const updatedEvs = [...(prev.evaluations || [])];
+      const matchIdx = updatedEvs.findIndex(evItem => 
+        (evItem.teamCode === teamCode || (evDoc?._id && evItem._id === evDoc._id)) && evItem.roundNumber === roundNumber
+      );
+      
+      const newEvObj = {
+        ...(matchIdx >= 0 ? updatedEvs[matchIdx] : {}),
+        _id: evDoc?._id || `temp-${Date.now()}`,
+        teamCode,
+        teamName,
+        teamId,
+        roundNumber,
+        reviewerId,
         rawScore: scoreNum,
-        comments: adminCommentsInput
+        totalMarks: scoreNum,
+        normalizedScore: scoreNum, // Direct admin mark without normalization
+        adminModified: true,
+        comments,
+        status: 'SUBMITTED',
+        submittedAt: new Date().toISOString()
       };
 
-      if (adminEditEvModal.evDoc?._id) {
-        await axios.put(`/api/admin/evaluations/${adminEditEvModal.evDoc._id}`, payload);
+      if (matchIdx >= 0) {
+        updatedEvs[matchIdx] = newEvObj;
+      } else {
+        updatedEvs.push(newEvObj);
+      }
+
+      const updatedLeaderboard = (prev.leaderboard || []).map(t => {
+        if (t.teamCode === teamCode || t.teamId === teamCode) {
+          const rounds = { ...(t.rounds || {}) };
+          const curRound = rounds[roundNumber] || {};
+          rounds[roundNumber] = {
+            ...curRound,
+            evaluated: true,
+            normalizedTally: scoreNum,
+            rawTally: scoreNum,
+            reviewersCount: Math.max(1, curRound.reviewersCount || 1)
+          };
+          const r1 = roundNumber === 1 ? scoreNum : (rounds[1]?.normalizedTally ?? t.round1Score ?? 0);
+          const r2 = roundNumber === 2 ? scoreNum : (rounds[2]?.normalizedTally ?? t.round2Score ?? 0);
+          const r3 = roundNumber === 3 ? scoreNum : (rounds[3]?.normalizedTally ?? t.round3Score ?? 0);
+          const total = Number((r1 + r2 + r3).toFixed(2));
+          return {
+            ...t,
+            rounds,
+            round1Score: roundNumber === 1 ? scoreNum : (rounds[1]?.normalizedTally ?? t.round1Score),
+            round2Score: roundNumber === 2 ? scoreNum : (rounds[2]?.normalizedTally ?? t.round2Score),
+            round3Score: roundNumber === 3 ? scoreNum : (rounds[3]?.normalizedTally ?? t.round3Score),
+            combinedTotal: total,
+            hasEvaluations: true
+          };
+        }
+        return t;
+      });
+
+      return {
+        ...prev,
+        evaluations: updatedEvs,
+        leaderboard: updatedLeaderboard
+      };
+    });
+
+    try {
+      const payload = {
+        teamCode,
+        roundNumber,
+        reviewerId,
+        rawScore: scoreNum,
+        comments
+      };
+
+      if (evDoc?._id) {
+        await axios.put(`/api/admin/evaluations/${evDoc._id}`, payload);
       } else {
         await axios.post('/api/admin/evaluations', payload);
       }
 
-      setActionMsg(`Raw score (${scoreNum}) saved & automatically recalculated for Team ${adminEditEvModal.teamCode} (Round ${adminEditEvModal.roundNumber})!`);
-      setTimeout(() => setActionMsg(''), 4000);
-
-      setAdminEditEvModal(null);
-      await fetchAllData();
+      // Smooth background refresh of evaluations only
+      const res = await axios.get('/api/admin/evaluations').catch(() => null);
+      if (res && res.data) {
+        setEvalData(res.data);
+      }
     } catch (err) {
+      console.error('Failed to save evaluation marks:', err);
       alert(err.response?.data?.error || 'Failed to save evaluation marks.');
-    } finally {
-      setAdminSubmittingEv(false);
+      const res = await axios.get('/api/admin/evaluations').catch(() => null);
+      if (res && res.data) setEvalData(res.data);
     }
   };
 
@@ -1349,9 +1433,9 @@ export default function AdminDashboard() {
                       <th style={{ width: '60px', textAlign: 'center' }}>Rank</th>
                       <th>Team ID</th>
                       <th>Team Name</th>
-                      <th style={{ textAlign: 'center' }}>Round 1 (Norm / 100)</th>
-                      <th style={{ textAlign: 'center' }}>Round 2 (Norm / 100)</th>
-                      <th style={{ textAlign: 'center' }}>Round 3 (Norm / 100)</th>
+                      <th style={{ textAlign: 'center' }}>Round 1 Score</th>
+                      <th style={{ textAlign: 'center' }}>Round 2 Score</th>
+                      <th style={{ textAlign: 'center' }}>Round 3 Score</th>
                       <th style={{ textAlign: 'center' }}>Combined Total (/ 300)</th>
                       <th style={{ textAlign: 'center' }}>Admin Action</th>
                     </tr>
@@ -1773,10 +1857,10 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* Automatic Recalculation Notice */}
-                    <div style={{ background: 'rgba(0, 242, 254, 0.08)', border: '1px solid rgba(0, 242, 254, 0.25)', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.78rem', color: '#CBD5E1', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Zap size={18} color="#00F2FE" />
-                      <span>Saving will automatically recalculate MIN, MAX, all affected teams' normalized scores, and the leaderboard in realtime.</span>
+                    {/* Direct Admin Mark Notice */}
+                    <div style={{ background: 'rgba(0, 230, 118, 0.08)', border: '1px solid rgba(0, 230, 118, 0.25)', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.78rem', color: '#CBD5E1', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckCircle2 size={18} color="#00E676" />
+                      <span>Direct Admin Mark Entry: Marks saved by Admin are applied directly without Min-Max normalization.</span>
                     </div>
 
                     {/* Admin Reason / Notes */}
