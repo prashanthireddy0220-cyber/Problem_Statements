@@ -14,8 +14,10 @@ export default function TeamLeadLogin() {
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
+    const cleanTeamId = teamId.trim().toUpperCase();
+    const cleanRegNum = registrationNumber.trim();
 
-    if (!teamId.trim() || !registrationNumber.trim()) {
+    if (!cleanTeamId || !cleanRegNum) {
       setError('Please enter both Team ID and Team Lead Registration Number.');
       return;
     }
@@ -25,18 +27,31 @@ export default function TeamLeadLogin() {
     setLoadingMessage('Verifying Credentials...');
 
     const wakeTimer = setTimeout(() => {
-      setLoadingMessage('Waking up server instance...');
-    }, 2500);
+      setLoadingMessage('Connecting to server...');
+    }, 2000);
+
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      setError('Server response timed out. Please tap Login again.');
+    }, 25000);
 
     const deviceId = `browser-device-${Math.random().toString(36).substring(2, 9)}`;
-    const result = await loginTeamLead(teamId, registrationNumber, deviceId);
 
-    clearTimeout(wakeTimer);
-    setLoading(false);
-    if (result.success) {
-      navigate('/team-lead/dashboard');
-    } else {
-      setError(result.error || 'Invalid Team ID or Team Lead Registration Number');
+    try {
+      const result = await loginTeamLead(cleanTeamId, cleanRegNum, deviceId);
+      clearTimeout(wakeTimer);
+      clearTimeout(safetyTimer);
+      setLoading(false);
+      if (result.success) {
+        navigate('/team-lead/dashboard');
+      } else {
+        setError(result.error || 'Invalid Team ID or Team Lead Registration Number');
+      }
+    } catch (err) {
+      clearTimeout(wakeTimer);
+      clearTimeout(safetyTimer);
+      setLoading(false);
+      setError('Network connection error. Please try again.');
     }
   };
 

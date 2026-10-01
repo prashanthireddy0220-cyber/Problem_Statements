@@ -14,7 +14,10 @@ export default function ReviewerLogin() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!username || !password) {
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanUsername || !cleanPassword) {
       setError('Please enter reviewer username and password.');
       return;
     }
@@ -24,17 +27,30 @@ export default function ReviewerLogin() {
     setLoadingMessage('Authenticating...');
 
     const wakeTimer = setTimeout(() => {
-      setLoadingMessage('Waking up server instance...');
-    }, 2500);
+      setLoadingMessage('Connecting to server...');
+    }, 2000);
 
-    const result = await loginReviewer(username, password);
-    clearTimeout(wakeTimer);
-    setLoading(false);
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      setError('Server response timed out. Please tap Login again.');
+    }, 25000);
 
-    if (result.success) {
-      navigate('/reviewer');
-    } else {
-      setError(result.error);
+    try {
+      const result = await loginReviewer(cleanUsername, cleanPassword);
+      clearTimeout(wakeTimer);
+      clearTimeout(safetyTimer);
+      setLoading(false);
+
+      if (result.success) {
+        navigate('/reviewer');
+      } else {
+        setError(result.error || 'Invalid reviewer credentials.');
+      }
+    } catch (err) {
+      clearTimeout(wakeTimer);
+      clearTimeout(safetyTimer);
+      setLoading(false);
+      setError('Network connection error. Please try again.');
     }
   };
 

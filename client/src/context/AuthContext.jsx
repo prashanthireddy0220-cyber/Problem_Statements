@@ -192,72 +192,89 @@ export const AuthProvider = ({ children }) => {
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
-  const loginTeamLead = async (teamId, registrationNumber, deviceId) => {
+  const performAuthPost = async (endpoint, data) => {
     let lastErr = null;
+    const directBase = 'https://problem-statements-w7wq.onrender.com';
+    const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+
+    // Ordered targets to ensure highest delivery success across cloud & mobile networks
+    const candidateEndpoints = [
+      endpoint,
+      `${directBase}${endpoint}`
+    ];
+    if (isVercel) {
+      candidateEndpoints.unshift(endpoint); // Vercel edge rewrite
+    }
+    const uniqueCandidates = [...new Set(candidateEndpoints)];
+
     for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await axios.post('/api/auth/team-lead/login', { teamId, registrationNumber, deviceId }, { timeout: 20000 });
-        const { token, user, sessionId } = res.data;
-        
-        localStorage.setItem('alpha_team_lead_token', token);
-        localStorage.setItem('alpha_team_lead_user', JSON.stringify(user));
-        localStorage.setItem('alpha_token', token);
-        localStorage.setItem('alpha_user', JSON.stringify(user));
-        localStorage.setItem('alpha_session_id', sessionId);
-        
-        setToken(token);
-        setUser(user);
-        setSessionId(sessionId);
-        setRevokedMessage(null);
-        return { success: true, user };
-      } catch (err) {
-        lastErr = err;
-        if (err.response && err.response.status >= 400 && err.response.status < 500) {
-          return { success: false, error: extractErrorMessage(err, 'Invalid credentials.') };
-        }
-        if (attempt < 2) {
-          await new Promise(r => setTimeout(r, 1200));
+      for (const target of uniqueCandidates) {
+        try {
+          const res = await axios.post(target, data, { timeout: 15000 });
+          if (res.data && (res.data.token || res.data.sessionId || res.data.user)) {
+            return res.data;
+          }
+        } catch (err) {
+          lastErr = err;
+          // If server returned 400, 401, or 403 (e.g. wrong credentials, revoked), do not retry!
+          if (err.response && err.response.status >= 400 && err.response.status < 500) {
+            throw err;
+          }
         }
       }
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 1200));
+      }
     }
-    return { success: false, error: extractErrorMessage(lastErr, 'Team lead login failed.') };
+    throw lastErr;
+  };
+
+  const loginTeamLead = async (teamId, registrationNumber, deviceId) => {
+    try {
+      const data = await performAuthPost('/api/auth/team-lead/login', { teamId, registrationNumber, deviceId });
+      const { token, user, sessionId } = data;
+      
+      localStorage.setItem('alpha_team_lead_token', token);
+      localStorage.setItem('alpha_team_lead_user', JSON.stringify(user));
+      localStorage.setItem('alpha_token', token);
+      localStorage.setItem('alpha_user', JSON.stringify(user));
+      localStorage.setItem('alpha_session_id', sessionId);
+      
+      setToken(token);
+      setUser(user);
+      setSessionId(sessionId);
+      setRevokedMessage(null);
+      return { success: true, user, team: data.team };
+    } catch (err) {
+      return { success: false, error: extractErrorMessage(err, 'Invalid credentials.') };
+    }
   };
 
   const loginAdmin = async (username, password) => {
-    let lastErr = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await axios.post('/api/auth/admin/login', { username, password }, { timeout: 20000 });
-        const { token, user, sessionId } = res.data;
-        
-        localStorage.setItem('alpha_admin_token', token);
-        localStorage.setItem('alpha_admin_user', JSON.stringify(user));
-        localStorage.setItem('alpha_token', token);
-        localStorage.setItem('alpha_user', JSON.stringify(user));
-        localStorage.setItem('alpha_session_id', sessionId);
-        
-        setToken(token);
-        setUser(user);
-        setSessionId(sessionId);
-        setRevokedMessage(null);
-        return { success: true, user };
-      } catch (err) {
-        lastErr = err;
-        if (err.response && err.response.status >= 400 && err.response.status < 500) {
-          return { success: false, error: extractErrorMessage(err, 'Invalid admin credentials.') };
-        }
-        if (attempt < 2) {
-          await new Promise(r => setTimeout(r, 1200));
-        }
-      }
+    try {
+      const data = await performAuthPost('/api/auth/admin/login', { username, password });
+      const { token, user, sessionId } = data;
+      
+      localStorage.setItem('alpha_admin_token', token);
+      localStorage.setItem('alpha_admin_user', JSON.stringify(user));
+      localStorage.setItem('alpha_token', token);
+      localStorage.setItem('alpha_user', JSON.stringify(user));
+      localStorage.setItem('alpha_session_id', sessionId);
+      
+      setToken(token);
+      setUser(user);
+      setSessionId(sessionId);
+      setRevokedMessage(null);
+      return { success: true, user };
+    } catch (err) {
+      return { success: false, error: extractErrorMessage(err, 'Invalid admin credentials.') };
     }
-    return { success: false, error: extractErrorMessage(lastErr, 'Admin login failed.') };
   };
 
   const loginVolunteer = async (username, password) => {
     try {
-      const res = await axios.post('/api/auth/volunteer/login', { username, password });
-      const { token, user, sessionId } = res.data;
+      const data = await performAuthPost('/api/auth/volunteer/login', { username, password });
+      const { token, user, sessionId } = data;
       
       localStorage.setItem('alpha_volunteer_token', token);
       localStorage.setItem('alpha_volunteer_user', JSON.stringify(user));
@@ -271,22 +288,22 @@ export const AuthProvider = ({ children }) => {
       setRevokedMessage(null);
       return { success: true, user };
     } catch (err) {
-      return { success: false, error: extractErrorMessage(err, 'Volunteer login failed.') };
+      return { success: false, error: extractErrorMessage(err, 'Invalid volunteer credentials.') };
     }
   };
 
   const loginReviewer = async (username, password) => {
     try {
-      let res;
+      let data;
       try {
-        res = await axios.post('/api/auth/reviewer/login', { username, password });
+        data = await performAuthPost('/api/auth/reviewer/login', { username, password });
       } catch (firstErr) {
         if (firstErr.response?.status === 404) {
           try {
-            res = await axios.post('/api/reviewer/login', { username, password });
+            data = await performAuthPost('/api/reviewer/login', { username, password });
           } catch (secondErr) {
             if (secondErr.response?.status === 404) {
-              res = await axios.post('/api/auth/reviewer-login', { username, password });
+              data = await performAuthPost('/api/auth/reviewer-login', { username, password });
             } else {
               throw secondErr;
             }
@@ -295,7 +312,7 @@ export const AuthProvider = ({ children }) => {
           throw firstErr;
         }
       }
-      const { token, user, sessionId } = res.data;
+      const { token, user, sessionId } = data;
       
       localStorage.setItem('alpha_reviewer_token', token);
       localStorage.setItem('alpha_reviewer_user', JSON.stringify(user));
@@ -309,7 +326,7 @@ export const AuthProvider = ({ children }) => {
       setRevokedMessage(null);
       return { success: true, user };
     } catch (err) {
-      return { success: false, error: extractErrorMessage(err, 'Reviewer login failed.') };
+      return { success: false, error: extractErrorMessage(err, 'Invalid reviewer credentials.') };
     }
   };
 

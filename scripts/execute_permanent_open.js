@@ -56,7 +56,15 @@ function get(path, token) {
 
 async function run() {
   console.log('1. Logging in as Admin...');
-  const adminRes = await post('/api/auth/admin/login', { username: 'Admin', password: 'Admin0509' });
+  let adminRes = null;
+  let attempts = 0;
+  while (attempts < 15) {
+    attempts++;
+    adminRes = await post('/api/auth/admin/login', { username: 'Admin', password: 'Admin0509' });
+    if (adminRes.status === 200 && adminRes.json?.token) break;
+    console.log(`Attempt ${attempts}: status=${adminRes.status}, error=${adminRes.error}, msg=${adminRes.json?.message || adminRes.body?.slice(0, 100)}`);
+    await new Promise(r => setTimeout(r, 4000));
+  }
   console.log('Admin login status:', adminRes.status, adminRes.json?.message || adminRes.body?.slice(0, 100));
 
   if (!adminRes.json?.token) {

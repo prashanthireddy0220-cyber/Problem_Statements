@@ -14,7 +14,10 @@ export default function AdminLogin() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!username || !password) {
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanUsername || !cleanPassword) {
       setError('Please enter admin username and password.');
       return;
     }
@@ -24,17 +27,30 @@ export default function AdminLogin() {
     setLoadingMessage('Authenticating Admin...');
 
     const wakeTimer = setTimeout(() => {
-      setLoadingMessage('Waking up server instance...');
-    }, 2500);
+      setLoadingMessage('Connecting to server...');
+    }, 2000);
 
-    const result = await loginAdmin(username, password);
-    clearTimeout(wakeTimer);
-    setLoading(false);
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      setError('Server response timed out. Please tap Login again.');
+    }, 25000);
 
-    if (result.success) {
-      navigate('/admin/dashboard');
-    } else {
-      setError(result.error);
+    try {
+      const result = await loginAdmin(cleanUsername, cleanPassword);
+      clearTimeout(wakeTimer);
+      clearTimeout(safetyTimer);
+      setLoading(false);
+
+      if (result.success) {
+        navigate('/admin/dashboard');
+      } else {
+        setError(result.error || 'Invalid admin credentials.');
+      }
+    } catch (err) {
+      clearTimeout(wakeTimer);
+      clearTimeout(safetyTimer);
+      setLoading(false);
+      setError('Network connection error. Please try again.');
     }
   };
 
