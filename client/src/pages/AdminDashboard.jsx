@@ -410,6 +410,16 @@ export default function AdminDashboard() {
     if (phaseActionLoading) return;
     setPhaseActionLoading(true);
 
+    // Map backwards-compatible actions
+    let effectiveAction = actionStr;
+    const payload = { ...extraData };
+    if (actionStr === 'START_SELECTION_2MIN' || actionStr === 'MANUAL_SELECTION_RELEASE_2MIN') {
+      effectiveAction = 'SCHEDULE_SELECTION';
+      if (!payload.scheduledTime) {
+        payload.scheduledTime = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+      }
+    }
+
     // Optimistic instant UI update for immediate admin feedback (<1ms)
     if (actionStr === 'RELEASE_PROBLEMS' || actionStr === 'RELEASE_NOW' || actionStr === 'RELEASE_PROBLEMS_MANUAL') {
       setLiveData(prev => ({
@@ -430,7 +440,7 @@ export default function AdminDashboard() {
         }
       }));
     } else if (actionStr === 'SCHEDULE_SELECTION' || actionStr === 'START_SELECTION_2MIN') {
-      const targetTime = extraData.scheduledTime || new Date(Date.now() + 2 * 60 * 1000).toISOString();
+      const targetTime = payload.scheduledTime || new Date(Date.now() + 2 * 60 * 1000).toISOString();
       setLiveData(prev => ({
         ...prev,
         summary: {
@@ -456,8 +466,8 @@ export default function AdminDashboard() {
     }
 
     try {
-      const res = await axios.post('/api/admin/session-control', { action: actionStr, ...extraData });
-      setActionMsg(res.data?.message || `Session action '${actionStr}' applied successfully!`);
+      const res = await axios.post('/api/admin/session-control', { action: effectiveAction, ...payload });
+      setActionMsg(res.data?.message || `Session action applied successfully!`);
       setTimeout(() => setActionMsg(''), 4000);
 
       // Direct synchronous update from authoritative server state
@@ -484,8 +494,10 @@ export default function AdminDashboard() {
       fetchAllData();
       fetchSettings();
     } catch (e) {
-      if (e.response?.status === 403) {
-        alert('Forbidden (403): Your current session is not authenticated as an Admin. If you logged into the Reviewer or Team Lead portal in another tab, please re-login as Admin at /admin/login to refresh your credentials.');
+      if (e.response?.status === 401 || e.response?.status === 403) {
+        alert('Authentication expired (401/403): Your Admin session has expired or is invalid. Please log in again at /admin/login.');
+        window.location.href = '/admin/login';
+        return;
       } else {
         alert(e.response?.data?.error || 'Failed to update session phase.');
       }
