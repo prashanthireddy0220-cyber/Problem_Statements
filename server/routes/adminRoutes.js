@@ -144,19 +144,17 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
         settings.selectionEndsAt = new Date(new Date(scheduledTime).getTime() + (settings.selectionDurationMinutes || 10) * 60 * 1000);
       }
       settings.currentPhase = (scheduledTime && now < new Date(scheduledTime)) ? 'RELEASED_LOCKED' : 'SELECTION_OPEN';
-    } else if (action === 'OPEN_NOW' || action === 'START_SELECTION') {
-      const selDur = Number(selectionDurationMinutes || settings.selectionDurationMinutes || 10);
+    } else if (action === 'OPEN_NOW' || action === 'START_SELECTION' || action === 'PERMANENTLY_OPEN' || action === 'OPEN_PERMANENT' || action === 'RELEASE_AND_OPEN' || action === 'OPEN_SELECTION') {
       settings.releaseManualState = 'RELEASED';
       settings.problemStatementsReleased = true;
       settings.problemSelectionEnabled = true;
       settings.selectionManualState = 'OPEN';
       settings.currentPhase = 'SELECTION_OPEN';
       settings.selectionStartedAt = now;
-      settings.selectionEndsAt = new Date(now.getTime() + selDur * 60 * 1000);
-      settings.selectionScheduledStart = now;
-      if (settings.releaseScheduledAt && new Date(settings.releaseScheduledAt) > now) {
-        settings.releaseScheduledAt = now;
-      }
+      settings.selectionScheduledStart = null;
+      settings.selectionEndsAt = null; // Permanently open - no auto-expiry!
+      settings.releaseScheduledAt = null;
+      settings.roundStatus = 'ACTIVE';
     } else if (action === 'CLOSE' || action === 'LOCK' || action === 'END_SESSION') {
       settings.selectionManualState = 'CLOSED';
       settings.currentPhase = 'SELECTION_CLOSED';
@@ -191,22 +189,23 @@ router.post('/session-control', authenticateToken, requireRole('ADMIN'), async (
     // Centrally re-evaluate system state cleanly
     const freshState = await getOrUpdateSystemState(true);
 
-    await AuditLog.create({
-      actor: req.user.username,
+    const actorName = req.user?.username || req.user?.registrationNumber || req.user?.name || 'Admin';
+    AuditLog.create({
+      actor: actorName,
       role: 'ADMIN',
       action: `SESSION_${action}`,
       target: freshState.currentPhase || action
-    });
+    }).catch(e => console.warn('Non-fatal AuditLog write warning:', e.message));
 
     return res.json({
-      message: `Session transition '${action}' applied successfully.`,
+      message: `Session transition '${action}' applied successfully. Selection is now ${freshState.currentPhase}.`,
       settings: freshState.settings,
       currentPhase: freshState.currentPhase,
       state: freshState
     });
   } catch (err) {
     console.error('Session control error:', err);
-    return res.status(500).json({ error: 'Failed to update session state.' });
+    return res.status(500).json({ error: 'Failed to update session state.', details: err.message });
   }
 });
 

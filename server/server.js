@@ -40,7 +40,15 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
 // Health check endpoint (Registered BEFORE any route handlers)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', version: '1.0.7-alpha-ps41-42-sync', message: 'College Hackathon ALPHA Server Running', time: new Date() });
+  const dbStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  res.json({
+    status: 'OK',
+    version: '1.0.8-alpha-top40-sync',
+    message: 'College Hackathon ALPHA Server Running',
+    dbState: dbStates[mongoose.connection.readyState] || 'unknown',
+    hasMongoUri: Boolean(config.MONGODB_URI),
+    time: new Date()
+  });
 });
 
 // Mount API Routes (Specific path prefixes registered first)
@@ -263,11 +271,11 @@ async function triggerAutoSeed() {
       { $set: { selectedProblemCode: 'Not Selected', selectionConfirmed: false, problemStatementId: null } }
     );
 
-    // 3. Upsert and synchronize all 40 problem statements from the Top 40 booklet
-    for (const p of problemStatementsData) {
-      await ProblemStatement.updateOne(
-        { problemId: p.problemId },
-        {
+    // 3. Upsert and synchronize all 40 problem statements from the Top 40 booklet in bulk
+    const bulkOps = problemStatementsData.map(p => ({
+      updateOne: {
+        filter: { problemId: p.problemId },
+        update: {
           $set: {
             title: p.title,
             description: p.description,
@@ -282,11 +290,12 @@ async function triggerAutoSeed() {
             status: 'PUBLISHED'
           }
         },
-        { upsert: true }
-      );
-    }
+        upsert: true
+      }
+    }));
+    await ProblemStatement.bulkWrite(bulkOps);
 
-    // 4. Synchronize selectedCount for each of the 40 problem statements based on active confirmed team selections
+    // 4. Synchronize selectedCount for each problem statement based on active confirmed team selections
     for (const p of problemStatementsData) {
       const activeCount = await Team.countDocuments({
         selectedProblemCode: p.problemId,
@@ -395,54 +404,47 @@ async function triggerAutoSeed() {
     }
 
     const authorizedTeams = require('./data/teamsData');
-    console.log(`🌱 Initializing ${authorizedTeams.length} authorized Teams & Team Leads (ALPHA-001 to ALPHA-061)...`);
+    console.log(`🌱 Initializing ${authorizedTeams.length} authorized Teams & Team Leads in bulk...`);
 
-    for (const item of authorizedTeams) {
-      let teamDoc = await Team.findOne({ $or: [{ name: item.teamId }, { teamId: item.teamId }, { teamLeadRegNum: item.regNum }] });
-
-      const qrToken = `TQ-${item.teamId}-${item.regNum.slice(-4)}`;
-      const passToken = `EP-${item.teamId}-${item.regNum.slice(-4)}`;
-
-      if (!teamDoc) {
-        teamDoc = await Team.create({
-          name: item.teamId,
-          teamId: item.teamId,
-          teamName: item.teamName || item.teamId,
-          teamLeadRegNum: item.regNum,
-          college: 'KARE',
-          department: 'CSE',
-          members: item.members || [],
-          teamQrToken: qrToken,
-          eventPassQrToken: passToken,
-          registrationStatus: 'CONFIRMED',
-          eventPassStatus: 'ISSUED'
-        });
-      } else {
-        teamDoc.name = item.teamId;
-        teamDoc.teamId = item.teamId;
-        teamDoc.teamName = item.teamName || item.teamId;
-        teamDoc.teamLeadRegNum = item.regNum;
-        teamDoc.members = item.members || teamDoc.members;
-        if (!teamDoc.college) teamDoc.college = 'KARE';
-        if (!teamDoc.teamQrToken) teamDoc.teamQrToken = qrToken;
-        if (!teamDoc.eventPassQrToken) teamDoc.eventPassQrToken = passToken;
-        await teamDoc.save();
+    const teamOps = authorizedTeams.map(item => ({
+      updateOne: {
+        filter: { name: item.teamId },
+        update: {
+          $setOnInsert: {
+            name: item.teamId,
+            teamId: item.teamId,
+            teamName: item.teamName || item.teamId,
+            teamLeadRegNum: item.regNum,
+            college: 'KARE',
+            department: 'CSE',
+            members: item.members || [],
+            teamQrToken: `TQ-${item.teamId}-${item.regNum.slice(-4)}`,
+            eventPassQrToken: `EP-${item.teamId}-${item.regNum.slice(-4)}`,
+            registrationStatus: 'CONFIRMED',
+            eventPassStatus: 'ISSUED'
+          }
+        },
+        upsert: true
       }
+    }));
 
-      const leadDoc = await TeamLead.findOne({ registrationNumber: item.regNum });
-      if (!leadDoc) {
-        await TeamLead.create({
-          registrationNumber: item.regNum,
-          name: item.leadName,
-          teamId: teamDoc._id,
-          phone: '9876543210',
-          email: `${item.teamId.toLowerCase()}@hackathon.edu`
-        });
-      } else if (!leadDoc.teamId) {
-        leadDoc.teamId = teamDoc._id;
-        await leadDoc.save();
+    const leadOps = authorizedTeams.map(item => ({
+      updateOne: {
+        filter: { registrationNumber: item.regNum },
+        update: {
+          $setOnInsert: {
+            registrationNumber: item.regNum,
+            name: item.leadName || `Team Lead (${item.teamId})`,
+            phone: '9876543210',
+            email: `${item.teamId.toLowerCase()}@hackathon.edu`
+          }
+        },
+        upsert: true
       }
-    }
+    }));
+
+    await Promise.all([Team.bulkWrite(teamOps), TeamLead.bulkWrite(leadOps)]);
+    console.log(`✅ Bulk initialized ${authorizedTeams.length} Teams and Team Leads.`);
   } catch (e) {
     console.error('Auto-seed error:', e);
   }

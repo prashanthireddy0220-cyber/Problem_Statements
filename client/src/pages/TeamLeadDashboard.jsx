@@ -958,10 +958,12 @@ export default function TeamLeadDashboard() {
                       boxShadow: `0 0 25px ${isSelectionOpen ? 'rgba(0, 230, 118, 0.35)' : (isReleasedLocked ? 'rgba(255, 215, 0, 0.35)' : 'rgba(0, 242, 254, 0.35)')}`
                     }}>
                       <div style={{ fontSize: '0.75rem', color: isSelectionOpen ? '#00E676' : (isReleasedLocked ? '#FFD700' : '#00F2FE'), textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
-                        {isSelectionOpen ? 'SELECTION TIME REMAINING' : (isReleasedLocked ? (timerState?.selectionScheduledStart ? 'SELECTION OPENS IN' : 'READING TIME') : 'PROBLEM STATEMENTS WILL BE RELEASED IN')}
+                        {isSelectionOpen 
+                          ? (timerState?.selectionEndsAt ? 'SELECTION TIME REMAINING' : 'SELECTION STATUS') 
+                          : (isReleasedLocked ? (timerState?.selectionScheduledStart ? 'SELECTION OPENS IN' : 'READING TIME') : 'PROBLEM STATEMENTS WILL BE RELEASED IN')}
                       </div>
-                      <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '2.5rem', fontWeight: '900', color: '#F8FAFC', letterSpacing: '3px', marginTop: '0.2rem' }}>
-                        {formatTime(secondsRemaining)}
+                      <div style={{ fontFamily: 'Orbitron, monospace', fontSize: (isSelectionOpen && !timerState?.selectionEndsAt) ? '2.1rem' : '2.5rem', fontWeight: '900', color: (isSelectionOpen && !timerState?.selectionEndsAt) ? '#00E676' : '#F8FAFC', letterSpacing: '3px', marginTop: '0.2rem' }}>
+                        {(isSelectionOpen && !timerState?.selectionEndsAt) ? 'ACTIVE' : formatTime(secondsRemaining)}
                       </div>
                     </div>
                   )}

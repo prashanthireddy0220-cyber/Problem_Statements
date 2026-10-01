@@ -88,14 +88,10 @@ async function getOrUpdateSystemState(forceRefresh = false) {
     computedPhase = 'SELECTION_CLOSED';
     isReleased = Boolean(settings.problemStatementsReleased || settings.releaseManualState === 'RELEASED');
   }
-  // 3. Explicit Manual Open override (Admin enabled selection now)
+  // 3. Explicit Manual Open override (Admin enabled selection permanently/now)
   else if (settings.selectionManualState === 'OPEN') {
     isReleased = true;
-    if (settings.selectionEndsAt && now >= new Date(settings.selectionEndsAt)) {
-      computedPhase = 'SELECTION_CLOSED';
-    } else {
-      computedPhase = 'SELECTION_OPEN';
-    }
+    computedPhase = 'SELECTION_OPEN';
   }
   // 4. Manual Release active (Problems released, selection depends on schedule / state)
   else if (settings.releaseManualState === 'RELEASED') {

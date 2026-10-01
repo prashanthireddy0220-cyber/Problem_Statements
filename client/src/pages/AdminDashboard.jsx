@@ -450,7 +450,7 @@ export default function AdminDashboard() {
           selectionScheduledStart: targetTime
         }
       }));
-    } else if (actionStr === 'OPEN_NOW' || actionStr === 'START_SELECTION') {
+    } else if (actionStr === 'OPEN_NOW' || actionStr === 'START_SELECTION' || actionStr === 'PERMANENTLY_OPEN' || actionStr === 'OPEN_PERMANENT') {
       const now = Date.now();
       setLiveData(prev => ({
         ...prev,
@@ -460,7 +460,8 @@ export default function AdminDashboard() {
           problemStatementsReleased: true,
           problemSelectionEnabled: true,
           selectionStartedAt: new Date(now).toISOString(),
-          selectionEndsAt: new Date(now + 30 * 60 * 1000).toISOString()
+          selectionEndsAt: null,
+          selectionScheduledStart: null
         }
       }));
     }
@@ -1091,25 +1092,29 @@ export default function AdminDashboard() {
                   })()}
 
                   <button
-                    disabled={phaseActionLoading || (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION')}
+                    disabled={phaseActionLoading}
                     onClick={() => {
-                      if (window.confirm("Enable selection IMMEDIATELY without waiting 2 minutes?")) {
+                      if (window.confirm("Release problem statement selection and PERMANENTLY open the session for all teams now?")) {
                         handlePhaseAction('OPEN_NOW');
                       }
                     }}
-                    className="btn-alpha-outline"
+                    className="btn-alpha-cyan"
                     style={{
                       width: '100%',
                       justifyContent: 'center',
-                      borderColor: (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 'rgba(0, 230, 118, 0.3)' : '#00E676',
-                      color: '#00E676',
-                      fontSize: '0.78rem',
-                      padding: '0.45rem',
-                      opacity: (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 0.6 : (phaseActionLoading ? 0.6 : 1),
-                      cursor: (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 'not-allowed' : 'pointer'
+                      background: (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') 
+                        ? 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)' 
+                        : 'rgba(0, 230, 118, 0.15)',
+                      borderColor: '#00E676',
+                      color: (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? '#0F172A' : '#00E676',
+                      fontWeight: '800',
+                      fontSize: '0.82rem',
+                      padding: '0.65rem 0.5rem',
+                      opacity: phaseActionLoading ? 0.6 : 1,
+                      cursor: phaseActionLoading ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    <Zap size={14} /> {(liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 'Selection Open (Active)' : '⚡ Enable Selection Instantly (Skip 2m)'}
+                    <Zap size={15} /> {(liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? '🟢 Selection is PERMANENTLY OPEN (Click to Re-assert)' : '🔓 Release & Permanently Open Selection Now'}
                   </button>
                 </div>
               </div>
