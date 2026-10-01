@@ -1,7 +1,7 @@
 /**
- * Hackathon 2026 - Comprehensive Problem Statement Booklet
- * Exactly 42 Problem Statements across Core CSE Domains
- * Strictly enforced 2-team capacity limit per problem statement
+ * Hackathon 2026 - Top 40 Problem Statement Booklet
+ * Strictly 40 Verified Problem Statements across 4 Core CSE Domains (10 Each)
+ * Enforces 2-Team Capacity Limit Per Statement
  */
 
 const problemStatements = [
@@ -90,7 +90,7 @@ const problemStatements = [
       "Gathering patient medical history forms with manual input friction."
     ],
     "domain": "Artificial Intelligence & Machine Learning",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "PyTorch",
       "Torchvision",
@@ -100,7 +100,8 @@ const problemStatements = [
       "FastAPI",
       "Gradio",
       "React",
-      "Kaggle APTOS/ISIC data"
+      "Kaggle APTOS",
+      "ISIC data"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,
@@ -141,30 +142,30 @@ const problemStatements = [
   {
     "problemId": "KARE-AI-05",
     "title": "SignBridge Lite: One-Way ISL Gesture-to-Speech Translator (Core Vocabulary)",
-    "description": "Build a webcam tool that tracks hand landmarks using MediaPipe, recognizes 15 to 25 core ISL gestures (numbers plus words like help, ticket, water, where, money, thank you) using a classifier, and instantly displays the recognized word and speaks it aloud using text-to-speech.",
-    "background": "Deaf and hard-of-hearing citizens struggle to communicate at ticket counters, pharmacies, and government offices because sign language interpreters are scarce and frontline staff cannot sign.",
-    "expectedSolution": "SIGNBRIDGE LITE: ONE-WAY INDIAN SIGN LANGUAGE GESTURE-TO-SPEECH TRANSLATOR\nProblem Statement ID: KARE-AI-05 | Domain: Artificial Intelligence & Machine Learning\n\n• THE CORE QUESTION:\nHow can a webcam application translate a small vocabulary of Indian Sign Language (ISL) gestures into text and spoken audio for public counter interactions?\n\n• THE PROBLEM GAP:\nDeaf and hard-of-hearing citizens struggle to communicate at ticket counters, pharmacies, and government offices because sign language interpreters are scarce and frontline staff cannot sign.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a webcam tool that tracks hand landmarks using MediaPipe, recognizes 15 to 25 core ISL gestures (numbers plus words like help, ticket, water, where, money, thank you) using a classifier trained on a dataset the team records themselves, and instantly displays the recognized word and speaks it aloud using text-to-speech.\n\n• SCOPE GUIDANCE:\nOne gesture at a time; no continuous signing or sentence-level grammar. Record 50 to 100 samples per gesture with 2 to 3 team members as a self-built dataset under varied lighting. Standard laptop webcam. Include a short note acknowledging regional ISL variation.\n\n• SOLUTION DIRECTIONS:\n• Landmark Feature Extraction: MediaPipe hand landmarks and finger angles per frame.\n• Gesture Classifier: RandomForest / kNN / small LSTM over landmark sequences with hold detection.\n• Instant Speech Output: Show the recognized word and speak it via text-to-speech in English or one regional language.\n\n• ANTI-GOALS:\n• Two-way translation\n• Full ISL grammar or continuous sentence recognition\n• Regional dialect coverage\n• Signing avatars\n\n• JUDGING CRITERIA:\n• Recognition accuracy on held-out gestures (45%)\n• Recognition latency (25%)\n• UI clarity for counter staff (30%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, MediaPipe, OpenCV, scikit-learn, gTTS, Streamlit / React",
+    "description": "Develop an interactive, bidirectional camera communication bridge that tracks hand and facial landmarks to translate live Indian Sign Language gestures into spoken audio/text, and converts the clerk's spoken responses back into animated/visual sign sequences.",
+    "background": "Over 18 million hearing and speech-impaired individuals in India struggle daily at railway ticket windows, banks, and post offices due to the absence of sign language interpreters. Existing translator apps are static dictionary lookup tables that require typing, defeating the purpose of seamless face-to-face conversation.",
+    "expectedSolution": "SIGNBRIDGE LITE: ONE-WAY INDIAN SIGN LANGUAGE GESTURE-TO-SPEECH TRANSLATOR\nProblem Statement ID: KARE-AI-05 | Domain: Artificial Intelligence and Machine Learning\n\n• THE CORE QUESTION:\nHow can a webcam application translate a small vocabulary of Indian Sign Language (ISL) gestures into text and spoken audio for public counter interactions?\n\n• THE PROBLEM GAP:\nDeaf and hard-of-hearing citizens struggle to communicate at ticket counters, pharmacies, and government offices because sign language interpreters are scarce and frontline staff cannot sign.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a webcam tool that tracks hand landmarks using MediaPipe, recognizes 15 to 25 core ISL gestures (numbers plus words like help, ticket, water, where, money, thank you) using a classifier trained on a dataset the team records themselves, and instantly displays the recognized word and speaks it aloud using text-to-speech.\n\n• SCOPE GUIDANCE:\nOne gesture at a time; no continuous signing or sentence-level grammar. Record 50 to 100 samples per gesture with 2 to 3 team members as a self-built dataset under varied lighting. Standard laptop webcam. Include a short note acknowledging regional ISL variation.\n\n• SOLUTION DIRECTIONS:\n• Landmark Feature Extraction: MediaPipe hand landmarks and finger angles per frame.\n• Gesture Classifier: RandomForest / kNN / small LSTM over landmark sequences with hold detection.\n• Instant Speech Output: Show the recognized word and speak it via text-to-speech in English or one regional language.\n\n• ANTI-GOALS:\n• Two-way translation\n• Full ISL grammar or continuous sentence recognition\n• Regional dialect coverage\n• Signing avatars\n\n• JUDGING CRITERIA:\n• Recognition accuracy on held-out gestures (45%)\n• Recognition latency (25%)\n• UI clarity for counter staff (30%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, MediaPipe, OpenCV, scikit-learn, gTTS, Streamlit / React",
     "requirements": [
-      "Landmark Feature Extraction: MediaPipe hand landmarks and finger angles per frame.",
-      "Gesture Classifier: RandomForest / kNN / small LSTM over landmark sequences with hold detection.",
-      "Instant Speech Output: Show the recognized word and speak it via text-to-speech in English or one regional language."
+      "Dynamic Hand Landmark Tracking: 21-point MediaPipe hand landmark tracking without wearable gloves.",
+      "Sign-to-Speech Conversion: Translate sign gestures into fluid spoken audio via browser speech synthesis.",
+      "Reverse Translation: Listen to counter speech and render corresponding sign gesture cards or animated avatar."
     ],
     "constraints": [
-      "Two-way translation",
-      "Full ISL grammar or continuous sentence recognition",
-      "Regional dialect coverage",
-      "Signing avatars"
+      "Translating every nuanced regional sign language dialect.",
+      "Building custom 3D Hollywood-level avatar animations.",
+      "Requiring specialized infrared depth cameras (like Leap Motion)."
     ],
     "domain": "Artificial Intelligence & Machine Learning",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
-      "Python",
-      "MediaPipe",
+      "MediaPipe Hands",
+      "Holistic",
       "OpenCV",
-      "Scikit-learn",
-      "gTTS",
-      "Streamlit",
-      "React"
+      "Python",
+      "JavaScript",
+      "Web Speech API",
+      "React",
+      "Tailwind CSS"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,
@@ -173,27 +174,29 @@ const problemStatements = [
   {
     "problemId": "KARE-AI-06",
     "title": "SignAvatar Lite: Text-to-Sign Visual Reply Player (Core Vocabulary)",
-    "description": "Build a web tool where the clerk types a reply or picks from quick phrases (e.g., Platform 5, 200 rupees, come tomorrow); the system maps each word to a short pre-recorded sign video clip and plays the sequence, so the deaf citizen can watch the reply in sign.",
-    "background": "Communication at public counters fails in both directions: even when a deaf citizen is understood, hearing staff have no way to reply in sign, leaving the interaction incomplete.",
-    "expectedSolution": "SIGNAVATAR LITE: TEXT-TO-SIGN VISUAL REPLY PLAYER FOR A CORE VOCABULARY\nProblem Statement ID: KARE-AI-06 | Domain: Artificial Intelligence & Machine Learning\n\n• THE CORE QUESTION:\nHow can a frontline clerk's typed reply be conveyed visually in sign language for a deaf citizen using a small recorded vocabulary?\n\n• THE PROBLEM GAP:\nCommunication at public counters fails in both directions: even when a deaf citizen is understood, hearing staff have no way to reply in sign, leaving the interaction incomplete.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a web tool where the clerk types a reply or picks from quick phrases (e.g., Platform 5, 200 rupees, come tomorrow); the system maps each word to a short pre-recorded sign video clip recorded by the team and plays the sequence, so the deaf citizen can watch the reply in sign.\n\n• SCOPE GUIDANCE:\nSame 15 to 25 word core vocabulary as the sign-to-speech direction. Clips are pre-recorded and played in sequence; no grammar-level sign synthesis. Text input or Web Speech API dictation only; no camera needed on this side.\n\n• SOLUTION DIRECTIONS:\n• Quick-Phrase Keyboard: One-tap common counter replies.\n• Word-to-Clip Mapping Engine: JSON dictionary with fallback text display for missing words.\n• Sequenced Playback View: Replay, pause, and speed control on the citizen's screen.\n\n• ANTI-GOALS:\n• Full machine translation into ISL grammar\n• Photorealistic signing avatars\n• Automated two-way conversation\n\n• JUDGING CRITERIA:\n• Vocabulary coverage and mapping logic (40%)\n• Playback clarity and sequencing (35%)\n• Clerk usability (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nReact / Next.js, HTML5 Video, Web Speech API (optional), JSON",
+    "description": "Develop an interactive, bidirectional camera communication bridge that tracks hand and facial landmarks to translate live Indian Sign Language gestures into spoken audio/text, and converts the clerk's spoken responses back into animated/visual sign sequences.",
+    "background": "Over 18 million hearing and speech-impaired individuals in India struggle daily at railway ticket windows, banks, and post offices due to the absence of sign language interpreters. Existing translator apps are static dictionary lookup tables that require typing, defeating the purpose of seamless face-to-face conversation.",
+    "expectedSolution": "SIGNAVATAR LITE: TEXT-TO-SIGN VISUAL REPLY PLAYER FOR A CORE VOCABULARY\nProblem Statement ID: KARE-AI-06 | Domain: Artificial Intelligence and Machine Learning\n\n• THE CORE QUESTION:\nHow can a frontline clerk's typed reply be conveyed visually in sign language for a deaf citizen using a small recorded vocabulary?\n\n• THE PROBLEM GAP:\nCommunication at public counters fails in both directions: even when a deaf citizen is understood, hearing staff have no way to reply in sign, leaving the interaction incomplete.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a web tool where the clerk types a reply or picks from quick phrases (e.g., Platform 5, 200 rupees, come tomorrow); the system maps each word to a short pre-recorded sign video clip recorded by the team and plays the sequence, so the deaf citizen can watch the reply in sign.\n\n• SCOPE GUIDANCE:\nSame 15 to 25 word core vocabulary as the sign-to-speech direction. Clips are pre-recorded and played in sequence; no grammar-level sign synthesis. Text input or Web Speech API dictation only; no camera needed on this side.\n\n• SOLUTION DIRECTIONS:\n• Quick-Phrase Keyboard: One-tap common counter replies.\n• Word-to-Clip Mapping Engine: JSON dictionary with fallback text display for missing words.\n• Sequenced Playback View: Replay, pause, and speed control on the citizen's screen.\n\n• ANTI-GOALS:\n• Full machine translation into ISL grammar\n• Photorealistic signing avatars\n• Automated two-way conversation\n\n• JUDGING CRITERIA:\n• Vocabulary coverage and mapping logic (40%)\n• Playback clarity and sequencing (35%)\n• Clerk usability (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nReact / Next.js, HTML5 Video, Web Speech API (optional), JSON",
     "requirements": [
-      "Quick-Phrase Keyboard: One-tap common counter replies.",
-      "Word-to-Clip Mapping Engine: JSON dictionary with fallback text display for missing words.",
-      "Sequenced Playback View: Replay, pause, and speed control on the citizen's screen."
+      "Dynamic Hand Landmark Tracking: 21-point MediaPipe hand landmark tracking without wearable gloves.",
+      "Sign-to-Speech Conversion: Translate sign gestures into fluid spoken audio via browser speech synthesis.",
+      "Reverse Translation: Listen to counter speech and render corresponding sign gesture cards or animated avatar."
     ],
     "constraints": [
-      "Full machine translation into ISL grammar",
-      "Photorealistic signing avatars",
-      "Automated two-way conversation"
+      "Translating every nuanced regional sign language dialect.",
+      "Building custom 3D Hollywood-level avatar animations.",
+      "Requiring specialized infrared depth cameras (like Leap Motion)."
     ],
     "domain": "Artificial Intelligence & Machine Learning",
     "difficulty": "Medium",
     "technologies": [
-      "React",
-      "Next.js",
-      "HTML5 Video",
+      "MediaPipe Hands",
+      "Holistic",
+      "OpenCV",
+      "Python",
+      "JavaScript",
       "Web Speech API",
-      "JSON",
+      "React",
       "Tailwind CSS"
     ],
     "maxTeamCapacity": 2,
@@ -249,7 +252,7 @@ const problemStatements = [
       "Generic document chat that does not actively evaluate risk."
     ],
     "domain": "Artificial Intelligence & Machine Learning",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Python",
       "LangChain",
@@ -287,7 +290,8 @@ const problemStatements = [
       "OpenCV",
       "MediaPipe FaceMesh",
       "NumPy",
-      "SciPy (FFT / Texture)",
+      "SciPy (FFT",
+      "Texture)",
       "Flask",
       "FastAPI",
       "React"
@@ -317,8 +321,8 @@ const problemStatements = [
     "technologies": [
       "Whisper API",
       "VOSK",
-      "spaCy",
-      "scispaCy",
+      "spaCy (scispaCy",
+      "NER)",
       "ReportLab",
       "jsPDF",
       "Python",
@@ -349,7 +353,8 @@ const problemStatements = [
     "difficulty": "Medium",
     "technologies": [
       "Python",
-      "email/mailbox module",
+      "email",
+      "mailbox module",
       "MaxMind GeoIP",
       "IP-API",
       "BeautifulSoup",
@@ -411,7 +416,7 @@ const problemStatements = [
       "Re-indexing the entire multi-terabyte Ethereum blockchain locally."
     ],
     "domain": "Cybersecurity & Blockchain",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Python",
       "Web3.py",
@@ -450,7 +455,7 @@ const problemStatements = [
       "PyPDF",
       "pdfplumber",
       "Tesseract OCR",
-      "spaCy",
+      "spaCy (NER)",
       "Streamlit",
       "React",
       "ReportLab"
@@ -476,7 +481,7 @@ const problemStatements = [
       "Performing offensive network attacks on external targets."
     ],
     "domain": "Cybersecurity & Blockchain",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Python",
       "Scapy",
@@ -485,7 +490,8 @@ const problemStatements = [
       "Dash",
       "Streamlit",
       "React",
-      "FastAPI"
+      "FastAPI",
+      "CIC-IDS dataset samples"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,
@@ -496,9 +502,9 @@ const problemStatements = [
     "title": "VulnHunter: Automated Web Application Security Fuzzer & Vulnerability Scanner",
     "description": "Build a lightweight, automated web application vulnerability fuzzer that takes a local or staging URL, crawls endpoints and form inputs, injects non-destructive security payloads, and produces an actionable vulnerability remediation scorecard.",
     "background": "Developers frequently deploy web applications with critical vulnerabilities such as SQL injection, cross-site scripting (XSS), and exposed administrative files (.git, .env). Commercial enterprise vulnerability scanners (Qualys, Nessus) are expensive, complex, and heavy, while manual penetration testing cannot scale to continuous deployments.",
-    "expectedSolution": "VULNHUNTER: AUTOMATED WEB APPLICATION SECURITY FUZZER & VULNERABILITY SCANNER\nProblem Statement ID: KARE-SEC-06 | Domain: Cybersecurity & Blockchain\n\n• THE CORE QUESTION:\nHow can student and startup web applications be continuously audited for critical OWASP Top 10 vulnerabilities before production deployment?\n\n• THE PROBLEM GAP:\nDevelopers frequently deploy web applications with critical vulnerabilities such as SQL injection, cross-site scripting (XSS), and exposed administrative files (.git, .env). Commercial enterprise vulnerability scanners (Qualys, Nessus) are expensive, complex, and heavy, while manual penetration testing cannot scale to continuous deployments.\n\n• THE CHALLENGE:\nBuild a lightweight, automated web application vulnerability fuzzer that takes a local or staging URL, crawls endpoints and form inputs, injects non-destructive security payloads, and produces an actionable vulnerability remediation scorecard.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nTest against intentionally vulnerable web applications (DVWA, Juice Shop, or a custom test Flask app). Focus on detecting SQLi error reflection, Reflected XSS execution proof, and sensitive endpoint discovery (.env, /admin).\n\n• SOLUTION DIRECTIONS:\n• Automated Endpoint & Form Crawler: Extract all <form> action parameters, query strings, and routes.\n• Payload Injection Engine: Test parameterized payloads for SQL syntax errors and HTML script reflection.\n• Actionable Developer Report: Detail exact reproduction steps, affected URLs, and code-level remediation advice.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Destructive hacking (database dropping, website defacement).\n• Brute-forcing production third-party websites without permission.\n• Exhaustive scanning that takes hours to complete.\n\n• JUDGING CRITERIA:\n• Vulnerability Detection Accuracy without False Positives (40%)\n• Safe Fuzzing Execution & Reporting Clarity (35%)\n• Crawler Depth & Form Handling (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Requests, BeautifulSoup4, SQLite, Tailwind CSS, Flask / Node.js",
+    "expectedSolution": "VULNHUNTER: AUTOMATED WEB APPLICATION SECURITY FUZZER & VULNERABILITY SCANNER\nProblem Statement ID: KARE-SEC-06 | Domain: Cybersecurity & Blockchain\n\n• THE CORE QUESTION:\nHow can student and startup web applications be continuously audited for critical OWASP Top 10 vulnerabilities before production deployment?\n\n• THE PROBLEM GAP:\nDevelopers frequently deploy web applications with critical vulnerabilities such as SQL injection, cross-site scripting (XSS), and exposed administrative files (.git, .env). Commercial enterprise vulnerability scanners (Qualys, Nessus) are expensive, complex, and heavy, while manual penetration testing cannot scale to continuous deployments.\n\n• THE CHALLENGE:\nBuild a lightweight, automated web application vulnerability fuzzer that takes a local or staging URL, crawls endpoints and form inputs, injects non-destructive security payloads, and produces an actionable vulnerability remediation scorecard.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nTest against intentionally vulnerable web applications (DVWA, Juice Shop, or a custom test Flask app). Focus on detecting SQLi error reflection, Reflected XSS execution proof, and sensitive endpoint discovery (.env, /admin).\n\n• SOLUTION DIRECTIONS:\n• Automated Endpoint & Form Crawler: Extract all `<form>` action parameters, query strings, and routes.\n• Payload Injection Engine: Test parameterized payloads for SQL syntax errors and HTML script reflection.\n• Actionable Developer Report: Detail exact reproduction steps, affected URLs, and code-level remediation advice.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Destructive hacking (database dropping, website defacement).\n• Brute-forcing production third-party websites without permission.\n• Exhaustive scanning that takes hours to complete.\n\n• JUDGING CRITERIA:\n• Vulnerability Detection Accuracy without False Positives (40%)\n• Safe Fuzzing Execution & Reporting Clarity (35%)\n• Crawler Depth & Form Handling (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Requests, BeautifulSoup4, SQLite, Tailwind CSS, Flask / Node.js",
     "requirements": [
-      "Automated Endpoint & Form Crawler: Extract all <form> action parameters, query strings, and routes.",
+      "Automated Endpoint & Form Crawler: Extract all `<form>` action parameters, query strings, and routes.",
       "Payload Injection Engine: Test parameterized payloads for SQL syntax errors and HTML script reflection.",
       "Actionable Developer Report: Detail exact reproduction steps, affected URLs, and code-level remediation advice."
     ],
@@ -527,11 +533,11 @@ const problemStatements = [
     "title": "RapidTriage: Endpoint Incident Response & Digital Forensic Timeline Extractor",
     "description": "Create a portable forensic triage script that runs on an endpoint, extracts key volatile artifacts (browser SQLite history, USB insertion registry keys, recently executed programs via UserAssist/Prefetch, and active network connections), and visualizes a unified chronological incident timeline.",
     "background": "When a corporate workstation or lab PC is suspected of infection, incident responders must quickly understand what occurred: what files were downloaded, what USB drives were inserted, and what commands were executed. Manually opening Windows Event Viewer, registry hives, and browser databases takes hours, during which malware may erase evidence.",
-    "expectedSolution": "RAPIDTRIAGE: ENDPOINT INCIDENT RESPONSE & DIGITAL FORENSIC TIMELINE EXTRACTOR\nProblem Statement ID: KARE-SEC-07 | Domain: Cybersecurity & Blockchain\n\n• THE CORE QUESTION:\nHow can a first responder reconstruct the timeline of an endpoint cyber compromise in under 3 minutes without tampering with evidence?\n\n• THE PROBLEM GAP:\nWhen a corporate workstation or lab PC is suspected of infection, incident responders must quickly understand what occurred: what files were downloaded, what USB drives were inserted, and what commands were executed. Manually opening Windows Event Viewer, registry hives, and browser databases takes hours, during which malware may erase evidence.\n\n• THE CHALLENGE:\nCreate a portable forensic triage script that runs on an endpoint, extracts key volatile artifacts (browser SQLite history, USB insertion registry keys, recently executed programs via UserAssist/Prefetch, and active network connections), and visualizes a unified chronological incident timeline.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nSimulate endpoint artifacts on a local machine or process sample registry and browser database files. Focus on timeline reconstruction and highlighting anomalous activities (e.g. executable launched from temp directory after suspicious download).\n\n• SOLUTION DIRECTIONS:\n• Multi-Artifact Parser: Parse SQLite history from Chrome/Firefox, USB serial keys, and execution logs.\n• Chronological Incident Timeline: Assemble events from multiple sources into a single navigable timeline.\n• Suspicious Activity Highlighting: Flag processes running from %AppData% or execution right after download.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Complex kernel-level memory dump acquisition (Volatility).\n• Bypassing administrative permissions or writing malicious rootkits.\n• Encrypted file system cracking.\n\n• JUDGING CRITERIA:\n• Timeline Correlation & Artifact Extraction Accuracy (45%)\n• Forensic Integrity & Non-Destructive Operation (30%)\n• Dashboard Clarity & Filterability (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, SQLite3, OS / psutil / winreg, Chart.js, HTML5 / Flask / Streamlit",
+    "expectedSolution": "RAPIDTRIAGE: ENDPOINT INCIDENT RESPONSE & DIGITAL FORENSIC TIMELINE EXTRACTOR\nProblem Statement ID: KARE-SEC-07 | Domain: Cybersecurity & Blockchain\n\n• THE CORE QUESTION:\nHow can a first responder reconstruct the timeline of an endpoint cyber compromise in under 3 minutes without tampering with evidence?\n\n• THE PROBLEM GAP:\nWhen a corporate workstation or lab PC is suspected of infection, incident responders must quickly understand what occurred: what files were downloaded, what USB drives were inserted, and what commands were executed. Manually opening Windows Event Viewer, registry hives, and browser databases takes hours, during which malware may erase evidence.\n\n• THE CHALLENGE:\nCreate a portable forensic triage script that runs on an endpoint, extracts key volatile artifacts (browser SQLite history, USB insertion registry keys, recently executed programs via UserAssist/Prefetch, and active network connections), and visualizes a unified chronological incident timeline.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nSimulate endpoint artifacts on a local machine or process sample registry and browser database files. Focus on timeline reconstruction and highlighting anomalous activities (e.g. executable launched from temp directory after suspicious download).\n\n• SOLUTION DIRECTIONS:\n• Multi-Artifact Parser: Parse SQLite history from Chrome/Firefox, USB serial keys, and execution logs.\n• Chronological Incident Timeline: Assemble events from multiple sources into a single navigable timeline.\n• Suspicious Activity Highlighting: Flag processes running from `%AppData%` or execution right after download.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Complex kernel-level memory dump acquisition (Volatility).\n• Bypassing administrative permissions or writing malicious rootkits.\n• Encrypted file system cracking.\n\n• JUDGING CRITERIA:\n• Timeline Correlation & Artifact Extraction Accuracy (45%)\n• Forensic Integrity & Non-Destructive Operation (30%)\n• Dashboard Clarity & Filterability (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, SQLite3, OS / psutil / winreg, Chart.js, HTML5 / Flask / Streamlit",
     "requirements": [
       "Multi-Artifact Parser: Parse SQLite history from Chrome/Firefox, USB serial keys, and execution logs.",
       "Chronological Incident Timeline: Assemble events from multiple sources into a single navigable timeline.",
-      "Suspicious Activity Highlighting: Flag processes running from %AppData% or execution right after download."
+      "Suspicious Activity Highlighting: Flag processes running from `%AppData%` or execution right after download."
     ],
     "constraints": [
       "Complex kernel-level memory dump acquisition (Volatility).",
@@ -543,6 +549,7 @@ const problemStatements = [
     "technologies": [
       "Python",
       "SQLite3",
+      "OS",
       "psutil",
       "winreg",
       "Chart.js",
@@ -559,7 +566,7 @@ const problemStatements = [
     "title": "AgriLedger: Farm-to-Fork Transparent Organic Produce Provenance DApp",
     "description": "Develop an end-to-end decentralized food provenance application on an EVM testnet where certified farmers log harvest batches, licensed labs upload verifiable pesticide-free test certificates to IPFS, and consumers scan packaging QR codes to view the immutable lifecycle.",
     "background": "Organic food markets command a 30-50% price premium, creating an enormous incentive for unscrupulous suppliers to label conventionally grown, pesticide-treated crops as 'organic.' Centralized certification paper labels are easily forged, and consumers have no verifiable proof of farm origin or chemical residue testing.",
-    "expectedSolution": "AGRILEDGER: FARM-TO-FORK TRANSPARENT ORGANIC PRODUCE PROVENANCE DAPP\nProblem Statement ID: KARE-SEC-08 | Domain: Cybersecurity & Blockchain\n\n• THE CORE QUESTION:\nHow can consumers be guaranteed that organic produce is truly authentic, unadulterated, and sustainably cultivated?\n\n• THE PROBLEM GAP:\nOrganic food markets command a 30-50% price premium, creating an enormous incentive for unscrupulous suppliers to label conventionally grown, pesticide-treated crops as 'organic.' Centralized certification paper labels are easily forged, and consumers have no verifiable proof of farm origin or chemical residue testing.\n\n• THE CHALLENGE:\nDevelop an end-to-end decentralized food provenance application on an EVM testnet where certified farmers log harvest batches, licensed labs upload verifiable pesticide-free test certificates to IPFS, and consumers scan packaging QR codes to view the immutable lifecycle.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nDeploy a prototype smart contract tracking 3 key milestones: Harvest Log -> Lab Certification -> Distribution Hub. Consumer scans a dynamic QR code on their smartphone to view the verified timeline.\n\n• SOLUTION DIRECTIONS:\n• Provenance Smart Contract: Record batch IDs, timestamped transitions, and authorized actor signatures.\n• IPFS Lab Certificate Storage: Pin decentralized lab reports and geotagged farm photos on IPFS.\n• Consumer Verification View: Clean mobile UI showing farm location, harvest date, and lab approval hash.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Physical barcode hardware printer integration.\n• Financial token speculation or crypto trading exchanges.\n• Complex multi-national customs tracking.\n\n• JUDGING CRITERIA:\n• Smart Contract Integrity & Role-Based Permissions (40%)\n• Decentralized File Storage & Data Linking (30%)\n• Consumer Trust UI & QR Scan Experience (30%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nSolidity, Polygon Amoy Testnet, IPFS / Pinata, Hardhat, React / Wagmi / Ethers.js",
+    "expectedSolution": "AGRILEDGER: FARM-TO-FORK TRANSPARENT ORGANIC PRODUCE PROVENANCE DAPP\nProblem Statement ID: KARE-SEC-08 | Domain: Cybersecurity & Blockchain\n\n• THE CORE QUESTION:\nHow can consumers be guaranteed that organic produce is truly authentic, unadulterated, and sustainably cultivated?\n\n• THE PROBLEM GAP:\nOrganic food markets command a 30-50% price premium, creating an enormous incentive for unscrupulous suppliers to label conventionally grown, pesticide-treated crops as 'organic.' Centralized certification paper labels are easily forged, and consumers have no verifiable proof of farm origin or chemical residue testing.\n\n• THE CHALLENGE:\nDevelop an end-to-end decentralized food provenance application on an EVM testnet where certified farmers log harvest batches, licensed labs upload verifiable pesticide-free test certificates to IPFS, and consumers scan packaging QR codes to view the immutable lifecycle.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nDeploy a prototype smart contract tracking 3 key milestones: Harvest Log $\\rightarrow$ Lab Certification $\\rightarrow$ Distribution Hub. Consumer scans a dynamic QR code on their smartphone to view the verified timeline.\n\n• SOLUTION DIRECTIONS:\n• Provenance Smart Contract: Record batch IDs, timestamped transitions, and authorized actor signatures.\n• IPFS Lab Certificate Storage: Pin decentralized lab reports and geotagged farm photos on IPFS.\n• Consumer Verification View: Clean mobile UI showing farm location, harvest date, and lab approval hash.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Physical barcode hardware printer integration.\n• Financial token speculation or crypto trading exchanges.\n• Complex multi-national customs tracking.\n\n• JUDGING CRITERIA:\n• Smart Contract Integrity & Role-Based Permissions (40%)\n• Decentralized File Storage & Data Linking (30%)\n• Consumer Trust UI & QR Scan Experience (30%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nSolidity, Polygon Amoy Testnet, IPFS / Pinata, Hardhat, React / Wagmi / Ethers.js",
     "requirements": [
       "Provenance Smart Contract: Record batch IDs, timestamped transitions, and authorized actor signatures.",
       "IPFS Lab Certificate Storage: Pin decentralized lab reports and geotagged farm photos on IPFS.",
@@ -571,7 +578,7 @@ const problemStatements = [
       "Complex multi-national customs tracking."
     ],
     "domain": "Cybersecurity & Blockchain",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Solidity",
       "Polygon Amoy Testnet",
@@ -622,10 +629,10 @@ const problemStatements = [
     "title": "PassZero: Passwordless Biometric WebAuthn Authentication & Key Vault",
     "description": "Build a modern passwordless authentication portal implementing the W3C WebAuthn / FIDO2 standard, enabling users to register and sign in using their laptop/phone's native biometric sensors (TouchID, Windows Hello) via public-key cryptography, with no passwords ever sent or stored.",
     "background": "Passwords are the single weakest link in digital security. Users reuse simple passwords across personal and academic services, leaving them vulnerable to data breaches, phishing, and credential-stuffing bots. Multi-factor authentication via SMS OTP is also susceptible to SIM-swapping and social engineering.",
-    "expectedSolution": "PASSZERO: PASSWORDLESS BIOMETRIC WEBAUTHN AUTHENTICATION & KEY VAULT\nProblem Statement ID: KARE-SEC-10 | Domain: Cybersecurity & Blockchain\n\n• THE CORE QUESTION:\nHow can organizations eradicate phishing and credential theft by eliminating passwords entirely in favor of cryptographic device biometrics?\n\n• THE PROBLEM GAP:\nPasswords are the single weakest link in digital security. Users reuse simple passwords across personal and academic services, leaving them vulnerable to data breaches, phishing, and credential-stuffing bots. Multi-factor authentication via SMS OTP is also susceptible to SIM-swapping and social engineering.\n\n• THE CHALLENGE:\nBuild a modern passwordless authentication portal implementing the W3C WebAuthn / FIDO2 standard, enabling users to register and sign in using their laptop/phone's native biometric sensors (TouchID, Windows Hello) via public-key cryptography, with no passwords ever sent or stored.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nImplement WebAuthn ceremony flows (Registration and Authentication). Demonstrate that the server stores only public keys and counter values, ensuring that a database compromise leaks zero user credentials.\n\n• SOLUTION DIRECTIONS:\n• FIDO2 / WebAuthn Protocol Flow: Implement challenge generation, client-side credential creation, and verification.\n• Biometric Sensor Interfacing: Leverage browser navigator.credentials.create and .get APIs.\n• Secure User Session Dashboard: Display cryptographic public key details and active biometric authenticators.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Writing low-level hardware biometric drivers.\n• Falling back to legacy email/SMS OTP passwords.\n• Complex enterprise Active Directory LDAP integration.\n\n• JUDGING CRITERIA:\n• WebAuthn Standard Compliance & Cryptographic Soundness (45%)\n• User Onboarding & Biometric Authentication Flow (35%)\n• Zero-Knowledge Server Security Architecture (20%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nNode.js, SimpleWebAuthn, React, MongoDB / PostgreSQL, Tailwind CSS",
+    "expectedSolution": "PASSZERO: PASSWORDLESS BIOMETRIC WEBAUTHN AUTHENTICATION & KEY VAULT\nProblem Statement ID: KARE-SEC-10 | Domain: Cybersecurity & Blockchain\n\n• THE CORE QUESTION:\nHow can organizations eradicate phishing and credential theft by eliminating passwords entirely in favor of cryptographic device biometrics?\n\n• THE PROBLEM GAP:\nPasswords are the single weakest link in digital security. Users reuse simple passwords across personal and academic services, leaving them vulnerable to data breaches, phishing, and credential-stuffing bots. Multi-factor authentication via SMS OTP is also susceptible to SIM-swapping and social engineering.\n\n• THE CHALLENGE:\nBuild a modern passwordless authentication portal implementing the W3C WebAuthn / FIDO2 standard, enabling users to register and sign in using their laptop/phone's native biometric sensors (TouchID, Windows Hello) via public-key cryptography, with no passwords ever sent or stored.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nImplement WebAuthn ceremony flows (Registration and Authentication). Demonstrate that the server stores only public keys and counter values, ensuring that a database compromise leaks zero user credentials.\n\n• SOLUTION DIRECTIONS:\n• FIDO2 / WebAuthn Protocol Flow: Implement challenge generation, client-side credential creation, and verification.\n• Biometric Sensor Interfacing: Leverage browser `navigator.credentials.create` and `.get` APIs.\n• Secure User Session Dashboard: Display cryptographic public key details and active biometric authenticators.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Writing low-level hardware biometric drivers.\n• Falling back to legacy email/SMS OTP passwords.\n• Complex enterprise Active Directory LDAP integration.\n\n• JUDGING CRITERIA:\n• WebAuthn Standard Compliance & Cryptographic Soundness (45%)\n• User Onboarding & Biometric Authentication Flow (35%)\n• Zero-Knowledge Server Security Architecture (20%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nNode.js, SimpleWebAuthn, React, MongoDB / PostgreSQL, Tailwind CSS",
     "requirements": [
       "FIDO2 / WebAuthn Protocol Flow: Implement challenge generation, client-side credential creation, and verification.",
-      "Biometric Sensor Interfacing: Leverage browser navigator.credentials.create and .get APIs.",
+      "Biometric Sensor Interfacing: Leverage browser `navigator.credentials.create` and `.get` APIs.",
       "Secure User Session Dashboard: Display cryptographic public key details and active biometric authenticators."
     ],
     "constraints": [
@@ -650,18 +657,18 @@ const problemStatements = [
   {
     "problemId": "KARE-DS-01",
     "title": "AgroPrice Lite: One-Commodity Mandi Price Forecast & Nearby Arbitrage Dashboard",
-    "description": "Use a preloaded Agmarknet sample for one commodity (e.g., onion or potato) across 5 to 10 mandis. Train Prophet or LightGBM to forecast 7 to 15 days of prices. Show nearby mandis on a map with price differentials and net profit after transport cost.",
-    "background": "Farmers often sell at distress prices because they lack price forecasts and nearby mandi price comparisons.",
-    "expectedSolution": "AGROPRICE LITE: ONE-COMMODITY MANDI PRICE FORECAST AND NEARBY ARBITRAGE DASHBOARD\nProblem Statement ID: KARE-DS-01 | Domain: Data Science & Predictive Analytics\n\n• THE CORE QUESTION:\nHow can short-term price forecasting help farmers choose a profitable nearby mandi for one crop after transport costs?\n\n• THE PROBLEM GAP:\nFarmers often sell at distress prices because they lack price forecasts and nearby mandi price comparisons.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nUse a preloaded Agmarknet sample for one commodity (e.g., onion or potato) across 5 to 10 mandis. Train Prophet or LightGBM to forecast 7 to 15 days of prices. Show nearby mandis on a map with price differentials and net profit after transport cost.\n\n• SCOPE GUIDANCE:\nOne commodity, limited mandis, static transport cost matrix. No nationwide live data, no futures exchange, no algorithmic trading. Forecast validation on a held-out time period.\n\n• SOLUTION DIRECTIONS:\n• Time-Series Price Forecasting: 7 to 15 day price trajectory.\n• Mandi Arbitrage Map: Price differential plus estimated net profit.\n• Best-Time-To-Sell Indicator: Sell now or store based on forecast trend.\n\n• ANTI-GOALS:\n• Full commodity futures exchange\n• Real-time nationwide fleet tracking\n• High-frequency automated trading\n\n• JUDGING CRITERIA:\n• Forecasting accuracy and validation (40%)\n• Practical arbitrage and economic logic (35%)\n• Visualization and map usability (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Prophet / LightGBM, Pandas, Scikit-learn, Streamlit / Next.js, Leaflet / Folium",
+    "description": "Develop a predictive market analytics dashboard that trains on historical wholesale commodity price records (Agmarknet data), forecasts price trends for the next 15-30 days, and recommends the most lucrative mandi within a 100 km radius factoring in transport costs.",
+    "background": "Smallholder farmers frequently sell crops at steep losses because wholesale mandi prices crash unexpectedly during harvest gluts. Simultaneously, a mandi just 60 km away might be trading the same crop at a 30% higher price due to localized supply deficits. Farmers have zero access to predictive price intelligence.",
+    "expectedSolution": "AGROPRICE LITE: ONE-COMMODITY MANDI PRICE FORECAST AND NEARBY ARBITRAGE DASHBOARD\nProblem Statement ID: KARE-DS-01 | Domain: Data Science and Predictive Analytics\n\n• THE CORE QUESTION:\nHow can short-term price forecasting help farmers choose a profitable nearby mandi for one crop after transport costs?\n\n• THE PROBLEM GAP:\nFarmers often sell at distress prices because they lack price forecasts and nearby mandi price comparisons.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nUse a preloaded Agmarknet sample for one commodity (e.g., onion or potato) across 5 to 10 mandis. Train Prophet or LightGBM to forecast 7 to 15 days of prices. Show nearby mandis on a map with price differentials and net profit after transport cost.\n\n• SCOPE GUIDANCE:\nOne commodity, limited mandis, static transport cost matrix. No nationwide live data, no futures exchange, no algorithmic trading. Forecast validation on a held-out time period.\n\n• SOLUTION DIRECTIONS:\n• Time-Series Price Forecasting: 7 to 15 day price trajectory.\n• Mandi Arbitrage Map: Price differential plus estimated net profit.\n• Best-Time-To-Sell Indicator: Sell now or store based on forecast trend.\n\n• ANTI-GOALS:\n• Full commodity futures exchange\n• Real-time nationwide fleet tracking\n• High-frequency automated trading\n\n• JUDGING CRITERIA:\n• Forecasting accuracy and validation (40%)\n• Practical arbitrage and economic logic (35%)\n• Visualization and map usability (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Prophet / LightGBM, Pandas, Scikit-learn, Streamlit / Next.js, Leaflet / Folium",
     "requirements": [
-      "Time-Series Price Forecasting: 7 to 15 day price trajectory.",
-      "Mandi Arbitrage Map: Price differential plus estimated net profit.",
-      "Best-Time-To-Sell Indicator: Sell now or store based on forecast trend."
+      "Time-Series Price Forecasting: Model seasonal price trends and generate 15-day price trajectories.",
+      "Mandi Arbitrage Map: Visualize nearby mandis with price differentials and net profit estimates.",
+      "Best-Time-To-Sell Indicator: Actionable recommendation indicating whether to harvest now or store produce."
     ],
     "constraints": [
-      "Full commodity futures exchange",
-      "Real-time nationwide fleet tracking",
-      "High-frequency automated trading"
+      "Building a full-fledged commodity futures exchange.",
+      "Real-time nationwide fleet tracking.",
+      "High-frequency automated algorithmic trading."
     ],
     "domain": "Data Science & Predictive Analytics",
     "difficulty": "Medium",
@@ -671,10 +678,10 @@ const problemStatements = [
       "LightGBM",
       "Pandas",
       "Scikit-learn",
+      "Leaflet.js",
+      "Folium",
       "Streamlit",
-      "Next.js",
-      "Leaflet",
-      "Folium"
+      "Next.js"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,
@@ -716,29 +723,29 @@ const problemStatements = [
   {
     "problemId": "KARE-DS-03",
     "title": "HydroCast Lite: Interactive Groundwater Budget & Recharge Pit Sizer",
-    "description": "Build an interactive dashboard where the user selects a district (defaults loaded from a small curated CGWB snapshot), adjusts sliders for annual rainfall, irrigated area, and water extraction, and sees the annual water balance computed with the standard rainfall-recharge equation, plus recommended recharge pit dimensions and the number of structures needed.",
-    "background": "Villages want to plan rainwater harvesting but lack an accessible tool connecting local rainfall, extraction, and recharge; professional groundwater models need data and expertise they do not have.",
-    "expectedSolution": "HYDROCAST LITE: INTERACTIVE GROUNDWATER BUDGET AND RECHARGE PIT SIZER\nProblem Statement ID: KARE-DS-03 | Domain: Data Science & Predictive Analytics\n\n• THE CORE QUESTION:\nHow can a simple annual water-balance model help a panchayat estimate the rainwater harvesting needed to stabilize its groundwater?\n\n• THE PROBLEM GAP:\nVillages want to plan rainwater harvesting but lack an accessible tool connecting local rainfall, extraction, and recharge; professional groundwater models need data and expertise they do not have.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild an interactive dashboard where the user selects a district (defaults loaded from a small curated CGWB snapshot), adjusts sliders for annual rainfall, irrigated area, and water extraction, and sees the annual water balance computed with the standard rainfall-recharge equation, plus recommended recharge pit dimensions and the number of structures needed.\n\n• SCOPE GUIDANCE:\nAnnual water-balance arithmetic; no 12-month forecast claim. Curated static CGWB district defaults or simulated figures. Standard CGWB / NDMA recharge-pit sizing formulas. This is a scenario what-if tool, not a predictive model.\n\n• SOLUTION DIRECTIONS:\n• Water Balance Engine: rainfall x area x infiltration factor minus estimated extraction.\n• Recharge Pit Sizer: pit dimensions and unit count for a chosen recharge target.\n• Scenario Comparison: save and compare 2 to 3 what-if scenarios side by side.\n\n• ANTI-GOALS:\n• Real-time aquifer forecasting\n• MODFLOW-style groundwater simulation\n• Live sensor / IoT integration\n• Sub-district precision claims\n\n• JUDGING CRITERIA:\n• Water-balance math correctness (45%)\n• Scenario visualization clarity (30%)\n• Practical actionability of pit sizing (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Pandas, Streamlit, Plotly, curated CGWB CSV",
+    "description": "Design an interactive predictive hydrology dashboard where users select a district or soil type, input historical rainfall and seasonal extraction rates, and forecast the water table depth trajectory over the next 12 months, calculating the exact rainwater harvesting recharge pit dimensions needed to stabilize the aquifer.",
+    "background": "Over 60% of rural and peri-urban districts face critical groundwater depletion due to unmonitored borewell drilling. Panchayat heads and local builders have no predictive insight into seasonal water table drops, leading to dry borewells and massive expenditures on private water tankers.",
+    "expectedSolution": "HYDROCAST LITE: INTERACTIVE GROUNDWATER BUDGET AND RECHARGE PIT SIZER\nProblem Statement ID: KARE-DS-03 | Domain: Data Science and Predictive Analytics\n\n• THE CORE QUESTION:\nHow can a simple annual water-balance model help a panchayat estimate the rainwater harvesting needed to stabilize its groundwater?\n\n• THE PROBLEM GAP:\nVillages want to plan rainwater harvesting but lack an accessible tool connecting local rainfall, extraction, and recharge; professional groundwater models need data and expertise they do not have.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild an interactive dashboard where the user selects a district (defaults loaded from a small curated CGWB snapshot), adjusts sliders for annual rainfall, irrigated area, and water extraction, and sees the annual water balance computed with the standard rainfall-recharge equation, plus recommended recharge pit dimensions and the number of structures needed.\n\n• SCOPE GUIDANCE:\nAnnual water-balance arithmetic; no 12-month forecast claim. Curated static CGWB district defaults or simulated figures. Standard CGWB / NDMA recharge-pit sizing formulas. This is a scenario what-if tool, not a predictive model.\n\n• SOLUTION DIRECTIONS:\n• Water Balance Engine: rainfall x area x infiltration factor minus estimated extraction.\n• Recharge Pit Sizer: pit dimensions and unit count for a chosen recharge target.\n• Scenario Comparison: save and compare 2 to 3 what-if scenarios side by side.\n\n• ANTI-GOALS:\n• Real-time aquifer forecasting\n• MODFLOW-style groundwater simulation\n• Live sensor / IoT integration\n• Sub-district precision claims\n\n• JUDGING CRITERIA:\n• Water-balance math correctness (45%)\n• Scenario visualization clarity (30%)\n• Practical actionability of pit sizing (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Pandas, Streamlit, Plotly, curated CGWB CSV",
     "requirements": [
-      "Water Balance Engine: rainfall x area x infiltration factor minus estimated extraction.",
-      "Recharge Pit Sizer: pit dimensions and unit count for a chosen recharge target.",
-      "Scenario Comparison: save and compare 2 to 3 what-if scenarios side by side."
+      "Aquifer Level Trend Forecaster: Predict seasonal water table rise and fall based on rainfall deficit.",
+      "Aquifer Stress Classification: Categorize zones into Safe, Semi-Critical, and Over-Exploited.",
+      "Rainwater Sizing Calculator: Output custom recharge pit dimensions based on rooftop square footage."
     ],
     "constraints": [
-      "Real-time aquifer forecasting",
-      "MODFLOW-style groundwater simulation",
-      "Live sensor / IoT integration",
-      "Sub-district precision claims"
+      "Seismic underground ultrasound exploration.",
+      "Drilling physical borewell hardware.",
+      "Building complex hydrodynamic river basin simulations."
     ],
     "domain": "Data Science & Predictive Analytics",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Python",
-      "Pandas",
+      "GeoPandas",
+      "Scikit-learn (Random Forest Regressor)",
+      "Folium",
+      "Mapbox",
       "Streamlit",
-      "Plotly",
-      "CGWB CSV",
-      "GeoPandas"
+      "Dash"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,
@@ -747,29 +754,30 @@ const problemStatements = [
   {
     "problemId": "KARE-DS-04",
     "title": "FraudLocate Lite: Mule Withdrawal Hotspot Mapper & Patrol Route Suggester",
-    "description": "Build a dashboard that ingests a preloaded synthetic complaint feed (timestamp, ATM or bank branch coordinates, amount), clusters withdrawal hotspots using DBSCAN, shows hour-of-day and day-of-week heat patterns, and suggests an efficient patrol route covering the top hotspots using a nearest-neighbor heuristic on a city map.",
-    "background": "After mule accounts cash out stolen funds, investigations stay case-by-case with no map view of where withdrawals cluster, so patrol planning misses repeat hotspots.",
-    "expectedSolution": "FRAUDLOCATE LITE: MULE WITHDRAWAL HOTSPOT MAPPER AND PATROL ROUTE SUGGESTER\nProblem Statement ID: KARE-DS-04 | Domain: Data Science & Predictive Analytics\n\n• THE CORE QUESTION:\nHow can descriptive geospatial analytics of past cybercrime withdrawals help police plan patrol coverage?\n\n• THE PROBLEM GAP:\nAfter mule accounts cash out stolen funds, investigations stay case-by-case with no map view of where withdrawals cluster, so patrol planning misses repeat hotspots.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a dashboard that ingests a preloaded synthetic complaint feed (timestamp, ATM or bank branch coordinates, amount), clusters withdrawal hotspots using DBSCAN, shows hour-of-day and day-of-week heat patterns, and suggests an efficient patrol route covering the top hotspots using a nearest-neighbor heuristic on a city map.\n\n• SCOPE GUIDANCE:\nPurely descriptive on past data; no future prediction claim. One synthetic dataset preloaded with the app. Haversine distances; routes are suggestions, not guaranteed optimal tours.\n\n• SOLUTION DIRECTIONS:\n• Hotspot Clustering: DBSCAN on withdrawal coordinates with tunable radius and min-points.\n• Time Pattern View: hour-of-day and day-of-week heatmaps of cash-outs.\n• Patrol Route Suggester: nearest-neighbor tour over top clusters with estimated travel time.\n\n• ANTI-GOALS:\n• Predicting future withdrawal locations\n• Live bank or FIR data integration\n• Agent-based criminal simulation\n• Conviction-grade evidentiary output\n\n• JUDGING CRITERIA:\n• Clustering quality and parameter handling (40%)\n• Patrol route suggestion logic (30%)\n• Map dashboard usability (30%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, scikit-learn (DBSCAN), Folium, Pandas, Streamlit",
+    "description": "Develop a predictive geospatial analytics engine that ingests simulated cybercrime complaint logs (timestamps, mule bank branches, ATM withdrawal locations), applies spatial clustering (DBSCAN) and time-decay modeling, and highlights high-probability ATM zones where withdrawals are anticipated over the next 2-4 hours.",
+    "background": "When victims report cyber financial fraud to police helplines (1930), stolen money is rapidly split across multiple 'mule' bank accounts and withdrawn at physical ATMs within hours. Law enforcement patrol teams struggle to intercept fraudsters because they lack predictive intelligence on which ATM clusters and neighborhoods are being actively targeted.",
+    "expectedSolution": "FRAUDLOCATE LITE: MULE WITHDRAWAL HOTSPOT MAPPER AND PATROL ROUTE SUGGESTER\nProblem Statement ID: KARE-DS-04 | Domain: Data Science and Predictive Analytics\n\n• THE CORE QUESTION:\nHow can descriptive geospatial analytics of past cybercrime withdrawals help police plan patrol coverage?\n\n• THE PROBLEM GAP:\nAfter mule accounts cash out stolen funds, investigations stay case-by-case with no map view of where withdrawals cluster, so patrol planning misses repeat hotspots.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a dashboard that ingests a preloaded synthetic complaint feed (timestamp, ATM or bank branch coordinates, amount), clusters withdrawal hotspots using DBSCAN, shows hour-of-day and day-of-week heat patterns, and suggests an efficient patrol route covering the top hotspots using a nearest-neighbor heuristic on a city map.\n\n• SCOPE GUIDANCE:\nPurely descriptive on past data; no future prediction claim. One synthetic dataset preloaded with the app. Haversine distances; routes are suggestions, not guaranteed optimal tours.\n\n• SOLUTION DIRECTIONS:\n• Hotspot Clustering: DBSCAN on withdrawal coordinates with tunable radius and min-points.\n• Time Pattern View: hour-of-day and day-of-week heatmaps of cash-outs.\n• Patrol Route Suggester: nearest-neighbor tour over top clusters with estimated travel time.\n\n• ANTI-GOALS:\n• Predicting future withdrawal locations\n• Live bank or FIR data integration\n• Agent-based criminal simulation\n• Conviction-grade evidentiary output\n\n• JUDGING CRITERIA:\n• Clustering quality and parameter handling (40%)\n• Patrol route suggestion logic (30%)\n• Map dashboard usability (30%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, scikit-learn (DBSCAN), Folium, Pandas, Streamlit",
     "requirements": [
-      "Hotspot Clustering: DBSCAN on withdrawal coordinates with tunable radius and min-points.",
-      "Time Pattern View: hour-of-day and day-of-week heatmaps of cash-outs.",
-      "Patrol Route Suggester: nearest-neighbor tour over top clusters with estimated travel time."
+      "Spatial Clustering Engine: Use DBSCAN / K-Means to identify recurring ATM withdrawal hotspots.",
+      "Time-Decay Risk Scoring: Weight recent withdrawals higher to predict immediate next targets.",
+      "Police Dispatch Map: Visualize high-alert zones with suggested patrol interception radiuses."
     ],
     "constraints": [
-      "Predicting future withdrawal locations",
-      "Live bank or FIR data integration",
-      "Agent-based criminal simulation",
-      "Conviction-grade evidentiary output"
+      "Hacking into private banking ATM networks.",
+      "Real-time interception of cellular phone locations.",
+      "Legal surveillance wiretapping."
     ],
     "domain": "Data Science & Predictive Analytics",
     "difficulty": "Medium",
     "technologies": [
       "Python",
       "Scikit-learn (DBSCAN)",
+      "GeoPandas",
       "Folium",
-      "Pandas",
-      "Streamlit",
-      "Mapbox"
+      "Mapbox GL",
+      "FastAPI",
+      "React",
+      "Tailwind CSS"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,
@@ -778,29 +786,31 @@ const problemStatements = [
   {
     "problemId": "KARE-DS-05",
     "title": "FareRadar Lite: Airfare History Dashboard & Buy-Wait Heuristic",
-    "description": "Use a preloaded fare-history dataset (Kaggle or simulated) for 5 to 10 domestic routes, compute each route's 30 / 60 / 90-day price statistics and a simple Volatility Index, plot the trend, and give a transparent heuristic verdict (today's price percentile versus the route's own history) with a 7-day Prophet projection clearly labeled as indicative.",
-    "background": "Travelers cannot tell if a quoted fare is a good deal because they have no easy view of a route's typical price range and volatility across recent months.",
-    "expectedSolution": "FARERADAR LITE: AIRFARE HISTORY DASHBOARD AND BUY-WAIT HEURISTIC\nProblem Statement ID: KARE-DS-05 | Domain: Data Science & Predictive Analytics\n\n• THE CORE QUESTION:\nHow can a route's historical fare range help a traveler judge whether today's quoted price is high or low?\n\n• THE PROBLEM GAP:\nTravelers cannot tell if a quoted fare is a good deal because they have no easy view of a route's typical price range and volatility across recent months.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nUse a preloaded fare-history dataset (Kaggle or simulated) for 5 to 10 domestic routes, compute each route's 30 / 60 / 90-day price statistics and a simple Volatility Index, plot the trend, and give a transparent heuristic verdict (today's price percentile versus the route's own history) with a 7-day Prophet projection clearly labeled as indicative.\n\n• SCOPE GUIDANCE:\nNo live airline API scraping. One preloaded dataset. The heuristic is percentile-based and explainable, not a trained prediction claim. Include a disclaimer that output is informational, not booking advice.\n\n• SOLUTION DIRECTIONS:\n• Route Price Statistics: rolling median, quartiles, and volatility index per route.\n• Buy-Wait Heuristic: current price percentile against the route's own history.\n• 7-Day Trend Projection: Prophet forecast with confidence band, labeled as indicative.\n\n• ANTI-GOALS:\n• Real-time fare scraping\n• Guaranteed price-drop prediction\n• Booking or checkout integration\n• Multi-airline API orchestration\n\n• JUDGING CRITERIA:\n• Statistical soundness of the heuristic (40%)\n• Dashboard clarity (30%)\n• Honest validation on held-out dates (30%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Pandas, Prophet, Plotly, Streamlit",
+    "description": "Build an airfare price tracking and predictive intelligence engine that analyzes historical domestic flight fares, computes a route-specific Price Volatility Index, and provides a clear 'Buy Now' vs. 'Wait for Price Drop' recommendation with projected price trajectories.",
+    "background": "Airlines employ opaque dynamic pricing algorithms that adjust ticket fares based on booking velocity, days to departure, and user cookies. Consumers face immense anxiety, either overpaying by booking prematurely or waiting too long and getting priced out by sudden surge hikes.",
+    "expectedSolution": "FARERADAR LITE: AIRFARE HISTORY DASHBOARD AND BUY-WAIT HEURISTIC\nProblem Statement ID: KARE-DS-05 | Domain: Data Science and Predictive Analytics\n\n• THE CORE QUESTION:\nHow can a route's historical fare range help a traveler judge whether today's quoted price is high or low?\n\n• THE PROBLEM GAP:\nTravelers cannot tell if a quoted fare is a good deal because they have no easy view of a route's typical price range and volatility across recent months.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nUse a preloaded fare-history dataset (Kaggle or simulated) for 5 to 10 domestic routes, compute each route's 30 / 60 / 90-day price statistics and a simple Volatility Index, plot the trend, and give a transparent heuristic verdict (today's price percentile versus the route's own history) with a 7-day Prophet projection clearly labeled as indicative.\n\n• SCOPE GUIDANCE:\nNo live airline API scraping. One preloaded dataset. The heuristic is percentile-based and explainable, not a trained prediction claim. Include a disclaimer that output is informational, not booking advice.\n\n• SOLUTION DIRECTIONS:\n• Route Price Statistics: rolling median, quartiles, and volatility index per route.\n• Buy-Wait Heuristic: current price percentile against the route's own history.\n• 7-Day Trend Projection: Prophet forecast with confidence band, labeled as indicative.\n\n• ANTI-GOALS:\n• Real-time fare scraping\n• Guaranteed price-drop prediction\n• Booking or checkout integration\n• Multi-airline API orchestration\n\n• JUDGING CRITERIA:\n• Statistical soundness of the heuristic (40%)\n• Dashboard clarity (30%)\n• Honest validation on held-out dates (30%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Pandas, Prophet, Plotly, Streamlit",
     "requirements": [
-      "Route Price Statistics: rolling median, quartiles, and volatility index per route.",
-      "Buy-Wait Heuristic: current price percentile against the route's own history.",
-      "7-Day Trend Projection: Prophet forecast with confidence band, labeled as indicative."
+      "Historical Trend & Volatility Index: Quantify price fluctuations for specific flight routes over time.",
+      "Buy vs. Wait Recommendation: Classification model predicting whether the fare will drop within 7 days.",
+      "Interactive Fare History Chart: Visual trajectory comparing current fare against median historical prices."
     ],
     "constraints": [
-      "Real-time fare scraping",
-      "Guaranteed price-drop prediction",
-      "Booking or checkout integration",
-      "Multi-airline API orchestration"
+      "Building a full-service online travel agency with payment processing.",
+      "Violating airline terms of service with aggressive scraping.",
+      "Predicting international multi-city layover fares."
     ],
     "domain": "Data Science & Predictive Analytics",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Python",
       "Pandas",
-      "Prophet",
+      "Scikit-learn",
+      "XGBoost",
       "Plotly",
+      "Chart.js",
+      "FastAPI",
       "Streamlit",
-      "XGBoost"
+      "Next.js"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,
@@ -887,7 +897,7 @@ const problemStatements = [
       "Manual auditing interfaces that require human line-by-line review."
     ],
     "domain": "Data Science & Predictive Analytics",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Python",
       "Scikit-learn (Isolation Forest)",
@@ -934,33 +944,31 @@ const problemStatements = [
   {
     "problemId": "KARE-DS-10",
     "title": "TransitSync Lite: Simulated Bus ETA & Delay Propagation Demo",
-    "description": "Build a pipeline on a preloaded or simulated GTFS-like CSV for 1 to 3 bus routes. Train a LightGBM or XGBoost model to predict travel time to the next stop. Simulate a live bus delay from a dashboard and recalculate downstream ETAs with a simple confidence range.",
-    "background": "Commuters lack reliable arrival times because static timetables ignore traffic and boarding delays. GPS trackers show only where the bus is, not when it will reach downstream stops.",
-    "expectedSolution": "TRANSITSYNC LITE: SIMULATED BUS ETA AND DELAY PROPAGATION DEMO\nProblem Statement ID: KARE-DS-10 | Domain: Data Science & Predictive Analytics\n\n• THE CORE QUESTION:\nHow can ML predict bus arrival at the next few stops using historical or simulated route logs and propagate a current delay downstream?\n\n• THE PROBLEM GAP:\nCommuters lack reliable arrival times because static timetables ignore traffic and boarding delays. GPS trackers show only where the bus is, not when it will reach downstream stops.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a pipeline on a preloaded or simulated GTFS-like CSV for 1 to 3 bus routes. Train a LightGBM or XGBoost model to predict travel time to the next stop. Simulate a live bus delay from a dashboard and recalculate downstream ETAs with a simple confidence range.\n\n• SCOPE GUIDANCE:\nUse simulated bus logs or a small public GTFS sample. No live GPS, no real weather API, no city-scale deployment. Weather and peak-hour can be pre-labelled columns in the dataset. Real-time means a local simulator that injects delay at a stop.\n\n• SOLUTION DIRECTIONS:\n• Dynamic ETA Regression: Predict travel minutes using route ID, stop sequence, hour, day, weather flag, previous delay, and dwell time.\n• Real-Time Delay Propagation: If bus is delayed at stop N, add predicted downstream travel times and propagate the delay with decay.\n• Commuter Web Display: Mobile-friendly countdown for next 3 stops, delay indicator, and confidence interval.\n\n• ANTI-GOALS:\n• Live GPS hardware integration\n• Full city-scale traffic simulation\n• Ticketing or booking system\n• Complex 3D visualization\n\n• JUDGING CRITERIA:\n• Downstream ETA accuracy (MAE or RMSE on held-out simulated data) (40%)\n• Delay propagation logic (35%)\n• Mobile UI cleanliness (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Pandas, LightGBM / XGBoost, FastAPI, React / Next.js, CSV / SQLite, Leaflet (optional)",
+    "description": "Design a machine learning transit prediction pipeline that models historical route travel times, time-of-day traffic patterns, and live stop delays to predict accurate Estimated Time of Arrival (ETA) for buses at upcoming stops, complete with confidence bounds.",
+    "background": "Millions of daily commuters waste hours at bus stops because published static timetables fail to account for urban traffic congestion, weather, and peak boarding delays. Existing GPS bus trackers only display current geographic location, leaving passengers in the dark about actual arrival time at downstream stops.",
+    "expectedSolution": "TRANSITSYNC LITE: SIMULATED BUS ETA AND DELAY PROPAGATION DEMO\nProblem Statement ID: KARE-DS-10 | Domain: Data Science and Predictive Analytics\n\n• THE CORE QUESTION:\nHow can ML predict bus arrival at the next few stops using historical or simulated route logs and propagate a current delay downstream?\n\n• THE PROBLEM GAP:\nCommuters lack reliable arrival times because static timetables ignore traffic and boarding delays. GPS trackers show only where the bus is, not when it will reach downstream stops.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a pipeline on a preloaded or simulated GTFS-like CSV for 1 to 3 bus routes. Train a LightGBM or XGBoost model to predict travel time to the next stop. Simulate a live bus delay from a dashboard and recalculate downstream ETAs with a simple confidence range.\n\n• SCOPE GUIDANCE:\nUse simulated bus logs or a small public GTFS sample. No live GPS, no real weather API, no city-scale deployment. Weather and peak-hour can be pre-labelled columns in the dataset. Real-time means a local simulator that injects delay at a stop.\n\n• SOLUTION DIRECTIONS:\n• Dynamic ETA Regression: Predict travel minutes using route ID, stop sequence, hour, day, weather flag, previous delay, and dwell time.\n• Real-Time Delay Propagation: If bus is delayed at stop N, add predicted downstream travel times and propagate the delay with decay.\n• Commuter Web Display: Mobile-friendly countdown for next 3 stops, delay indicator, and confidence interval.\n\n• ANTI-GOALS:\n• Live GPS hardware integration\n• Full city-scale traffic simulation\n• Ticketing or booking system\n• Complex 3D visualization\n\n• JUDGING CRITERIA:\n• Downstream ETA accuracy (MAE or RMSE on held-out simulated data) (40%)\n• Delay propagation logic (35%)\n• Mobile UI cleanliness (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Pandas, LightGBM / XGBoost, FastAPI, React / Next.js, CSV / SQLite, Leaflet (optional)",
     "requirements": [
-      "Dynamic ETA Regression: Predict travel minutes using route ID, stop sequence, hour, day, weather flag, previous delay, and dwell time.",
-      "Real-Time Delay Propagation: If bus is delayed at stop N, add predicted downstream travel times and propagate the delay with decay.",
-      "Commuter Web Display: Mobile-friendly countdown for next 3 stops, delay indicator, and confidence interval."
+      "Dynamic ETA Regression: Calculate arrival times factoring in weather, peak hour coefficients, and past stop delays.",
+      "Real-Time Delay Propagation: Adjust entire downstream route arrival estimates when a bus is delayed at one stop.",
+      "Commuter Web Display: Clean mobile interface with live countdown timers and route delay indicators."
     ],
     "constraints": [
-      "Live GPS hardware integration",
-      "Full city-scale traffic simulation",
-      "Ticketing or booking system",
-      "Complex 3D visualization"
+      "Manufacturing hardware GPS tracking devices for buses.",
+      "Building a full-fledged ticket booking and ticketing machine ecosystem.",
+      "Complex 3D city traffic simulation."
     ],
     "domain": "Data Science & Predictive Analytics",
     "difficulty": "Medium",
     "technologies": [
       "Python",
-      "Pandas",
       "LightGBM",
       "XGBoost",
-      "FastAPI",
+      "Pandas",
+      "Socket.io",
       "React",
       "Next.js",
-      "CSV",
-      "SQLite",
-      "Leaflet"
+      "FastAPI",
+      "OpenStreetMap"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,
@@ -1018,7 +1026,8 @@ const problemStatements = [
     "difficulty": "Medium",
     "technologies": [
       "Next.js",
-      "Supabase",
+      "Supabase (Auth",
+      "Storage & Database)",
       "Tailwind CSS",
       "Twilio",
       "WhatsApp Business API",
@@ -1045,7 +1054,7 @@ const problemStatements = [
       "Complex municipal GIS map servers."
     ],
     "domain": "Full-Stack Web & Smart Automation",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Flutter",
       "React PWA",
@@ -1063,33 +1072,30 @@ const problemStatements = [
   {
     "problemId": "KARE-SYS-04",
     "title": "JusticeBail Lite: Curated 436A Eligibility Calculator & Petition Template Generator",
-    "description": "Build an interactive web tool where paralegals input offence section from a curated list of 10 to 15 common sections, custody start date, and trial status. The engine computes half or one-third custody thresholds under CrPC 436A and generates an editable PDF draft using a standard petition template. Include a clear prototype disclaimer.",
-    "background": "Many undertrial prisoners remain in jail beyond statutory thresholds because legal-aid volunteers lack quick eligibility-checking and petition-drafting tools.",
-    "expectedSolution": "JUSTICEBAIL LITE: CURATED 436A ELIGIBILITY CALCULATOR AND PETITION TEMPLATE GENERATOR\nProblem Statement ID: KARE-SYS-04 | Domain: Full-Stack Web & Smart Automation\n\n• THE CORE QUESTION:\nHow can a legal-aid tool help paralegals check Section 436A eligibility for a small set of common offences and auto-fill a bail petition draft?\n\n• THE PROBLEM GAP:\nMany undertrial prisoners remain in jail beyond statutory thresholds because legal-aid volunteers lack quick eligibility-checking and petition-drafting tools.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild an interactive web tool where paralegals input offence section from a curated list of 10 to 15 common sections, custody start date, and trial status. The engine computes half or one-third custody thresholds under CrPC 436A and generates an editable PDF draft using a standard petition template. Include a clear prototype disclaimer.\n\n• SCOPE GUIDANCE:\nEncode only selected sections with maximum punishment. No precedent engine, no full CrPC or BNS coverage, no police database. Petition is template-based, not AI-generated legal reasoning.\n\n• SOLUTION DIRECTIONS:\n• Statutory Eligibility Calculator: Compare custody duration against 1/2 or 1/3 rule.\n• Legal Reason Template: Insert statutory justification citing CrPC 436A.\n• Petition PDF Generator: Populate court template with client data and export PDF.\n\n• ANTI-GOALS:\n• Replacing trial lawyers\n• Connecting to classified police databases\n• Sentencing or judicial outcome prediction\n• Covering every penal section\n\n• JUDGING CRITERIA:\n• Legal logic accuracy for curated sections (45%)\n• Petition template formatting (30%)\n• Usability for paralegal workers (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nReact / Next.js, FastAPI / Node.js, ReportLab / jsPDF, Tailwind / Bootstrap, SQLite / JSON",
+    "description": "Develop an interactive legal decision-support web platform where paralegals and legal aid volunteers input prisoner offense sections, custody start dates, and trial status; the engine computes Section 436A bail eligibility and automatically drafts a ready-to-file bail petition PDF.",
+    "background": "Over 75% of India's prison population comprises undertrial prisoners, many of whom have spent more time incarcerated than the maximum sentence for their alleged offense. Under Section 436A of the CrPC, they are legally entitled to bail, but languish in jail because legal aid volunteers lack automated tools to track statutory thresholds.",
+    "expectedSolution": "JUSTICEBAIL LITE: CURATED 436A ELIGIBILITY CALCULATOR AND PETITION TEMPLATE GENERATOR\nProblem Statement ID: KARE-SYS-04 | Domain: Full-Stack Web and Smart Automation\n\n• THE CORE QUESTION:\nHow can a legal-aid tool help paralegals check Section 436A eligibility for a small set of common offences and auto-fill a bail petition draft?\n\n• THE PROBLEM GAP:\nMany undertrial prisoners remain in jail beyond statutory thresholds because legal-aid volunteers lack quick eligibility-checking and petition-drafting tools.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild an interactive web tool where paralegals input offence section from a curated list of 10 to 15 common sections, custody start date, and trial status. The engine computes half or one-third custody thresholds under CrPC 436A and generates an editable PDF draft using a standard petition template. Include a clear prototype disclaimer.\n\n• SCOPE GUIDANCE:\nEncode only selected sections with maximum punishment. No precedent engine, no full CrPC or BNS coverage, no police database. Petition is template-based, not AI-generated legal reasoning.\n\n• SOLUTION DIRECTIONS:\n• Statutory Eligibility Calculator: Compare custody duration against 1/2 or 1/3 rule.\n• Legal Reason Template: Insert statutory justification citing CrPC 436A.\n• Petition PDF Generator: Populate court template with client data and export PDF.\n\n• ANTI-GOALS:\n• Replacing trial lawyers\n• Connecting to classified police databases\n• Sentencing or judicial outcome prediction\n• Covering every penal section\n\n• JUDGING CRITERIA:\n• Legal logic accuracy for curated sections (45%)\n• Petition template formatting (30%)\n• Usability for paralegal workers (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nReact / Next.js, FastAPI / Node.js, ReportLab / jsPDF, Tailwind / Bootstrap, SQLite / JSON",
     "requirements": [
-      "Statutory Eligibility Calculator: Compare custody duration against 1/2 or 1/3 rule.",
-      "Legal Reason Template: Insert statutory justification citing CrPC 436A.",
-      "Petition PDF Generator: Populate court template with client data and export PDF."
+      "Statutory Eligibility Calculator: Evaluate custody duration against maximum penalties (1/2 or 1/3 rules).",
+      "Legal Reason Engine: Generate statutory justifications citing CrPC 436A and landmark bail precedents.",
+      "Automated Court Petition PDF Generator: Export completed, properly formatted bail application ready for signature."
     ],
     "constraints": [
-      "Replacing trial lawyers",
-      "Connecting to classified police databases",
-      "Sentencing or judicial outcome prediction",
-      "Covering every penal section"
+      "Replacing professional trial lawyers in court.",
+      "Connecting to classified police internal databases.",
+      "Automated sentencing or judicial outcome prediction."
     ],
     "domain": "Full-Stack Web & Smart Automation",
     "difficulty": "Medium",
     "technologies": [
       "React",
       "Next.js",
-      "FastAPI",
       "Node.js",
+      "Python",
       "ReportLab",
       "jsPDF",
-      "Tailwind",
       "Bootstrap",
-      "SQLite",
-      "JSON"
+      "Tailwind CSS"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,
@@ -1112,7 +1118,7 @@ const problemStatements = [
       "Replacing global job portals (LinkedIn)."
     ],
     "domain": "Full-Stack Web & Smart Automation",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Next.js",
       "FastAPI",
@@ -1131,7 +1137,7 @@ const problemStatements = [
     "title": "KalaKriti: AI-Powered Multilingual Cataloging Portal for Rural Artisans",
     "description": "Design a mobile progressive web app where artisans snap a photo of their handmade craft; multimodal vision AI analyzes the image, automatically tags craft categories, identifies colors and materials, and generates compelling promotional descriptions in both English and local Indian languages for instant digital sharing.",
     "background": "Millions of skilled rural artisans (potters, weavers, painters) struggle to sell their craft on digital platforms because cataloging products requires writing fluent English descriptions, measuring dimensions, and categorizing crafts correctly. High agency commissions eat up their profits.",
-    "expectedSolution": "KALAKRITI: AI-POWERED MULTILINGUAL CATALOGING PORTAL FOR RURAL ARTISANS\nProblem Statement ID: KARE-SYS-06 | Domain: Full-Stack Web & Smart Automation\n\n• THE CORE QUESTION:\nHow can traditional artisans create digital e-commerce storefronts with professional marketing descriptions using just their phone camera?\n\n• THE PROBLEM GAP:\nMillions of skilled rural artisans (potters, weavers, painters) struggle to sell their craft on digital platforms because cataloging products requires writing fluent English descriptions, measuring dimensions, and categorizing crafts correctly. High agency commissions eat up their profits.\n\n• THE CHALLENGE:\nDesign a mobile progressive web app where artisans snap a photo of their handmade craft; multimodal vision AI analyzes the image, automatically tags craft categories, identifies colors and materials, and generates compelling promotional descriptions in both English and local Indian languages for instant digital sharing.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nUse free vision-language APIs (BLIP, CLIP, or Gemini API). The artisan workflow must be one-click simple: upload photo -> review generated product card -> share on WhatsApp or export catalog.\n\n• SOLUTION DIRECTIONS:\n• Photo-to-Catalog Pipeline: Extract craft type (e.g., 'Terracotta pottery', 'Bandhani saree') and color palette.\n• Multilingual Marketing Copywriter: Generate engaging product descriptions in English, Hindi, Tamil, etc.\n• Digital Showcase Storefront: Auto-generate a sharable web link where customers can view products and message the artisan.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Building an entire payment gateway and banking settlement engine.\n• Requiring complex inventory SKU management.\n• Manual multi-page form filling.\n\n• JUDGING CRITERIA:\n• Vision-to-Copy Generation Quality (40%)\n• Artisan Mobile Usability & Accessibility (35%)\n• Storefront Presentation & Sharing Flow (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nReact / Next.js, FastAPI, HuggingFace Inference API (BLIP / Vision), Firebase / Supabase, Tailwind CSS",
+    "expectedSolution": "KALAKRITI: AI-POWERED MULTILINGUAL CATALOGING PORTAL FOR RURAL ARTISANS\nProblem Statement ID: KARE-SYS-06 | Domain: Full-Stack Web & Smart Automation\n\n• THE CORE QUESTION:\nHow can traditional artisans create digital e-commerce storefronts with professional marketing descriptions using just their phone camera?\n\n• THE PROBLEM GAP:\nMillions of skilled rural artisans (potters, weavers, painters) struggle to sell their craft on digital platforms because cataloging products requires writing fluent English descriptions, measuring dimensions, and categorizing crafts correctly. High agency commissions eat up their profits.\n\n• THE CHALLENGE:\nDesign a mobile progressive web app where artisans snap a photo of their handmade craft; multimodal vision AI analyzes the image, automatically tags craft categories, identifies colors and materials, and generates compelling promotional descriptions in both English and local Indian languages for instant digital sharing.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nUse free vision-language APIs (BLIP, CLIP, or Gemini API). The artisan workflow must be one-click simple: upload photo $\\rightarrow$ review generated product card $\\rightarrow$ share on WhatsApp or export catalog.\n\n• SOLUTION DIRECTIONS:\n• Photo-to-Catalog Pipeline: Extract craft type (e.g., 'Terracotta pottery', 'Bandhani saree') and color palette.\n• Multilingual Marketing Copywriter: Generate engaging product descriptions in English, Hindi, Tamil, etc.\n• Digital Showcase Storefront: Auto-generate a sharable web link where customers can view products and message the artisan.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Building an entire payment gateway and banking settlement engine.\n• Requiring complex inventory SKU management.\n• Manual multi-page form filling.\n\n• JUDGING CRITERIA:\n• Vision-to-Copy Generation Quality (40%)\n• Artisan Mobile Usability & Accessibility (35%)\n• Storefront Presentation & Sharing Flow (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nReact / Next.js, FastAPI, HuggingFace Inference API (BLIP / Vision), Firebase / Supabase, Tailwind CSS",
     "requirements": [
       "Photo-to-Catalog Pipeline: Extract craft type (e.g., 'Terracotta pottery', 'Bandhani saree') and color palette.",
       "Multilingual Marketing Copywriter: Generate engaging product descriptions in English, Hindi, Tamil, etc.",
@@ -1148,9 +1154,8 @@ const problemStatements = [
       "React",
       "Next.js",
       "FastAPI",
-      "HuggingFace Inference API",
-      "BLIP",
-      "Vision",
+      "HuggingFace Inference API (BLIP",
+      "Vision)",
       "Firebase",
       "Supabase",
       "Tailwind CSS"
@@ -1162,19 +1167,18 @@ const problemStatements = [
   {
     "problemId": "KARE-SYS-07",
     "title": "GeoAttend Lite: Geofenced Check-in with Rotating Code & Basic Anomaly Flags",
-    "description": "Build a mobile web attendance portal where faculty displays a rotating 6-digit code or QR, students submit the code plus browser geolocation, and the system verifies coordinates inside a simulated classroom polygon using Haversine logic while flagging basic anomalies (out-of-polygon, duplicate device ID, rapid speed jumps).",
-    "background": "Roll calls waste lecture time. Biometrics create queues and hygiene issues. Simple attendance apps are tricked by GPS spoofing or credential sharing.",
-    "expectedSolution": "GEOATTEND LITE: GEOFENCED CHECK-IN WITH ROTATING CODE AND BASIC ANOMALY FLAGS\nProblem Statement ID: KARE-SYS-07 | Domain: Full-Stack Web & Smart Automation\n\n• THE CORE QUESTION:\nHow can a mobile web app automate classroom attendance using geofencing and a rotating check-in code while deterring simple proxy or spoofing attempts?\n\n• THE PROBLEM GAP:\nRoll calls waste lecture time. Biometrics create queues and hygiene issues. Simple attendance apps are tricked by GPS spoofing or credential sharing.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a mobile web attendance portal where faculty displays a rotating 6-digit code or QR, students submit the code plus browser geolocation, and the system verifies coordinates inside a simulated classroom polygon using Haversine logic while flagging basic anomalies (out-of-polygon, duplicate device ID, rapid speed jumps).\n\n• SCOPE GUIDANCE:\nOne simulated campus and one classroom polygon. No RFID hardware, no background tracking outside class. Use localStorage or device ID plus rotating code for basic proxy deterrence. Note: spoof-deterrent rather than claim of impossible spoof-proofing.\n\n• SOLUTION DIRECTIONS:\n• Geofence Validator: Check student coordinates against classroom polygon.\n• Anti-Spoofing Heuristics: Mock-location flag if available, abnormal speed, duplicate device, low GPS accuracy.\n• Live Faculty Monitor: Occupancy view, absentee export, session code rotation.\n\n• ANTI-GOALS:\n• RFID gates in every doorway\n• Tracking students outside lecture hours\n• Multi-semester grading portal\n• Claiming impossible spoof-proof security\n\n• JUDGING CRITERIA:\n• Geofence accuracy and basic spoof deterrence (45%)\n• Faculty dashboard and live roster UX (30%)\n• Mobile responsiveness and lightweight design (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nReact / Next.js, HTML5 Geolocation API, Node.js / FastAPI, SQLite / PostgreSQL / MongoDB, Tailwind CSS",
+    "description": "Develop a spoof-resistant mobile web attendance portal that verifies a student's presence inside a designated classroom polygon using the Haversine formula and HTML5 Geolocation, detects fake location providers/mock location flags, and updates a real-time faculty attendance dashboard.",
+    "background": "Manual roll calls waste 10 minutes of every college lecture, while biometric fingerprint scanners create long hallway lines and hygiene concerns. Existing mobile attendance apps are easily tricked by students using GPS spoofing apps or sharing login credentials with friends.",
+    "expectedSolution": "GEOATTEND LITE: GEOFENCED CHECK-IN WITH ROTATING CODE AND BASIC ANOMALY FLAGS\nProblem Statement ID: KARE-SYS-07 | Domain: Full-Stack Web and Smart Automation\n\n• THE CORE QUESTION:\nHow can a mobile web app automate classroom attendance using geofencing and a rotating check-in code while deterring simple proxy or spoofing attempts?\n\n• THE PROBLEM GAP:\nRoll calls waste lecture time. Biometrics create queues and hygiene issues. Simple attendance apps are tricked by GPS spoofing or credential sharing.\n\n• THE CHALLENGE (24-HR FEASIBILITY):\nBuild a mobile web attendance portal where faculty displays a rotating 6-digit code or QR, students submit the code plus browser geolocation, and the system verifies coordinates inside a simulated classroom polygon using Haversine logic while flagging basic anomalies (out-of-polygon, duplicate device ID, rapid speed jumps).\n\n• SCOPE GUIDANCE:\nOne simulated campus and one classroom polygon. No RFID hardware, no background tracking outside class. Use localStorage or device ID plus rotating code for basic proxy deterrence. Note: spoof-deterrent rather than claim of impossible spoof-proofing.\n\n• SOLUTION DIRECTIONS:\n• Geofence Validator: Check student coordinates against classroom polygon.\n• Anti-Spoofing Heuristics: Mock-location flag if available, abnormal speed, duplicate device, low GPS accuracy.\n• Live Faculty Monitor: Occupancy view, absentee export, session code rotation.\n\n• ANTI-GOALS:\n• RFID gates in every doorway\n• Tracking students outside lecture hours\n• Multi-semester grading portal\n• Claiming impossible spoof-proof security\n\n• JUDGING CRITERIA:\n• Geofence accuracy and basic spoof deterrence (45%)\n• Faculty dashboard and live roster UX (30%)\n• Mobile responsiveness and lightweight design (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nReact / Next.js, HTML5 Geolocation API, Node.js / FastAPI, SQLite / PostgreSQL / MongoDB, Tailwind CSS",
     "requirements": [
-      "Geofence Validator: Check student coordinates against classroom polygon.",
-      "Anti-Spoofing Heuristics: Mock-location flag if available, abnormal speed, duplicate device, low GPS accuracy.",
-      "Live Faculty Monitor: Occupancy view, absentee export, session code rotation."
+      "Geofence Polygon Validator: Check student coordinates against classroom bounding polygons.",
+      "Anti-Spoofing Heuristics: Check mock-location browser flags, abnormal speed jumps, and device fingerprinting.",
+      "Live Faculty Monitor: Display live classroom occupancy with instant absentee list export."
     ],
     "constraints": [
-      "RFID gates in every doorway",
-      "Tracking students outside lecture hours",
-      "Multi-semester grading portal",
-      "Claiming impossible spoof-proof security"
+      "Installing expensive RFID hardware gates in every doorway.",
+      "Tracking student GPS movements outside lecture hours.",
+      "Building complex multi-semester grading portals."
     ],
     "domain": "Full-Stack Web & Smart Automation",
     "difficulty": "Medium",
@@ -1183,10 +1187,8 @@ const problemStatements = [
       "Next.js",
       "HTML5 Geolocation API",
       "Node.js",
-      "FastAPI",
-      "SQLite",
-      "PostgreSQL",
       "MongoDB",
+      "PostgreSQL",
       "Tailwind CSS"
     ],
     "maxTeamCapacity": 2,
@@ -1210,7 +1212,7 @@ const problemStatements = [
       "Building a broad search engine with unverified links."
     ],
     "domain": "Full-Stack Web & Smart Automation",
-    "difficulty": "Hard",
+    "difficulty": "Medium",
     "technologies": [
       "Next.js",
       "React",
@@ -1246,7 +1248,7 @@ const problemStatements = [
     "technologies": [
       "React",
       "Next.js",
-      "HTML5-QRCode Scanner",
+      "HTML5-QRCode Scanner library",
       "Node.js",
       "Express",
       "PostgreSQL",
@@ -1283,68 +1285,6 @@ const problemStatements = [
       "Chart.js",
       "PostgreSQL",
       "Supabase"
-    ],
-    "maxTeamCapacity": 2,
-    "selectedCount": 0,
-    "status": "PUBLISHED"
-  },
-  {
-    "problemId": "PS-041",
-    "title": "NSS Blood Connect – Smart Blood Donor & Emergency Coordination System",
-    "description": "During emergencies, finding suitable blood donors quickly can be challenging due to limited access to donor information and availability. Develop a digital platform that connects blood donors with patients, hospitals, and organizations through blood-group matching, location-based donor search, availability tracking, emergency blood requests, donor responses, and request tracking. The system should provide a centralized dashboard for managing donors, blood requests, emergency requirements, donation records, and blood-group statistics.",
-    "background": "During critical medical emergencies, finding suitable blood donors quickly is challenging due to limited access to donor information, outdated contact records, and lack of real-time availability tracking.",
-    "expectedSolution": "NSS BLOOD CONNECT – SMART BLOOD DONOR & EMERGENCY COORDINATION SYSTEM\nProblem Statement ID: PS-041 | Domain: Full-Stack Web & Smart Automation\n\n• THE CORE QUESTION:\nHow can an intelligent digital platform connect blood donors with patients and hospitals in real time to eliminate delays during critical emergencies?\n\n• THE PROBLEM GAP:\nDuring emergencies, finding suitable blood donors quickly can be challenging due to limited access to donor information and availability. Traditional coordination relies on frantic manual calls and unverified social media messages, losing vital minutes when lives are at risk.\n\n• THE CHALLENGE:\nDevelop a digital platform that connects blood donors with patients, hospitals, and organizations through blood-group matching, location-based donor search, availability tracking, emergency blood requests, donor responses, and request tracking. The system should provide a centralized dashboard for managing donors, blood requests, emergency requirements, donation records, and blood-group statistics.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nBuild a responsive full-stack platform using React, Node.js, Express, and MongoDB. Implement geolocation radius searches for donors with Google Maps API, use WebSockets for real-time emergency broadcasts and response tracking, and secure all user and administrative roles with JWT.\n\n• SOLUTION DIRECTIONS:\n• Location-Based Donor Matching: Search and filter available donors based on compatible blood groups and proximity radius.\n• Real-Time Emergency SOS & WebSockets: Broadcast urgent blood requirements with instant notifications and donor response tracking.\n• Centralized Management Dashboard: Track donation records, donor availability status, emergency requirements, and blood-group statistics.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Building automated laboratory blood cross-matching hardware.\n• Exposing unverified personal phone numbers publicly without privacy guards.\n• Ingesting national hospital EHR databases with heavy enterprise compliance overhead.\n\n• JUDGING CRITERIA:\n• Emergency Matching & Notification Latency (40%)\n• Centralized Dashboard & Inventory Analytics (35%)\n• Security, Privacy & JWT Implementation (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nReact, Node.js, Express.js, MongoDB, Google Maps API, WebSockets, JWT",
-    "requirements": [
-      "Blood-Group Matching & Location-Based Donor Search: Connect patients with eligible donors using blood compatibility and geolocation radius proximity on an interactive map.",
-      "Emergency Blood Requests & Real-Time Tracking: Broadcast urgent SOS requests with instant notifications via WebSockets and live donor acceptance tracking.",
-      "Centralized Management Dashboard: Manage donors, blood requests, emergency requirements, donation records, and blood-group statistics."
-    ],
-    "constraints": [
-      "Exposing donor private contact info without consent.",
-      "Manual phone-based coordination during emergency workflows.",
-      "Unsecured API endpoints without JWT authorization."
-    ],
-    "domain": "Full-Stack Web & Smart Automation",
-    "difficulty": "Medium",
-    "technologies": [
-      "React",
-      "Node.js",
-      "Express.js",
-      "MongoDB",
-      "Google Maps API",
-      "WebSockets",
-      "JWT"
-    ],
-    "maxTeamCapacity": 2,
-    "selectedCount": 0,
-    "status": "PUBLISHED"
-  },
-  {
-    "problemId": "PS-042",
-    "title": "AI-Driven EV Range Prediction & Smart Navigation System",
-    "description": "EV users often experience range anxiety due to uncertain battery consumption caused by traffic, driving speed, weather, vehicle load, air-conditioning usage, and vehicle characteristics. Develop an AI-powered EV navigation system that predicts the vehicle's remaining driving range using real-time and user-provided parameters. The system should recommend energy-efficient routes by considering distance, traffic conditions, estimated energy consumption, and nearby charging-station availability.",
-    "background": "EV users often experience range anxiety due to uncertain battery consumption caused by traffic, driving speed, weather, vehicle load, air-conditioning usage, and vehicle characteristics.",
-    "expectedSolution": "AI-DRIVEN EV RANGE PREDICTION & SMART NAVIGATION SYSTEM\nProblem Statement ID: PS-042 | Domain: Artificial Intelligence & Machine Learning\n\n• THE CORE QUESTION:\nHow can an AI navigation system accurately predict electric vehicle battery range under real-world dynamic conditions and recommend energy-optimal charging routes?\n\n• THE PROBLEM GAP:\nEV users often experience range anxiety due to uncertain battery consumption caused by traffic, driving speed, weather, vehicle load, air-conditioning usage, and vehicle characteristics. Existing navigation apps calculate routes based purely on distance or time without factoring in vehicle energy dynamics or charger queues.\n\n• THE CHALLENGE:\nDevelop an AI-powered EV navigation system that predicts the vehicle's remaining driving range using real-time and user-provided parameters. The system should recommend energy-efficient routes by considering distance, traffic conditions, estimated energy consumption, and nearby charging-station availability.\n\n• SCOPE GUIDANCE (24-HR FEASIBILITY):\nTrain or evaluate an ML regression model (e.g. Scikit-learn, XGBoost) using EV driving cycle parameters. Build a full-stack interface using React and Node.js that visualizes estimated battery levels along the route, alerts on critical battery drop, and routes via nearby charging stations using Google Maps API.\n\n• SOLUTION DIRECTIONS:\n• Dynamic ML Range Prediction: Predict real-time energy consumption factoring in speed, payload, HVAC usage, and elevation profile.\n• Energy-Aware Route Optimization: Recommend optimal paths balancing battery longevity, travel time, and live traffic conditions.\n• Smart Charging Corridor Navigation: Integrate EV charging station APIs to schedule automated charging stops when range drops below critical thresholds.\n\n• ANTI-GOALS (WHAT THIS IS NOT):\n• Physical vehicle ECU or CAN-bus reverse-engineering.\n• Designing high-voltage physical charging hardware.\n• Static lookup tables without machine learning regression.\n\n• JUDGING CRITERIA:\n• ML Prediction Accuracy & Feature Engineering (40%)\n• Energy-Optimal Route Planning & Efficiency (35%)\n• Navigation UI & Charging Station Integration (25%)\n\n• RECOMMENDED TECH STACK & RESOURCES:\nPython, Machine Learning, React, Node.js, MongoDB, Google Maps API, EV Charging APIs",
-    "requirements": [
-      "AI/ML Driving Range Prediction: Predict real-time battery consumption and remaining distance factoring in speed, vehicle weight, weather, and climate control.",
-      "Energy-Efficient Smart Navigation: Route planning algorithm that optimizes for minimal battery expenditure rather than just shortest distance.",
-      "Charging Station Integration & Stop Planner: Discover nearby charging points along the route using EV charging APIs with live availability and automated charging stop suggestions."
-    ],
-    "constraints": [
-      "Static linear range estimations without ML regression.",
-      "Hardware OBD-II or CAN-bus reverse-engineering.",
-      "Offline routing without dynamic traffic consideration."
-    ],
-    "domain": "Artificial Intelligence & Machine Learning",
-    "difficulty": "Medium",
-    "technologies": [
-      "Python",
-      "Machine Learning",
-      "React",
-      "Node.js",
-      "MongoDB",
-      "Google Maps API",
-      "EV Charging APIs"
     ],
     "maxTeamCapacity": 2,
     "selectedCount": 0,

@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { TeamLead, Admin, Volunteer, Reviewer, ActiveSession, Team, AuditLog } = require('../models/Schema');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
+const config = require('../config/env');
 const AUTHORIZED_TEAMS = require('../data/teamsData');
 
 // 1. TEAM LEAD LOGIN (Strict 2-Field Authentication & Single-Device Access)

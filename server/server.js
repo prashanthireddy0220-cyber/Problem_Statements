@@ -14,24 +14,23 @@ const reviewerRoutes = require('./routes/reviewerRoutes');
 const app = express();
 const PORT = config.PORT;
 
-// Enable CORS using FRONTEND_URL environment variable configuration
-const allowedOrigins = [
-  config.FRONTEND_URL,
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:5173'
-].filter(Boolean);
+// Protect against unhandled crashes to keep Render web service online
+process.on('uncaughtException', (err) => {
+  console.error('🚨 UNCAUGHT EXCEPTION (Process kept alive):', err);
+});
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🚨 UNHANDLED REJECTION (Process kept alive):', reason);
+});
+
+// Enable CORS with full preflight support
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || config.NODE_ENV === 'development') {
-      callback(null, true);
-    } else {
-      callback(null, true);
-    }
-  },
-  credentials: true
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
+app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -250,38 +249,57 @@ async function triggerAutoSeed() {
     }
 
     const problemStatementsData = require('./data/problemStatements');
-    const existingCount = await ProblemStatement.countDocuments();
+    const validProblemIds = problemStatementsData.map(p => p.problemId);
 
-    if (existingCount === 0) {
-      console.log('🌱 Syncing Problem Statements: Seeding Hackathon 2026 Comprehensive Booklet (KARE & PS statements with 2-Team capacity limit)...');
-      const preparedData = problemStatementsData.map(p => ({
-        ...p,
-        maxTeamCapacity: 2,
-        selectedCount: 0,
-        status: 'PUBLISHED'
-      }));
-      await ProblemStatement.insertMany(preparedData);
-      console.log(`✅ Seeded ${preparedData.length} new problem statements.`);
-    } else {
-      // Upsert any missing problem statements from booklet dataset (e.g. PS-041, PS-042)
-      for (const p of problemStatementsData) {
-        await ProblemStatement.updateOne(
-          { problemId: p.problemId },
-          {
-            $setOnInsert: {
-              ...p,
-              maxTeamCapacity: 2,
-              selectedCount: 0,
-              status: 'PUBLISHED'
-            }
-          },
-          { upsert: true }
-        );
-      }
-      await ProblemStatement.updateMany({ maxTeamCapacity: { $ne: 2 } }, { $set: { maxTeamCapacity: 2 } });
-      const updatedTotal = await ProblemStatement.countDocuments();
-      console.log(`✅ Synchronized Problem Statements: ${updatedTotal} statements active in database.`);
+    // 1. Remove all old/extra problem statements not in the Top 40 booklet from database
+    const removeResult = await ProblemStatement.deleteMany({ problemId: { $nin: validProblemIds } });
+    if (removeResult.deletedCount > 0) {
+      console.log(`🧹 Removed ${removeResult.deletedCount} outdated problem statements not in Top 40 booklet.`);
     }
+
+    // 2. Clean up any team selections that pointed to removed problem statements
+    await Team.updateMany(
+      { selectedProblemCode: { $nin: [...validProblemIds, 'Not Selected'] } },
+      { $set: { selectedProblemCode: 'Not Selected', selectionConfirmed: false, problemStatementId: null } }
+    );
+
+    // 3. Upsert and synchronize all 40 problem statements from the Top 40 booklet
+    for (const p of problemStatementsData) {
+      await ProblemStatement.updateOne(
+        { problemId: p.problemId },
+        {
+          $set: {
+            title: p.title,
+            description: p.description,
+            background: p.background,
+            expectedSolution: p.expectedSolution,
+            requirements: p.requirements,
+            constraints: p.constraints,
+            domain: p.domain,
+            difficulty: p.difficulty || 'Medium',
+            technologies: p.technologies,
+            maxTeamCapacity: 2,
+            status: 'PUBLISHED'
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    // 4. Synchronize selectedCount for each of the 40 problem statements based on active confirmed team selections
+    for (const p of problemStatementsData) {
+      const activeCount = await Team.countDocuments({
+        selectedProblemCode: p.problemId,
+        selectionConfirmed: true
+      });
+      await ProblemStatement.updateOne(
+        { problemId: p.problemId },
+        { $set: { selectedCount: activeCount } }
+      );
+    }
+
+    const currentTotal = await ProblemStatement.countDocuments();
+    console.log(`✅ Synchronized Problem Statements: Exactly ${currentTotal} statements active in database (Top 40 booklet only).`);
 
     // Always ensure Team 50 (9824005012) and Team 61 (9824005007) are properly separated and synchronized
     const team50Members = [
@@ -430,49 +448,58 @@ async function triggerAutoSeed() {
   }
 }
 
-// Global Database Connection Strategy
-async function startServer() {
-  try {
-    let mongoUri = config.MONGODB_URI;
-
-    if (mongoUri) {
-      try {
-        console.log('Connecting to configured MONGODB_URI...');
-        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 3000 });
-        console.log('✅ Connected to MongoDB database via Mongoose.');
-      } catch (connErr) {
-        console.warn('⚠️ Could not connect to remote MONGODB_URI:', connErr.message);
-        console.log('⚡ Falling back to embedded MongoDB server engine...');
-        const { MongoMemoryServer } = require('mongodb-memory-server');
-        const mongod = await MongoMemoryServer.create({ instance: { dbName: 'hackathon_alpha_db' } });
-        mongoUri = mongod.getUri();
-        await mongoose.connect(mongoUri);
-        console.log(`✅ Embedded MongoDB Server started at: ${mongoUri}`);
-      }
-    } else {
-      console.log('⚡ MONGODB_URI not configured in .env. Initializing embedded MongoDB server engine...');
-      const { MongoMemoryServer } = require('mongodb-memory-server');
-      const mongod = await MongoMemoryServer.create({ instance: { dbName: 'hackathon_alpha_db' } });
-      mongoUri = mongod.getUri();
-      await mongoose.connect(mongoUri);
-      console.log(`✅ Embedded MongoDB Server started at: ${mongoUri}`);
-    }
-
-    // Start Express listening immediately so health checks pass instantly
-    app.listen(PORT, () => {
-      console.log(`=======================================================`);
-      console.log(`🚀 EVENT ALPHA HACKATHON SERVER ACTIVE ON PORT: ${PORT}`);
-      console.log(`   Header Logo: KARE IEEE Education Society`);
-      console.log(`   Web App URL: http://localhost:${PORT}`);
-      console.log(`=======================================================`);
+// Global Express Error Handler Middleware
+app.use((err, req, res, next) => {
+  console.error('🚨 Express Error Handler caught:', err);
+  if (!res.headersSent) {
+    res.status(err.status || 500).json({
+      error: err.message || 'An unexpected internal server error occurred.'
     });
+  }
+});
 
-    // Run auto-seed asynchronously in background
-    triggerAutoSeed().catch(err => console.error('Auto-seed error:', err));
-  } catch (err) {
-    console.error('❌ Server startup error:', err);
-    process.exit(1);
+// Start Express listening immediately on 0.0.0.0 so Render port binding and health checks succeed instantly
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`=======================================================`);
+  console.log(`🚀 EVENT ALPHA HACKATHON SERVER ACTIVE ON PORT: ${PORT}`);
+  console.log(`   Header Logo: KARE IEEE Education Society`);
+  console.log(`   Binding: 0.0.0.0:${PORT}`);
+  console.log(`=======================================================`);
+});
+
+// Global Database Connection Strategy
+async function connectDatabase() {
+  let mongoUri = config.MONGODB_URI;
+
+  if (mongoUri) {
+    try {
+      console.log('Connecting to configured MONGODB_URI...');
+      await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 20000 });
+      console.log('✅ Connected to MongoDB database via Mongoose.');
+      return;
+    } catch (connErr) {
+      console.warn('⚠️ Could not connect to remote MONGODB_URI:', connErr.message);
+    }
+  }
+
+  try {
+    console.log('⚡ Initializing embedded MongoDB server engine...');
+    const { MongoMemoryServer } = require('mongodb-memory-server');
+    const mongod = await MongoMemoryServer.create({ instance: { dbName: 'hackathon_alpha_db' } });
+    mongoUri = mongod.getUri();
+    await mongoose.connect(mongoUri);
+    console.log(`✅ Embedded MongoDB Server started at: ${mongoUri}`);
+  } catch (memErr) {
+    console.error('⚠️ Embedded MongoDB failed to initialize:', memErr.message);
   }
 }
 
-startServer();
+// Connect database and run auto-seed asynchronously
+connectDatabase()
+  .then(() => {
+    triggerAutoSeed().catch(err => console.error('Auto-seed error:', err));
+  })
+  .catch(err => {
+    console.error('Database connection process error:', err);
+  });
+

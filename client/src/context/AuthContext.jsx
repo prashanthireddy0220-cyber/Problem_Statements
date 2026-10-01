@@ -5,7 +5,7 @@ const AuthContext = createContext();
 
 const extractErrorMessage = (err, fallback) => {
   if (!err) return fallback;
-  const isHtml = (str) => typeof str === 'string' && (str.includes('<html') || str.includes('<!DOCTYPE') || str.includes('<body') || str.includes('<pre>') || str.includes('Cannot POST') || str.includes('Cannot GET'));
+  const isHtml = (str) => typeof str === 'string' && (str.includes('<html') || str.includes('<!DOCTYPE') || str.includes('<body') || str.includes('<pre>') || str.includes('Cannot POST') || str.includes('Cannot GET') || str.includes('502 Bad Gateway'));
 
   if (typeof err === 'string') return isHtml(err) ? fallback : err;
   const data = err.response?.data;
@@ -16,7 +16,12 @@ const extractErrorMessage = (err, fallback) => {
     const msg = data.error.message || data.error.error || JSON.stringify(data.error);
     return isHtml(msg) ? fallback : msg;
   }
-  if (err.message && typeof err.message === 'string') return isHtml(err.message) ? fallback : err.message;
+  if (err.message && typeof err.message === 'string') {
+    if (err.message.toLowerCase().includes('network error') || err.message.toLowerCase().includes('timeout')) {
+      return 'Server is waking up or reconnecting. Please wait a few seconds and try again.';
+    }
+    return isHtml(err.message) ? fallback : err.message;
+  }
   return fallback;
 };
 
@@ -188,45 +193,65 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const loginTeamLead = async (teamId, registrationNumber, deviceId) => {
-    try {
-      const res = await axios.post('/api/auth/team-lead/login', { teamId, registrationNumber, deviceId });
-      const { token, user, sessionId } = res.data;
-      
-      localStorage.setItem('alpha_team_lead_token', token);
-      localStorage.setItem('alpha_team_lead_user', JSON.stringify(user));
-      localStorage.setItem('alpha_token', token);
-      localStorage.setItem('alpha_user', JSON.stringify(user));
-      localStorage.setItem('alpha_session_id', sessionId);
-      
-      setToken(token);
-      setUser(user);
-      setSessionId(sessionId);
-      setRevokedMessage(null);
-      return { success: true, user };
-    } catch (err) {
-      return { success: false, error: extractErrorMessage(err, 'Team lead login failed.') };
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await axios.post('/api/auth/team-lead/login', { teamId, registrationNumber, deviceId }, { timeout: 20000 });
+        const { token, user, sessionId } = res.data;
+        
+        localStorage.setItem('alpha_team_lead_token', token);
+        localStorage.setItem('alpha_team_lead_user', JSON.stringify(user));
+        localStorage.setItem('alpha_token', token);
+        localStorage.setItem('alpha_user', JSON.stringify(user));
+        localStorage.setItem('alpha_session_id', sessionId);
+        
+        setToken(token);
+        setUser(user);
+        setSessionId(sessionId);
+        setRevokedMessage(null);
+        return { success: true, user };
+      } catch (err) {
+        lastErr = err;
+        if (err.response && err.response.status >= 400 && err.response.status < 500) {
+          return { success: false, error: extractErrorMessage(err, 'Invalid credentials.') };
+        }
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1200));
+        }
+      }
     }
+    return { success: false, error: extractErrorMessage(lastErr, 'Team lead login failed.') };
   };
 
   const loginAdmin = async (username, password) => {
-    try {
-      const res = await axios.post('/api/auth/admin/login', { username, password });
-      const { token, user, sessionId } = res.data;
-      
-      localStorage.setItem('alpha_admin_token', token);
-      localStorage.setItem('alpha_admin_user', JSON.stringify(user));
-      localStorage.setItem('alpha_token', token);
-      localStorage.setItem('alpha_user', JSON.stringify(user));
-      localStorage.setItem('alpha_session_id', sessionId);
-      
-      setToken(token);
-      setUser(user);
-      setSessionId(sessionId);
-      setRevokedMessage(null);
-      return { success: true, user };
-    } catch (err) {
-      return { success: false, error: extractErrorMessage(err, 'Admin login failed.') };
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await axios.post('/api/auth/admin/login', { username, password }, { timeout: 20000 });
+        const { token, user, sessionId } = res.data;
+        
+        localStorage.setItem('alpha_admin_token', token);
+        localStorage.setItem('alpha_admin_user', JSON.stringify(user));
+        localStorage.setItem('alpha_token', token);
+        localStorage.setItem('alpha_user', JSON.stringify(user));
+        localStorage.setItem('alpha_session_id', sessionId);
+        
+        setToken(token);
+        setUser(user);
+        setSessionId(sessionId);
+        setRevokedMessage(null);
+        return { success: true, user };
+      } catch (err) {
+        lastErr = err;
+        if (err.response && err.response.status >= 400 && err.response.status < 500) {
+          return { success: false, error: extractErrorMessage(err, 'Invalid admin credentials.') };
+        }
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1200));
+        }
+      }
     }
+    return { success: false, error: extractErrorMessage(lastErr, 'Admin login failed.') };
   };
 
   const loginVolunteer = async (username, password) => {
