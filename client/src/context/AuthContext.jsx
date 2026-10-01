@@ -37,6 +37,8 @@ const getCleanBaseUrl = (rawUrl) => {
   return cleaned;
 };
 
+import AUTHORIZED_TEAMS from '../data/teamsData.js';
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
@@ -51,7 +53,25 @@ export const AuthProvider = ({ children }) => {
       roleKey = 'alpha_team_lead_user';
     }
     const saved = localStorage.getItem(roleKey) || localStorage.getItem('alpha_user');
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed?.role === 'TEAM_LEAD' && parsed?.team) {
+        const authItem = AUTHORIZED_TEAMS.find(t => 
+          (t.teamId && t.teamId.toUpperCase() === String(parsed.team.teamId || parsed.team.name).trim().toUpperCase()) ||
+          (t.regNum && t.regNum.toUpperCase() === String(parsed.registrationNumber).trim().toUpperCase())
+        );
+        if (authItem?.fixedProblemStatementId) {
+          if (!parsed.team.selectedProblemCode || parsed.team.selectedProblemCode === 'Not Selected') {
+            parsed.team.selectedProblemCode = authItem.fixedProblemStatementId;
+            parsed.team.selectionConfirmed = true;
+          }
+        }
+      }
+      return parsed;
+    } catch (e) {
+      return null;
+    }
   });
 
   const [token, setToken] = useState(() => {
@@ -233,6 +253,18 @@ export const AuthProvider = ({ children }) => {
     try {
       const data = await performAuthPost('/api/auth/team-lead/login', { teamId, registrationNumber, deviceId });
       const { token, user, sessionId } = data;
+
+      // Guarantee user.team has their assigned fixed problem statement locked
+      const authItem = AUTHORIZED_TEAMS.find(t => 
+        (t.teamId && t.teamId.toUpperCase() === String(teamId).trim().toUpperCase()) ||
+        (t.regNum && t.regNum.toUpperCase() === String(registrationNumber).trim().toUpperCase())
+      );
+      if (authItem?.fixedProblemStatementId && user?.team) {
+        if (!user.team.selectedProblemCode || user.team.selectedProblemCode === 'Not Selected') {
+          user.team.selectedProblemCode = authItem.fixedProblemStatementId;
+          user.team.selectionConfirmed = true;
+        }
+      }
       
       localStorage.setItem('alpha_team_lead_token', token);
       localStorage.setItem('alpha_team_lead_user', JSON.stringify(user));

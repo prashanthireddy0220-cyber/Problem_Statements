@@ -151,6 +151,12 @@ const handleTeamLeadLogin = async (req, res) => {
         if (authItem.members) team.members = authItem.members;
         needsSave = true;
       }
+      if (authItem?.fixedProblemStatementId && (!team.selectionConfirmed || team.selectedProblemCode !== authItem.fixedProblemStatementId)) {
+        team.selectedProblemCode = authItem.fixedProblemStatementId;
+        team.selectionConfirmed = true;
+        if (!team.selectedAt) team.selectedAt = new Date();
+        needsSave = true;
+      }
       if (needsSave) {
         await team.save().catch(e => console.warn('Non-fatal team save warning:', e.message));
       }
@@ -253,8 +259,8 @@ const handleTeamLeadLogin = async (req, res) => {
           members: teamMembers,
           teamQrToken: qrToken,
           eventPassQrToken: passToken,
-          selectionConfirmed: Boolean(team?.selectionConfirmed && team?.selectedProblemCode && team?.selectedProblemCode !== 'Not Selected'),
-          selectedProblemCode: (team?.selectionConfirmed && team?.selectedProblemCode && team?.selectedProblemCode !== 'Not Selected') ? team.selectedProblemCode : 'Not Selected'
+          selectionConfirmed: Boolean(authItem?.fixedProblemStatementId || team?.selectionConfirmed),
+          selectedProblemCode: authItem?.fixedProblemStatementId || ((team?.selectedProblemCode && team.selectedProblemCode !== 'Not Selected') ? team.selectedProblemCode : 'Not Selected')
         }
       }
     });
