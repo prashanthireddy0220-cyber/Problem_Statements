@@ -43,7 +43,7 @@ app.get('/api/health', (req, res) => {
   const dbStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
   res.json({
     status: 'OK',
-    version: '1.0.8-alpha-top40-sync',
+    version: '1.0.9-alpha-fixed-teams',
     message: 'College Hackathon ALPHA Server Running',
     dbState: dbStates[mongoose.connection.readyState] || 'unknown',
     hasMongoUri: Boolean(config.MONGODB_URI),

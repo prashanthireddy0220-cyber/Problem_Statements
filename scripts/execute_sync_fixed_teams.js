@@ -84,14 +84,15 @@ async function main() {
   const testTeams = [
     { teamId: 'ALPHA-001', regNum: '9924008110', expectedPS: 'PS-013' },
     { teamId: 'ALPHA-002', regNum: '99230041040', expectedPS: 'PS-039' },
-    { teamId: 'ALPHA-003', regNum: '9924004033', expectedPS: 'PS-001' },
+    { teamId: 'ALPHA-003', regNum: '9924005337', expectedPS: 'PS-001' },
     { teamId: 'ALPHA-050', regNum: '9824005012', expectedPS: 'PS-007' },
-    { teamId: 'ALPHA-060', regNum: '99220040718', expectedPS: 'PS-011' }
+    { teamId: 'ALPHA-060', regNum: '99240041322', expectedPS: 'PS-011' }
   ];
 
   console.log('4. Verifying Team Lead Dashboard for sample teams...');
   for (const t of testTeams) {
     const leadLogin = await request('/api/auth/team-lead/login', 'POST', {
+      teamId: t.teamId,
       registrationNumber: t.regNum
     });
 
