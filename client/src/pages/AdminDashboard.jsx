@@ -151,13 +151,24 @@ export default function AdminDashboard() {
         await axios.post(`/api/admin/rounds/${roundNum}/close`);
         setActionMsg(`Round ${roundNum} closed and frozen. Reviewer mark entry locked.`);
       } else {
-        if (!window.confirm(`Open Round ${roundNum} for reviewers? Reviewers will now be able to enter and submit marks for Round ${roundNum}.`)) {
+        if (!window.confirm(`⚠️ OPEN ROUND ${roundNum}?\n\nStrict Rule: Only ONE round can be open at a time.\nOpening Round ${roundNum} will automatically CLOSE and FREEZE all other rounds for reviewers.\n\nDo you want to proceed?`)) {
           return;
         }
-        await axios.post(`/api/admin/rounds/${roundNum}/open`);
-        setActionMsg(`Round ${roundNum} opened. Reviewers can now enter marks for Round ${roundNum}.`);
+        const res = await axios.post(`/api/admin/rounds/${roundNum}/open`);
+
+        // Optimistically update round states: Round roundNum is open, all other rounds are closed
+        setEvalData(prev => ({
+          ...prev,
+          rounds: (prev.rounds || []).map(r => ({
+            ...r,
+            status: r.roundNumber === roundNum ? 'ACTIVE' : 'CLOSED',
+            active: r.roundNumber === roundNum
+          }))
+        }));
+
+        setActionMsg(res?.data?.message || `Round ${roundNum} is now OPEN. All other rounds have been automatically closed.`);
       }
-      setTimeout(() => setActionMsg(''), 4000);
+      setTimeout(() => setActionMsg(''), 5000);
       await fetchAllData();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update round status.');
@@ -1116,8 +1127,29 @@ export default function AdminDashboard() {
 
       {/* TAB: REVIEWER EVALUATIONS DASHBOARD (VIEW-ONLY FOR ADMIN) */}
       {activeTab === 'evaluations' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
+          {/* Mutual Exclusivity Policy Notice Banner */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.08) 0%, rgba(15, 23, 42, 0.9) 100%)',
+            border: '1px solid rgba(0, 242, 254, 0.3)',
+            borderRadius: '10px',
+            padding: '0.75rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', color: '#E2E8F0' }}>
+              <ShieldCheck size={18} color="#00F2FE" />
+              <span><strong>Strict Single-Round Policy:</strong> When one round is open, all other rounds are automatically closed and frozen. Reviewers can only enter marks for the currently opened round.</span>
+            </div>
+            <span style={{ fontSize: '0.72rem', background: 'rgba(0, 242, 254, 0.15)', border: '1px solid rgba(0, 242, 254, 0.4)', color: '#00F2FE', padding: '3px 10px', borderRadius: '12px', fontWeight: 800 }}>
+              AUTO-EXCLUSIVE
+            </span>
+          </div>
+
           {/* Round Progress Statistics Header */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
             

@@ -957,7 +957,7 @@ router.post('/rounds/:roundNumber/close', authenticateToken, requireRole('ADMIN'
   }
 });
 
-// 8f. ADMIN: OPEN / REOPEN EVALUATION ROUND
+// 8f. ADMIN: OPEN / REOPEN EVALUATION ROUND (MUTUAL EXCLUSIVITY: ONLY ONE ROUND OPEN AT A TIME)
 router.post('/rounds/:roundNumber/open', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
     const roundNum = Number(req.params.roundNumber);
@@ -966,24 +966,39 @@ router.post('/rounds/:roundNumber/open', authenticateToken, requireRole('ADMIN')
       return res.status(404).json({ error: `Evaluation Round ${roundNum} not found.` });
     }
 
+    // 1. Activate target round
     roundDoc.status = 'ACTIVE';
     roundDoc.active = true;
     roundDoc.closedAt = null;
     await roundDoc.save();
 
+    // 2. Mutual exclusivity: Automatically close and freeze ALL other rounds
+    await EvaluationRound.updateMany(
+      { roundNumber: { $ne: roundNum } },
+      { $set: { status: 'CLOSED', active: false, closedAt: new Date() } }
+    );
+
+    // 3. Unfreeze target round normalization, freeze all other rounds
     await RoundReviewerNormalization.updateMany({ roundNumber: roundNum }, { $set: { isFrozen: false } });
+    await RoundReviewerNormalization.updateMany({ roundNumber: { $ne: roundNum } }, { $set: { isFrozen: true } });
 
     await AuditLog.create({
       actor: req.user.username,
       role: 'ADMIN',
-      action: 'REOPEN_EVALUATION_ROUND',
-      target: `Round ${roundNum}`
+      action: 'OPEN_SINGLE_EVALUATION_ROUND',
+      target: `Round ${roundNum}`,
+      metadata: { openedRound: roundNum, closedOtherRounds: true }
     });
 
-    return res.json({ message: `Round ${roundNum} reopened successfully. Reviewer submissions active.`, round: roundDoc });
+    const allRounds = await EvaluationRound.find().sort({ roundNumber: 1 });
+    return res.json({
+      message: `Round ${roundNum} is now OPEN. All other rounds have been automatically closed.`,
+      round: roundDoc,
+      rounds: allRounds
+    });
   } catch (err) {
-    console.error('Reopen round error:', err);
-    return res.status(500).json({ error: 'Failed to reopen evaluation round.' });
+    console.error('Open round error:', err);
+    return res.status(500).json({ error: 'Failed to open evaluation round.' });
   }
 });
 
