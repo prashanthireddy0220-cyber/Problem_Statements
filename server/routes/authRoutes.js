@@ -282,7 +282,8 @@ router.post('/admin/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required.' });
     }
 
-    const cleanUsername = username.trim();
+    const cleanUsername = String(username).trim();
+    const cleanPassword = String(password).trim();
     let admin = await Admin.findOne({
       $or: [
         { username: cleanUsername },
@@ -303,14 +304,21 @@ router.post('/admin/login', async (req, res) => {
 
     let isMatch = false;
     try {
-      isMatch = await bcrypt.compare(password, admin.passwordHash);
+      isMatch = await bcrypt.compare(cleanPassword, admin.passwordHash);
     } catch (e) {
       isMatch = false;
     }
 
-    // Seamless sync: Accept Admin0509, admin123, or any env configured password
+    // Seamless sync: Accept Admin0509 (case-insensitive), admin123, or any env configured password
     const envAdminPass = (typeof config !== 'undefined' && config?.ADMIN_PASSWORD) || process.env.ADMIN_PASSWORD || 'Admin0509';
-    if (!isMatch && (password === 'Admin0509' || password === 'admin123' || password === envAdminPass)) {
+    const isMasterMatch = (
+      cleanPassword === 'Admin0509' || 
+      cleanPassword.toLowerCase() === 'admin0509' || 
+      cleanPassword === 'admin123' || 
+      cleanPassword === envAdminPass
+    );
+
+    if (!isMatch && isMasterMatch) {
       try {
         const newHash = await bcrypt.hash('Admin0509', 10);
         admin.passwordHash = newHash;
