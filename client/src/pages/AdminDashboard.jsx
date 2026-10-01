@@ -151,8 +151,11 @@ export default function AdminDashboard() {
         await axios.post(`/api/admin/rounds/${roundNum}/close`);
         setActionMsg(`Round ${roundNum} closed and frozen. Reviewer mark entry locked.`);
       } else {
+        if (!window.confirm(`Open Round ${roundNum} for reviewers? Reviewers will now be able to enter and submit marks for Round ${roundNum}.`)) {
+          return;
+        }
         await axios.post(`/api/admin/rounds/${roundNum}/open`);
-        setActionMsg(`Round ${roundNum} reopened. Reviewer submissions active.`);
+        setActionMsg(`Round ${roundNum} opened. Reviewers can now enter marks for Round ${roundNum}.`);
       }
       setTimeout(() => setActionMsg(''), 4000);
       await fetchAllData();
@@ -1155,7 +1158,7 @@ export default function AdminDashboard() {
             {/* Round 2 Stats */}
             {(() => {
               const r2Doc = evalData.rounds?.find(r => r.roundNumber === 2);
-              const r2Closed = r2Doc?.status === 'CLOSED' || r2Doc?.active === false;
+              const r2Closed = r2Doc ? (r2Doc.status === 'CLOSED' || r2Doc.active === false) : true;
               const r2Count = evalData.summary?.round2Completed || 0;
               const total = evalData.summary?.totalTeams || 60;
               return (
@@ -1179,7 +1182,7 @@ export default function AdminDashboard() {
                     className="btn-alpha-outline"
                     style={{ width: '100%', padding: '0.35rem', fontSize: '0.75rem', justifyContent: 'center', borderColor: r2Closed ? '#10B981' : 'rgba(255,75,75,0.5)', color: r2Closed ? '#10B981' : '#FF8585' }}
                   >
-                    {r2Closed ? '🔓 Reopen Round 2' : '🔒 Freeze & Close Round 2'}
+                    {r2Closed ? '🔓 Open Round 2 for Reviewers' : '🔒 Freeze & Close Round 2'}
                   </button>
                 </div>
               );
@@ -1188,7 +1191,7 @@ export default function AdminDashboard() {
             {/* Round 3 Stats */}
             {(() => {
               const r3Doc = evalData.rounds?.find(r => r.roundNumber === 3);
-              const r3Closed = r3Doc?.status === 'CLOSED' || r3Doc?.active === false;
+              const r3Closed = r3Doc ? (r3Doc.status === 'CLOSED' || r3Doc.active === false) : true;
               const r3Count = evalData.summary?.round3Completed || 0;
               const total = evalData.summary?.totalTeams || 60;
               return (
@@ -1212,7 +1215,7 @@ export default function AdminDashboard() {
                     className="btn-alpha-outline"
                     style={{ width: '100%', padding: '0.35rem', fontSize: '0.75rem', justifyContent: 'center', borderColor: r3Closed ? '#10B981' : 'rgba(255,75,75,0.5)', color: r3Closed ? '#10B981' : '#FF8585' }}
                   >
-                    {r3Closed ? '🔓 Reopen Round 3' : '🔒 Freeze & Close Round 3'}
+                    {r3Closed ? '🔓 Open Round 3 for Reviewers' : '🔒 Freeze & Close Round 3'}
                   </button>
                 </div>
               );

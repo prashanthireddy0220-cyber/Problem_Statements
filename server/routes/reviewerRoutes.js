@@ -74,6 +74,7 @@ router.post('/reviewer/login', handleReviewerLogin);
 router.get('/login', (req, res) => res.json({ status: 'ACTIVE', message: 'Reviewer Login endpoint active.' }));
 
 // Default Evaluation Criteria per Round (Used as fallback if DB isn't seeded)
+// By default, ONLY Round 1 is open. Round 2 and Round 3 require explicit opening by the Administrator.
 const DEFAULT_ROUNDS = [
   {
     roundNumber: 1,
@@ -81,6 +82,7 @@ const DEFAULT_ROUNDS = [
     description: 'Initial evaluation of team problem understanding, feasibility, and design approach.',
     maximumMarks: 100,
     active: true,
+    status: 'ACTIVE',
     criteria: [
       { key: 'innovation', name: 'Innovation & Originality', maxMarks: 20, description: 'Novelty & uniqueness of solution' },
       { key: 'tech_approach', name: 'Technical Approach & Architecture', maxMarks: 20, description: 'System design & technical planning' },
@@ -95,7 +97,8 @@ const DEFAULT_ROUNDS = [
     roundName: 'Round 2 - Implementation & Coding',
     description: 'Mid-event evaluation of codebase, technical complexity, and progress.',
     maximumMarks: 100,
-    active: true,
+    active: false,
+    status: 'CLOSED',
     criteria: [
       { key: 'code_quality', name: 'Code Quality & Structure', maxMarks: 25, description: 'Clean code & architectural standards' },
       { key: 'tech_complexity', name: 'Technical Complexity & Depth', maxMarks: 25, description: 'Algorithmic & engineering complexity' },
@@ -108,7 +111,8 @@ const DEFAULT_ROUNDS = [
     roundName: 'Round 3 - Final Demo & Pitch',
     description: 'Final evaluation of complete project, live demo, and QA.',
     maximumMarks: 100,
-    active: true,
+    active: false,
+    status: 'CLOSED',
     criteria: [
       { key: 'completeness', name: 'Project Completeness & Stability', maxMarks: 35, description: 'Finished product & system stability' },
       { key: 'business_value', name: 'Business Value & Viability', maxMarks: 35, description: 'Market utility & real-world value' },
@@ -122,7 +126,11 @@ async function ensureRoundsExist() {
   for (const r of DEFAULT_ROUNDS) {
     let doc = await EvaluationRound.findOne({ roundNumber: r.roundNumber });
     if (!doc) {
-      await EvaluationRound.create(r);
+      await EvaluationRound.create({
+        ...r,
+        active: r.roundNumber === 1,
+        status: r.roundNumber === 1 ? 'ACTIVE' : 'CLOSED'
+      });
     } else {
       doc.maximumMarks = 100;
       doc.criteria = r.criteria;
@@ -271,9 +279,10 @@ const handleSubmitEvaluation = async (req, res) => {
 
     // Section 21: Check if Round is Closed by Admin (Reviewers cannot submit new marks)
     const roundDoc = await EvaluationRound.findOne({ roundNumber: roundNum });
-    if (req.user.role === 'REVIEWER' && roundDoc && (roundDoc.status === 'CLOSED' || roundDoc.active === false)) {
+    const isRoundOpen = roundDoc ? (roundDoc.status === 'ACTIVE' && roundDoc.active === true) : (roundNum === 1);
+    if (req.user.role === 'REVIEWER' && !isRoundOpen) {
       return res.status(403).json({
-        error: `Evaluation Round ${roundNum} is closed and frozen. New mark submissions are not permitted.`,
+        error: `Evaluation Round ${roundNum} is closed. The administrator has not opened Round ${roundNum} for mark submission.`,
         code: 'ROUND_CLOSED'
       });
     }

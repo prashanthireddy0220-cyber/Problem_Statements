@@ -13,6 +13,8 @@ const DEFAULT_FRONTEND_ROUNDS = [
     roundNumber: 1,
     roundName: 'Round 1 - Ideation & Architecture',
     maximumMarks: 100,
+    active: true,
+    status: 'ACTIVE',
     criteria: [
       { key: 'innovation', name: 'Innovation & Originality', maxMarks: 20, description: 'Novelty & uniqueness of solution' },
       { key: 'tech_approach', name: 'Technical Approach & Architecture', maxMarks: 20, description: 'System design & technical planning' },
@@ -26,6 +28,8 @@ const DEFAULT_FRONTEND_ROUNDS = [
     roundNumber: 2,
     roundName: 'Round 2 - Implementation & Coding',
     maximumMarks: 100,
+    active: false,
+    status: 'CLOSED',
     criteria: [
       { key: 'code_quality', name: 'Code Quality & Structure', maxMarks: 25, description: 'Clean code & architectural standards' },
       { key: 'tech_complexity', name: 'Technical Complexity & Depth', maxMarks: 25, description: 'Algorithmic & engineering complexity' },
@@ -37,6 +41,8 @@ const DEFAULT_FRONTEND_ROUNDS = [
     roundNumber: 3,
     roundName: 'Round 3 - Final Pitch & Demo',
     maximumMarks: 100,
+    active: false,
+    status: 'CLOSED',
     criteria: [
       { key: 'completeness', name: 'Project Completeness & Stability', maxMarks: 35, description: 'Finished product & system stability' },
       { key: 'business_value', name: 'Business Value & Viability', maxMarks: 35, description: 'Market utility & real-world value' },
@@ -91,6 +97,20 @@ export default function ReviewerDashboard() {
     }
   }, [selectedRoundNum, user]);
 
+  // Real-time synchronization: poll round statuses from backend so changes made by admin reflect immediately
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      axios.get('/api/reviewer/rounds').then(res => {
+        if (res.data && res.data.rounds) {
+          setRounds(res.data.rounds);
+        }
+      }).catch(() => {});
+      fetchEvaluations(selectedRoundNum);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [user, selectedRoundNum]);
+
   const fetchInitialData = async (retryCount = 0) => {
     try {
       const [teamsRes, roundsRes] = await Promise.all([
@@ -143,6 +163,14 @@ export default function ReviewerDashboard() {
   const currentRoundDoc = (matchedDbRound && matchedDbRound.criteria && matchedDbRound.criteria.length > 0)
     ? matchedDbRound
     : fallbackRoundDoc;
+
+  // Strict check: Is the current round closed / not opened by the administrator?
+  const isCurrentRoundClosed = Boolean(
+    (matchedDbRound && (matchedDbRound.status === 'CLOSED' || matchedDbRound.active === false)) ||
+    (!matchedDbRound && fallbackRoundDoc.active === false) ||
+    currentRoundDoc.status === 'CLOSED' ||
+    currentRoundDoc.active === false
+  );
 
   // Map team evaluations for quick lookup with all possible keys (teamCode, teamId, _id)
   const evaluationMap = {};
@@ -200,6 +228,10 @@ export default function ReviewerDashboard() {
 
   // Open Mark Entry Form (Reviewer enters ONLY raw marks 0–100)
   const openEvaluationModal = (team) => {
+    if (isCurrentRoundClosed) {
+      setErrorMsg(`Round ${selectedRoundNum} is currently closed. The administrator has not opened Round ${selectedRoundNum} for marks evaluation yet.`);
+      return;
+    }
     const existingEv = getTeamEvaluation(team);
     if (existingEv && user?.role === 'REVIEWER') {
       // Reviewers cannot view or edit marks once submitted
@@ -215,6 +247,11 @@ export default function ReviewerDashboard() {
   const handleSubmitEvaluation = async (e) => {
     e.preventDefault();
     if (!activeModalTeam) return;
+
+    if (isCurrentRoundClosed) {
+      setErrorMsg(`Cannot submit marks: Round ${selectedRoundNum} is currently closed by the Administrator.`);
+      return;
+    }
 
     // Section 20: Reject invalid marks with exact message
     if (rawMarkInput === '' || rawMarkInput === null || rawMarkInput === undefined || isNaN(Number(rawMarkInput))) {
@@ -369,8 +406,8 @@ export default function ReviewerDashboard() {
         <div style={{ display: 'flex', gap: '0.75rem', background: 'rgba(15, 23, 42, 0.8)', padding: '0.4rem', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)' }}>
           {[1, 2, 3].map(roundNum => {
             const rdDoc = rounds.find(r => r.roundNumber === roundNum);
+            const isRoundLocked = rdDoc ? (rdDoc.status === 'CLOSED' || rdDoc.active === false) : (roundNum > 1);
             const isSelected = selectedRoundNum === roundNum;
-            const rCount = teams.filter(t => Boolean(evaluationMap[t.teamCode] || evaluationMap[t._id])).length;
             
             return (
               <button
@@ -379,9 +416,11 @@ export default function ReviewerDashboard() {
                 style={{
                   padding: '0.65rem 1.35rem',
                   borderRadius: '10px',
-                  border: 'none',
-                  background: isSelected ? 'linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%)' : 'transparent',
-                  color: isSelected ? '#0F172A' : '#94A3B8',
+                  border: isRoundLocked && !isSelected ? '1px dashed rgba(239, 68, 68, 0.35)' : 'none',
+                  background: isSelected 
+                    ? (isRoundLocked ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.9) 0%, rgba(185, 28, 28, 0.95) 100%)' : 'linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%)') 
+                    : (isRoundLocked ? 'rgba(239, 68, 68, 0.08)' : 'transparent'),
+                  color: isSelected ? (isRoundLocked ? '#FFFFFF' : '#0F172A') : (isRoundLocked ? '#FCA5A5' : '#94A3B8'),
                   fontWeight: isSelected ? 800 : 600,
                   fontSize: '0.9rem',
                   cursor: 'pointer',
@@ -389,29 +428,85 @@ export default function ReviewerDashboard() {
                   alignItems: 'center',
                   gap: '0.5rem',
                   transition: 'all 0.2s ease',
-                  boxShadow: isSelected ? '0 0 15px rgba(0, 242, 254, 0.4)' : 'none'
+                  boxShadow: isSelected ? (isRoundLocked ? '0 0 15px rgba(239, 68, 68, 0.4)' : '0 0 15px rgba(0, 242, 254, 0.4)') : 'none'
                 }}
               >
+                {isRoundLocked && <Lock size={14} color={isSelected ? '#FFFFFF' : '#EF4444'} />}
                 <span>Round {roundNum}</span>
                 <span style={{ 
-                  background: isSelected ? 'rgba(15, 23, 42, 0.2)' : 'rgba(255,255,255,0.1)', 
+                  background: isSelected ? 'rgba(15, 23, 42, 0.25)' : (isRoundLocked ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255,255,255,0.1)'), 
                   padding: '2px 8px', 
                   borderRadius: '12px', 
-                  fontSize: '0.75rem',
-                  color: isSelected ? '#0F172A' : '#CBD5E1'
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: isSelected ? (isRoundLocked ? '#FFFFFF' : '#0F172A') : (isRoundLocked ? '#F87171' : '#CBD5E1')
                 }}>
-                  {rdDoc?.roundName ? rdDoc.roundName.split('-')[1]?.trim() || `R${roundNum}` : `R${roundNum}`}
+                  {isRoundLocked ? 'LOCKED' : (rdDoc?.roundName ? rdDoc.roundName.split('-')[1]?.trim() || `R${roundNum}` : `R${roundNum}`)}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* Round Description Badge */}
-        <div style={{ fontSize: '0.85rem', color: '#94A3B8', background: 'rgba(255,255,255,0.03)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <strong style={{ color: '#00F2FE' }}>{currentRoundDoc.roundName}</strong> • Max Score: <strong style={{ color: '#FFD700' }}>{currentRoundDoc.maximumMarks} Marks</strong>
+        {/* Round Description & Open/Closed Status Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <span style={{
+            fontSize: '0.78rem',
+            padding: '4px 10px',
+            borderRadius: '6px',
+            fontWeight: 800,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            background: isCurrentRoundClosed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+            color: isCurrentRoundClosed ? '#EF4444' : '#10B981',
+            border: `1px solid ${isCurrentRoundClosed ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`
+          }}>
+            {isCurrentRoundClosed ? <Lock size={13} /> : <CheckCircle2 size={13} />}
+            {isCurrentRoundClosed ? 'ROUND NOT OPENED / FROZEN' : 'ROUND OPEN & ACTIVE'}
+          </span>
+          <div style={{ fontSize: '0.85rem', color: '#94A3B8', background: 'rgba(255,255,255,0.03)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <strong style={{ color: isCurrentRoundClosed ? '#EF4444' : '#00F2FE' }}>{currentRoundDoc.roundName}</strong> • Max Score: <strong style={{ color: '#FFD700' }}>{currentRoundDoc.maximumMarks} Marks</strong>
+          </div>
         </div>
       </div>
+
+      {/* ROUND CLOSED NOTICE BANNER */}
+      {isCurrentRoundClosed && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(15, 23, 42, 0.95) 100%)',
+          border: '1px solid rgba(239, 68, 68, 0.45)',
+          borderRadius: '12px',
+          padding: '1.25rem 1.5rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1.25rem',
+          boxShadow: '0 4px 20px rgba(239, 68, 68, 0.15)'
+        }}>
+          <div style={{
+            width: '46px',
+            height: '46px',
+            borderRadius: '12px',
+            background: 'rgba(239, 68, 68, 0.2)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Lock size={24} color="#EF4444" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#F87171', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ROUND {selectedRoundNum} IS NOT OPEN FOR EVALUATION
+            </div>
+            <div style={{ fontSize: '0.85rem', color: '#CBD5E1', marginTop: '4px', lineHeight: 1.4 }}>
+              The administrator has not opened Round {selectedRoundNum} for marks evaluation yet. Reviewers cannot enter or modify marks until the Administrator explicitly enables Round {selectedRoundNum} from the Admin Panel.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. FILTERS & SEARCH BAR */}
       <div className="glass-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem', borderRadius: '12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
@@ -564,6 +659,27 @@ export default function ReviewerDashboard() {
                           >
                             <CheckCircle size={14} color="#10B981" /> Submitted
                           </button>
+                        ) : isCurrentRoundClosed ? (
+                          <button
+                            disabled
+                            title={`Round ${selectedRoundNum} is closed. The administrator has not opened mark entry.`}
+                            style={{
+                              padding: '0.45rem 0.9rem',
+                              fontSize: '0.8rem',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(239, 68, 68, 0.35)',
+                              background: 'rgba(239, 68, 68, 0.08)',
+                              color: '#F87171',
+                              fontWeight: 600,
+                              cursor: 'not-allowed',
+                              opacity: 0.8,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            <Lock size={13} color="#EF4444" /> Round Closed
+                          </button>
                         ) : (
                           <button
                             onClick={() => openEvaluationModal(team)}
@@ -595,7 +711,7 @@ export default function ReviewerDashboard() {
       {activeModalTeam && (() => {
         const modalEv = getTeamEvaluation(activeModalTeam);
         const isEvSubmitted = Boolean(modalEv && modalEv.status === 'SUBMITTED');
-        const isLocked = isEvSubmitted && user?.role === 'REVIEWER';
+        const isLocked = (isEvSubmitted && user?.role === 'REVIEWER') || isCurrentRoundClosed;
         const currentScore = modalEv ? (modalEv.rawScore !== undefined ? modalEv.rawScore : modalEv.totalMarks) : null;
 
         return (
@@ -619,6 +735,25 @@ export default function ReviewerDashboard() {
                   <X size={22} />
                 </button>
               </div>
+
+              {/* Round Closed Warning inside Modal */}
+              {isCurrentRoundClosed && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.45)',
+                  color: '#F87171',
+                  padding: '0.85rem 1.25rem',
+                  borderRadius: '10px',
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  fontSize: '0.88rem'
+                }}>
+                  <Lock size={18} color="#EF4444" />
+                  <span><strong>Round {selectedRoundNum} is Closed:</strong> Mark entry is locked because the administrator has not opened this round yet.</span>
+                </div>
+              )}
 
               {/* Submitted Marks Banner */}
               {isEvSubmitted && currentScore !== null && currentScore !== undefined && (

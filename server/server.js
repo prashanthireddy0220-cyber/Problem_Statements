@@ -182,7 +182,8 @@ async function triggerAutoSeed() {
         roundName: 'Round 2 - Implementation & Coding',
         description: 'Evaluation of codebase quality, complexity, and working demo.',
         maximumMarks: 100,
-        active: true,
+        active: false,
+        status: 'CLOSED',
         criteria: [
           { key: 'code_quality', name: 'Code Quality & Structure', maxMarks: 25, description: 'Clean code & architectural standards' },
           { key: 'tech_complexity', name: 'Technical Complexity & Depth', maxMarks: 25, description: 'Algorithmic & engineering complexity' },
@@ -195,7 +196,8 @@ async function triggerAutoSeed() {
         roundName: 'Round 3 - Final Demo & Pitch',
         description: 'Evaluation of project completeness, business viability, and live pitch.',
         maximumMarks: 100,
-        active: true,
+        active: false,
+        status: 'CLOSED',
         criteria: [
           { key: 'completeness', name: 'Project Completeness & Stability', maxMarks: 35, description: 'Finished product & system stability' },
           { key: 'business_value', name: 'Business Value & Viability', maxMarks: 35, description: 'Market utility & real-world value' },
@@ -207,7 +209,11 @@ async function triggerAutoSeed() {
     for (const rd of defaultRoundsConfig) {
       let rDoc = await EvaluationRound.findOne({ roundNumber: rd.roundNumber });
       if (!rDoc) {
-        await EvaluationRound.create(rd);
+        await EvaluationRound.create({
+          ...rd,
+          active: rd.roundNumber === 1,
+          status: rd.roundNumber === 1 ? 'ACTIVE' : 'CLOSED'
+        });
       } else {
         rDoc.maximumMarks = 100;
         rDoc.criteria = rd.criteria;
