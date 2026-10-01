@@ -252,8 +252,8 @@ const handleTeamLeadLogin = async (req, res) => {
           members: teamMembers,
           teamQrToken: qrToken,
           eventPassQrToken: passToken,
-          selectionConfirmed: Boolean(team?.selectionConfirmed),
-          selectedProblemCode: team?.selectedProblemCode || null
+          selectionConfirmed: Boolean(team?.selectionConfirmed && team?.selectedProblemCode && team?.selectedProblemCode !== 'Not Selected'),
+          selectedProblemCode: (team?.selectionConfirmed && team?.selectedProblemCode && team?.selectedProblemCode !== 'Not Selected') ? team.selectedProblemCode : 'Not Selected'
         }
       }
     });
@@ -471,6 +471,12 @@ router.get('/me', authenticateToken, async (req, res) => {
       const teamLead = await TeamLead.findOne({ registrationNumber: req.user.registrationNumber }).populate('teamId');
       if (teamLead) {
         const teamDoc = teamLead.teamId;
+        const isSelectionConfirmed = Boolean(
+          teamDoc &&
+          teamDoc.selectionConfirmed &&
+          teamDoc.selectedProblemCode &&
+          teamDoc.selectedProblemCode !== 'Not Selected'
+        );
         userData.team = teamDoc ? {
           id: teamDoc._id,
           teamId: teamDoc.teamId || teamDoc.name,
@@ -483,8 +489,8 @@ router.get('/me', authenticateToken, async (req, res) => {
           members: teamDoc.members || [],
           teamQrToken: teamDoc.teamQrToken,
           eventPassQrToken: teamDoc.eventPassQrToken,
-          selectionConfirmed: Boolean(teamDoc.selectionConfirmed),
-          selectedProblemCode: teamDoc.selectedProblemCode || null
+          selectionConfirmed: isSelectionConfirmed,
+          selectedProblemCode: isSelectionConfirmed ? teamDoc.selectedProblemCode : 'Not Selected'
         } : null;
       }
     }

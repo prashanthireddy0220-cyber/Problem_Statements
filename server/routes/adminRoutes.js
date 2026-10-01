@@ -310,7 +310,7 @@ router.post('/teams/:teamId/reset-selection', authenticateToken, requireRole('AD
     }
 
     team.selectedProblemId = null;
-    team.selectedProblemCode = null;
+    team.selectedProblemCode = 'Not Selected';
     team.selectionConfirmed = false;
     team.selectedAt = null;
     await team.save();

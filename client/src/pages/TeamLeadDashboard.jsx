@@ -105,13 +105,19 @@ export default function TeamLeadDashboard() {
   const [selectingLoading, setSelectingLoading] = useState(false);
   const [selectionError, setSelectionError] = useState('');
   const [confirmedData, setConfirmedData] = useState(() => {
-    if (user?.team?.selectionConfirmed) {
+    if (user?.team?.selectionConfirmed && user?.team?.selectedProblemCode && user?.team?.selectedProblemCode !== 'Not Selected') {
       return {
         teamName: user.team.name || user.team.teamName,
         problemId: user.team.selectedProblemCode,
         problemCode: user.team.selectedProblemCode,
         status: 'CONFIRMED'
       };
+    }
+    if (user?.team && (!user.team.selectionConfirmed || user.team.selectedProblemCode === 'Not Selected')) {
+      try {
+        localStorage.removeItem('alpha_confirmed_selection');
+      } catch (e) {}
+      return null;
     }
     try {
       const saved = localStorage.getItem('alpha_confirmed_selection');
@@ -124,8 +130,17 @@ export default function TeamLeadDashboard() {
   useEffect(() => {
     if (confirmedData) {
       localStorage.setItem('alpha_confirmed_selection', JSON.stringify(confirmedData));
+    } else {
+      localStorage.removeItem('alpha_confirmed_selection');
     }
   }, [confirmedData]);
+
+  // Authoritative check: A selection is confirmed IF AND ONLY IF the server/myTeamData or active user confirms it
+  const hasConfirmedSelection = Boolean(
+    myTeamData
+      ? (myTeamData.team?.selectionConfirmed && myTeamData.team?.selectedProblemCode && myTeamData.team?.selectedProblemCode !== 'Not Selected')
+      : (user?.team?.selectionConfirmed && user?.team?.selectedProblemCode && user?.team?.selectedProblemCode !== 'Not Selected' && confirmedData)
+  );
 
   const [secondsRemaining, setSecondsRemaining] = useState(0);
 
@@ -149,29 +164,62 @@ export default function TeamLeadDashboard() {
   const [myAttendanceRecords, setMyAttendanceRecords] = useState({});
   const [myAttendanceFullData, setMyAttendanceFullData] = useState(null);
 
-  // 1. Fetch My Team Details
+  // 1. Fetch My Team Details (Polled live every 3.5 seconds to track admin changes)
   const fetchMyTeam = async () => {
     try {
       if (!myTeamData) setLoadingTeam(true);
       const res = await axios.get('/api/teams/my-team');
       if (res.data) {
         setMyTeamData(res.data);
-        if (res.data.team?.selectionConfirmed) {
+        const team = res.data.team;
+        const isConfirmed = Boolean(
+          team?.selectionConfirmed &&
+          team?.selectedProblemCode &&
+          team?.selectedProblemCode !== 'Not Selected'
+        );
+
+        if (isConfirmed) {
           setConfirmedData(prev => ({
             ...prev,
-            teamName: res.data.team.name || res.data.team.teamName,
-            problemId: res.data.team.selectedProblemCode,
-            problemCode: res.data.team.selectedProblemCode,
-            problemTitle: res.data.team.selectedProblem?.title || prev?.problemTitle,
-            domain: res.data.team.selectedProblem?.domain || prev?.domain,
-            description: res.data.team.selectedProblem?.description || prev?.description,
-            requirements: res.data.team.selectedProblem?.requirements || prev?.requirements,
-            expectedSolution: res.data.team.selectedProblem?.expectedSolution || prev?.expectedSolution,
-            technologies: res.data.team.selectedProblem?.technologies || prev?.technologies,
-            selectedProblem: res.data.team.selectedProblem || prev?.selectedProblem,
-            selectedAt: res.data.team.selectedAt || prev?.selectedAt,
+            teamName: team.name || team.teamName,
+            problemId: team.selectedProblemCode,
+            problemCode: team.selectedProblemCode,
+            problemTitle: team.selectedProblem?.title || prev?.problemTitle,
+            domain: team.selectedProblem?.domain || prev?.domain,
+            description: team.selectedProblem?.description || prev?.description,
+            requirements: team.selectedProblem?.requirements || prev?.requirements,
+            expectedSolution: team.selectedProblem?.expectedSolution || prev?.expectedSolution,
+            technologies: team.selectedProblem?.technologies || prev?.technologies,
+            selectedProblem: team.selectedProblem || prev?.selectedProblem,
+            selectedAt: team.selectedAt || prev?.selectedAt,
             status: 'CONFIRMED'
           }));
+        } else {
+          // If the admin deleted/reset selections, purge local cached selection immediately
+          setConfirmedData(null);
+          try {
+            localStorage.removeItem('alpha_confirmed_selection');
+            const savedUserStr = localStorage.getItem('alpha_user');
+            if (savedUserStr) {
+              const parsed = JSON.parse(savedUserStr);
+              if (parsed?.team) {
+                parsed.team.selectionConfirmed = false;
+                parsed.team.selectedProblemCode = 'Not Selected';
+                parsed.team.selectedProblem = null;
+                localStorage.setItem('alpha_user', JSON.stringify(parsed));
+              }
+            }
+            const savedLeadUserStr = localStorage.getItem('alpha_team_lead_user');
+            if (savedLeadUserStr) {
+              const parsed = JSON.parse(savedLeadUserStr);
+              if (parsed?.team) {
+                parsed.team.selectionConfirmed = false;
+                parsed.team.selectedProblemCode = 'Not Selected';
+                parsed.team.selectedProblem = null;
+                localStorage.setItem('alpha_team_lead_user', JSON.stringify(parsed));
+              }
+            }
+          } catch (e) {}
         }
       }
     } catch (err) {
@@ -183,6 +231,8 @@ export default function TeamLeadDashboard() {
 
   useEffect(() => {
     fetchMyTeam();
+    const pollInterval = setInterval(fetchMyTeam, 3500);
+    return () => clearInterval(pollInterval);
   }, [user]);
 
   // Generate Team QR Data URL
@@ -328,13 +378,18 @@ export default function TeamLeadDashboard() {
 
   // Check confirmed problem selection from user session
   useEffect(() => {
-    if (user?.team?.selectionConfirmed) {
+    if (user?.team?.selectionConfirmed && user?.team?.selectedProblemCode && user?.team?.selectedProblemCode !== 'Not Selected') {
       setConfirmedData(prev => prev || {
         teamName: user.team.name || user.team.teamName,
         problemId: user.team.selectedProblemCode,
         problemCode: user.team.selectedProblemCode,
         status: 'CONFIRMED'
       });
+    } else if (user?.team && (!user.team.selectionConfirmed || user.team.selectedProblemCode === 'Not Selected')) {
+      setConfirmedData(null);
+      try {
+        localStorage.removeItem('alpha_confirmed_selection');
+      } catch (e) {}
     }
   }, [user]);
 
@@ -583,7 +638,7 @@ export default function TeamLeadDashboard() {
                     </p>
                   </div>
 
-                  {(myTeamData?.team?.selectionConfirmed || user?.team?.selectionConfirmed || confirmedData) ? (
+                  {hasConfirmedSelection ? (
                     <div style={{ background: 'rgba(0,230,118,0.15)', border: '1px solid #00E676', padding: '0.4rem 0.85rem', borderRadius: '20px', color: '#00E676', fontSize: '0.85rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <CheckCircle2 size={16} /> SELECTION CONFIRMED
                     </div>
@@ -594,9 +649,9 @@ export default function TeamLeadDashboard() {
                   )}
                 </div>
 
-                {(myTeamData?.team?.selectionConfirmed || user?.team?.selectionConfirmed || confirmedData) ? (
+                {hasConfirmedSelection ? (
                   (() => {
-                    const selCode = myTeamData?.team?.selectedProblemCode || user?.team?.selectedProblemCode || confirmedData?.problemCode || confirmedData?.problemId;
+                    const selCode = myTeamData?.team?.selectedProblemCode || confirmedData?.problemCode || confirmedData?.problemId || user?.team?.selectedProblemCode;
                     const selObj = myTeamData?.team?.selectedProblem || problems.find(p => p.problemId === selCode) || confirmedData?.selectedProblem || {};
                     const selTitle = selObj.title || confirmedData?.problemTitle;
                     const selDesc = selObj.description || confirmedData?.description;
@@ -635,9 +690,9 @@ export default function TeamLeadDashboard() {
       {/* ==================================================== */}
       {activeTab === 'problems' && (
         <div>
-          {confirmedData || (user?.team?.selectionConfirmed) || (myTeamData?.team?.selectionConfirmed) ? (
+          {hasConfirmedSelection ? (
             (() => {
-              const activeSelectedCode = confirmedData?.problemId || confirmedData?.problemCode || myTeamData?.team?.selectedProblemCode || user?.team?.selectedProblemCode;
+              const activeSelectedCode = myTeamData?.team?.selectedProblemCode || confirmedData?.problemId || confirmedData?.problemCode || user?.team?.selectedProblemCode;
               const selectedProblemObj = myTeamData?.team?.selectedProblem || problems.find(p => p.problemId === activeSelectedCode) || confirmedData?.selectedProblem || {};
               const activeProblemTitle = selectedProblemObj?.title || confirmedData?.problemTitle || 'Selected Problem Statement';
               const activeProblemDomain = selectedProblemObj?.domain || confirmedData?.domain || '';

@@ -156,6 +156,10 @@ export const AuthProvider = ({ children }) => {
           if (res.data && res.data.user) {
             setUser(res.data.user);
             setToken(savedToken);
+            localStorage.setItem('alpha_user', JSON.stringify(res.data.user));
+            if (res.data.user.role === 'TEAM_LEAD') {
+              localStorage.setItem('alpha_team_lead_user', JSON.stringify(res.data.user));
+            }
           }
         } catch (err) {
           // If token verification fails on mount, do not force logout if other role sessions exist
@@ -325,6 +329,9 @@ export const AuthProvider = ({ children }) => {
       if (res.data && res.data.user) {
         setUser(res.data.user);
         localStorage.setItem('alpha_user', JSON.stringify(res.data.user));
+        if (res.data.user.role === 'TEAM_LEAD') {
+          localStorage.setItem('alpha_team_lead_user', JSON.stringify(res.data.user));
+        }
       }
     } catch (err) {
       // Interceptor will handle single device error

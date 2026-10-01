@@ -173,9 +173,15 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
 
     const members = sanitizeTeamMembers(team, authItem);
 
+    const isSelectionConfirmed = Boolean(
+      team?.selectionConfirmed &&
+      team?.selectedProblemCode &&
+      team?.selectedProblemCode !== 'Not Selected'
+    );
+
     // Fetch problem details if selected
     let selectedProblem = null;
-    if (team?.selectedProblemCode || team?.selectedProblemId) {
+    if (isSelectionConfirmed) {
       const searchOr = [];
       if (team.selectedProblemCode) searchOr.push({ problemId: team.selectedProblemCode.trim().toUpperCase() });
       if (team.selectedProblemId) searchOr.push({ _id: team.selectedProblemId });
@@ -202,10 +208,10 @@ router.get('/my-team', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
         teamQrToken: qrToken,
         publicQrUrl,
         eventPassQrToken: passToken,
-        selectedProblemCode: team?.selectedProblemCode || null,
-        selectionConfirmed: Boolean(team?.selectionConfirmed),
-        selectedAt: team?.selectedAt || null,
-        selectedProblem
+        selectedProblemCode: isSelectionConfirmed ? team.selectedProblemCode : 'Not Selected',
+        selectionConfirmed: isSelectionConfirmed,
+        selectedAt: isSelectionConfirmed ? (team?.selectedAt || null) : null,
+        selectedProblem: isSelectionConfirmed ? selectedProblem : null
       },
       teamLead: {
         name: teamLead?.name || authItem?.leadName || req.user.name || 'Team Lead',
@@ -248,9 +254,15 @@ router.get('/public/:tokenOrId', async (req, res) => {
     const teamLeadDoc = await TeamLead.findOne({ registrationNumber: team.teamLeadRegNum });
     const leadName = teamLeadDoc ? teamLeadDoc.name : (members[0] ? members[0].name : `Team Lead (${team.name})`);
 
+    const isSelectionConfirmed = Boolean(
+      team.selectionConfirmed &&
+      team.selectedProblemCode &&
+      team.selectedProblemCode !== 'Not Selected'
+    );
+
     // Fetch problem title if selected
     let selectedProblemTitle = null;
-    if (team.selectedProblemCode) {
+    if (isSelectionConfirmed) {
       const ps = await ProblemStatement.findOne({ problemId: team.selectedProblemCode });
       if (ps) selectedProblemTitle = ps.title;
     }
@@ -273,9 +285,9 @@ router.get('/public/:tokenOrId', async (req, res) => {
         registrationNumber: m.registrationNumber,
         role: m.role || (idx === 0 ? 'LEAD' : 'MEMBER')
       })),
-      selectedProblemCode: team.selectedProblemCode || null,
-      selectedProblemTitle: selectedProblemTitle || null,
-      selectionConfirmed: Boolean(team.selectionConfirmed)
+      selectedProblemCode: isSelectionConfirmed ? team.selectedProblemCode : null,
+      selectedProblemTitle: isSelectionConfirmed ? selectedProblemTitle : null,
+      selectionConfirmed: isSelectionConfirmed
     };
 
     return res.json({ team: publicTeamInfo });
