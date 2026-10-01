@@ -156,7 +156,28 @@ export default function TeamLeadDashboard() {
       : (user?.team?.selectionConfirmed && user?.team?.selectedProblemCode && user?.team?.selectedProblemCode !== 'Not Selected' && confirmedData)
   );
 
-  const [secondsRemaining, setSecondsRemaining] = useState(0);
+  const [secondsRemaining, setSecondsRemaining] = useState(() => {
+    try {
+      const savedTimer = localStorage.getItem('alpha_timer_state');
+      if (!savedTimer) return 0;
+      const parsed = JSON.parse(savedTimer);
+      let target = null;
+      if (parsed.currentPhase === 'RELEASED_LOCKED' || parsed.currentPhase === 'READING') {
+        target = parsed.selectionScheduledStart || parsed.readingEndsAt;
+      } else if (parsed.currentPhase === 'SELECTION_OPEN' || parsed.currentPhase === 'SELECTION') {
+        target = parsed.selectionEndsAt;
+      } else if (parsed.currentPhase === 'ROUND_STARTED_UNRELEASED') {
+        target = parsed.releaseScheduledAt;
+      }
+      if (!target) return 0;
+      const skew = Number(localStorage.getItem('alpha_clock_skew') || 0);
+      const estNow = Date.now() + skew;
+      const targetMs = new Date(target).getTime();
+      return Math.max(0, Math.ceil((targetMs - estNow) / 1000));
+    } catch (e) {
+      return 0;
+    }
+  });
 
   // Attendance Sessions State (Persisted across refreshes)
   const [attSessions, setAttSessions] = useState([]);
@@ -299,6 +320,14 @@ export default function TeamLeadDashboard() {
             setTimerState(res.data.timerState);
             try {
               localStorage.setItem('alpha_timer_state', JSON.stringify(res.data.timerState));
+              if (res.data.timerState.serverTime) {
+                const serverMs = new Date(res.data.timerState.serverTime).getTime();
+                const skew = serverMs - Date.now();
+                if (Math.abs(skew) < 24 * 3600 * 1000) {
+                  clockSkewRef.current = skew;
+                  localStorage.setItem('alpha_clock_skew', String(skew));
+                }
+              }
             } catch (e) {}
           }
         }
@@ -370,16 +399,10 @@ export default function TeamLeadDashboard() {
     }
   }, [selectedAttSession, user, displayTeamId, displayLeadRegNum]);
 
-  // Clock Skew Tracker: accurately records delta between server timestamp and client local clock
-  const clockSkewRef = useRef(0);
-  useEffect(() => {
-    if (timerState?.serverTime) {
-      const serverMs = new Date(timerState.serverTime).getTime();
-      clockSkewRef.current = serverMs - Date.now();
-    }
-  }, [timerState?.serverTime]);
+  // Server Clock Skew Tracker: accurately records delta between server timestamp and client local clock
+  const clockSkewRef = useRef(Number(localStorage.getItem('alpha_clock_skew') || 0));
 
-  // Server-synchronized smooth sub-second countdown ticker (250ms interval)
+  // Server-synchronized smooth sub-second countdown ticker (200ms interval)
   useEffect(() => {
     const updateCountdown = () => {
       if (!timerState) return;
@@ -938,12 +961,7 @@ export default function TeamLeadDashboard() {
                         {isSelectionOpen ? 'SELECTION TIME REMAINING' : (isReleasedLocked ? (timerState?.selectionScheduledStart ? 'SELECTION OPENS IN' : 'READING TIME') : 'PROBLEM STATEMENTS WILL BE RELEASED IN')}
                       </div>
                       <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '2.5rem', fontWeight: '900', color: '#F8FAFC', letterSpacing: '3px', marginTop: '0.2rem' }}>
-                        {formatTime(
-                          secondsRemaining || (
-                            isRoundStartedUnreleased ? timerState?.timeUntilReleaseSeconds :
-                            (isReleasedLocked ? timerState?.timeUntilSelectionStartSeconds : timerState?.selectionTimeRemainingSeconds)
-                          )
-                        )}
+                        {formatTime(secondsRemaining)}
                       </div>
                     </div>
                   )}
