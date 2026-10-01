@@ -74,8 +74,6 @@ async function getOrUpdateSystemState(forceRefresh = false) {
     });
   }
 
-  const now = new Date();
-
   // Dynamic Phase Evaluation Logic
   let computedPhase = 'NOT_RELEASED';
   let isReleased = false;
