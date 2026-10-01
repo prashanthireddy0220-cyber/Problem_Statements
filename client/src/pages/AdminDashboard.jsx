@@ -429,15 +429,28 @@ export default function AdminDashboard() {
           problemStatementsReleased: false
         }
       }));
-    } else if (actionStr === 'START_SELECTION_2MIN') {
-      const now = Date.now();
+    } else if (actionStr === 'SCHEDULE_SELECTION' || actionStr === 'START_SELECTION_2MIN') {
+      const targetTime = extraData.scheduledTime || new Date(Date.now() + 2 * 60 * 1000).toISOString();
       setLiveData(prev => ({
         ...prev,
         summary: {
           ...prev.summary,
           currentPhase: 'RELEASED_LOCKED',
           problemStatementsReleased: true,
-          selectionScheduledStart: new Date(now + 2 * 60 * 1000).toISOString()
+          selectionScheduledStart: targetTime
+        }
+      }));
+    } else if (actionStr === 'OPEN_NOW' || actionStr === 'START_SELECTION') {
+      const now = Date.now();
+      setLiveData(prev => ({
+        ...prev,
+        summary: {
+          ...prev.summary,
+          currentPhase: 'SELECTION_OPEN',
+          problemStatementsReleased: true,
+          problemSelectionEnabled: true,
+          selectionStartedAt: new Date(now).toISOString(),
+          selectionEndsAt: new Date(now + 30 * 60 * 1000).toISOString()
         }
       }));
     }
@@ -1020,29 +1033,53 @@ export default function AdminDashboard() {
                   Start 2-minute countdown timer. Teams see 2:00 timer, and selection button unlocks simultaneously for all teams at 00:00.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <button
-                    disabled={phaseActionLoading}
-                    onClick={() => {
-                      if (window.confirm("Start 2-minute selection countdown? All teams will see a 2:00 timer and selection buttons will unlock simultaneously at 00:00.")) {
-                        handlePhaseAction('START_SELECTION_2MIN', { countdownMinutes: 2 });
-                      }
-                    }}
-                    className="btn-alpha-cyan"
-                    style={{
-                      width: '100%',
-                      justifyContent: 'center',
-                      background: 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)',
-                      color: '#0F172A',
-                      fontWeight: '900',
-                      padding: '0.65rem 0.5rem',
-                      opacity: phaseActionLoading ? 0.6 : 1
-                    }}
-                  >
-                    <Clock size={16} /> {phaseActionLoading ? 'Starting...' : '⏱️ Start 2-Min Selection Countdown'}
-                  </button>
+                  {(() => {
+                    const isCountdownActive = Boolean(
+                      liveData.summary?.selectionScheduledStart && 
+                      new Date(liveData.summary.selectionScheduledStart) > new Date()
+                    );
+                    const isSelectionOpen = liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION';
+                    const isReleasedAndDisabled = isCountdownActive || isSelectionOpen;
+
+                    return (
+                      <button
+                        disabled={phaseActionLoading || isReleasedAndDisabled}
+                        onClick={() => {
+                          if (window.confirm("Start 2-minute selection countdown? All teams will see a 2:00 timer and selection buttons will unlock simultaneously at 00:00.")) {
+                            const scheduledTime = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+                            handlePhaseAction('SCHEDULE_SELECTION', { scheduledTime, countdownMinutes: 2 });
+                          }
+                        }}
+                        className="btn-alpha-cyan"
+                        style={{
+                          width: '100%',
+                          justifyContent: 'center',
+                          background: isReleasedAndDisabled 
+                            ? 'rgba(255,255,255,0.06)' 
+                            : 'linear-gradient(135deg, #00E676 0%, #00B0FF 100%)',
+                          color: isReleasedAndDisabled ? '#94A3B8' : '#0F172A',
+                          border: isReleasedAndDisabled ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                          fontWeight: '900',
+                          padding: '0.65rem 0.5rem',
+                          opacity: isReleasedAndDisabled ? 0.6 : (phaseActionLoading ? 0.7 : 1),
+                          cursor: isReleasedAndDisabled ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <Clock size={16} /> {
+                          phaseActionLoading 
+                            ? 'Updating...' 
+                            : isCountdownActive 
+                              ? '⏱️ 2-Min Countdown in Progress...' 
+                              : isSelectionOpen 
+                                ? '🟢 Selection Already Released & Active' 
+                                : '⏱️ Start 2-Min Selection Countdown'
+                        }
+                      </button>
+                    );
+                  })()}
 
                   <button
-                    disabled={phaseActionLoading}
+                    disabled={phaseActionLoading || (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION')}
                     onClick={() => {
                       if (window.confirm("Enable selection IMMEDIATELY without waiting 2 minutes?")) {
                         handlePhaseAction('OPEN_NOW');
@@ -1052,11 +1089,12 @@ export default function AdminDashboard() {
                     style={{
                       width: '100%',
                       justifyContent: 'center',
-                      borderColor: '#00E676',
+                      borderColor: (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 'rgba(0, 230, 118, 0.3)' : '#00E676',
                       color: '#00E676',
                       fontSize: '0.78rem',
                       padding: '0.45rem',
-                      opacity: phaseActionLoading ? 0.6 : 1
+                      opacity: (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 0.6 : (phaseActionLoading ? 0.6 : 1),
+                      cursor: (liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 'not-allowed' : 'pointer'
                     }}
                   >
                     <Zap size={14} /> {(liveData.summary?.currentPhase === 'SELECTION_OPEN' || liveData.summary?.currentPhase === 'SELECTION') ? 'Selection Open (Active)' : '⚡ Enable Selection Instantly (Skip 2m)'}

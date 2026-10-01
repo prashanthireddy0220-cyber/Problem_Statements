@@ -131,10 +131,6 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
 
     // A. Check Master System Access & State
     const state = await getOrUpdateSystemState();
-    if (!state.problemSelectionEnabled) {
-      return res.status(403).json({ error: 'Problem selection is currently disabled by the administrator.' });
-    }
-
     if (!state.problemStatementsReleased) {
       return res.status(400).json({ error: 'Problem statements have not been released by the admin yet.', code: 'NOT_RELEASED' });
     }
@@ -162,8 +158,12 @@ router.post('/select', authenticateToken, requireRole('TEAM_LEAD'), async (req, 
 
     const team = teamLead.teamId;
 
-    // C. Check Target Problem Statement
-    const problem = await ProblemStatement.findById(problemId);
+    // C. Check Target Problem Statement (Supports ObjectId or custom problemId string like KARE-AI-01)
+    const mongoose = require('mongoose');
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(problemId) && String(new mongoose.Types.ObjectId(problemId)) === String(problemId);
+    const problem = isValidObjectId
+      ? (await ProblemStatement.findById(problemId) || await ProblemStatement.findOne({ problemId }))
+      : await ProblemStatement.findOne({ problemId });
     if (!problem || problem.status !== 'PUBLISHED') {
       return res.status(404).json({ error: 'Selected problem statement is unavailable or unpublished.' });
     }
