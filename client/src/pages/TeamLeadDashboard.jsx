@@ -11,6 +11,8 @@ import QRCode from 'qrcode';
 import AUTHORIZED_TEAMS from '../data/teamsData.js';
 import { TOP_40_PROBLEMS } from '../data/problemStatementsData.js';
 
+const isValidProblemCode = (code) => Boolean(code && typeof code === 'string' && code.trim() !== '' && code !== 'Not Selected' && code !== 'null' && code !== 'undefined');
+
 export default function TeamLeadDashboard() {
   const { user, refreshUserSession } = useAuth();
 
@@ -121,42 +123,26 @@ export default function TeamLeadDashboard() {
   const [selectionError, setSelectionError] = useState('');
   const [confirmedData, setConfirmedData] = useState(() => {
     const fixedCode = authItem?.fixedProblemStatementId;
-    if (fixedCode) {
-      const fixedProb = TOP_40_PROBLEMS.find(p => p.problemId === fixedCode);
+    const serverCode = user?.team?.selectedProblemCode;
+    const effectiveCode = isValidProblemCode(serverCode) ? serverCode : fixedCode;
+
+    if (effectiveCode) {
+      const fixedProb = TOP_40_PROBLEMS.find(p => p.problemId === effectiveCode);
       return {
-        teamName: authItem.teamName || authItem.teamId,
-        problemId: fixedCode,
-        problemCode: fixedCode,
-        problemTitle: fixedProb?.title,
-        domain: fixedProb?.domain,
-        description: fixedProb?.description,
-        requirements: fixedProb?.requirements,
-        expectedSolution: fixedProb?.expectedSolution,
-        technologies: fixedProb?.technologies,
-        selectedProblem: fixedProb,
+        teamName: authItem?.teamName || user?.team?.name || user?.team?.teamName || authItem?.teamId,
+        problemId: effectiveCode,
+        problemCode: effectiveCode,
+        problemTitle: fixedProb?.title || user?.team?.selectedProblem?.title,
+        domain: fixedProb?.domain || user?.team?.selectedProblem?.domain,
+        description: fixedProb?.description || user?.team?.selectedProblem?.description,
+        requirements: fixedProb?.requirements || user?.team?.selectedProblem?.requirements,
+        expectedSolution: fixedProb?.expectedSolution || user?.team?.selectedProblem?.expectedSolution,
+        technologies: fixedProb?.technologies || user?.team?.selectedProblem?.technologies,
+        selectedProblem: fixedProb || user?.team?.selectedProblem,
         status: 'CONFIRMED'
       };
     }
-    if (user?.team?.selectionConfirmed && user?.team?.selectedProblemCode && user?.team?.selectedProblemCode !== 'Not Selected') {
-      return {
-        teamName: user.team.name || user.team.teamName,
-        problemId: user.team.selectedProblemCode,
-        problemCode: user.team.selectedProblemCode,
-        status: 'CONFIRMED'
-      };
-    }
-    if (user?.team && (!user.team.selectionConfirmed || user.team.selectedProblemCode === 'Not Selected')) {
-      try {
-        localStorage.removeItem('alpha_confirmed_selection');
-      } catch (e) {}
-      return null;
-    }
-    try {
-      const saved = localStorage.getItem('alpha_confirmed_selection');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
+    return null;
   });
 
   useEffect(() => {
@@ -171,8 +157,8 @@ export default function TeamLeadDashboard() {
   const hasConfirmedSelection = Boolean(
     authItem?.fixedProblemStatementId ||
     (myTeamData
-      ? (myTeamData.team?.selectionConfirmed && myTeamData.team?.selectedProblemCode && myTeamData.team?.selectedProblemCode !== 'Not Selected')
-      : (user?.team?.selectionConfirmed && user?.team?.selectedProblemCode && user?.team?.selectedProblemCode !== 'Not Selected' && confirmedData))
+      ? (myTeamData.team?.selectionConfirmed && isValidProblemCode(myTeamData.team?.selectedProblemCode))
+      : (user?.team?.selectionConfirmed && isValidProblemCode(user?.team?.selectedProblemCode) && confirmedData))
   );
 
   const [secondsRemaining, setSecondsRemaining] = useState(() => {
@@ -226,53 +212,32 @@ export default function TeamLeadDashboard() {
       if (res.data) {
         setMyTeamData(res.data);
         const team = res.data.team;
-        const isConfirmed = Boolean(
-          team?.selectionConfirmed &&
-          team?.selectedProblemCode &&
-          team?.selectedProblemCode !== 'Not Selected'
-        );
+        const fixedCode = authItem?.fixedProblemStatementId;
+        const effectiveCode = isValidProblemCode(team?.selectedProblemCode)
+          ? team.selectedProblemCode
+          : fixedCode;
 
-        if (isConfirmed) {
+        if (effectiveCode) {
+          const matchedProb = TOP_40_PROBLEMS.find(p => p.problemId === effectiveCode) || team?.selectedProblem;
           setConfirmedData(prev => ({
             ...prev,
-            teamName: team.name || team.teamName,
-            problemId: team.selectedProblemCode,
-            problemCode: team.selectedProblemCode,
-            problemTitle: team.selectedProblem?.title || prev?.problemTitle,
-            domain: team.selectedProblem?.domain || prev?.domain,
-            description: team.selectedProblem?.description || prev?.description,
-            requirements: team.selectedProblem?.requirements || prev?.requirements,
-            expectedSolution: team.selectedProblem?.expectedSolution || prev?.expectedSolution,
-            technologies: team.selectedProblem?.technologies || prev?.technologies,
-            selectedProblem: team.selectedProblem || prev?.selectedProblem,
-            selectedAt: team.selectedAt || prev?.selectedAt,
+            teamName: team?.name || team?.teamName || authItem?.teamName,
+            problemId: effectiveCode,
+            problemCode: effectiveCode,
+            problemTitle: matchedProb?.title || team?.selectedProblem?.title || prev?.problemTitle,
+            domain: matchedProb?.domain || team?.selectedProblem?.domain || prev?.domain,
+            description: matchedProb?.description || team?.selectedProblem?.description || prev?.description,
+            requirements: matchedProb?.requirements || team?.selectedProblem?.requirements || prev?.requirements,
+            expectedSolution: matchedProb?.expectedSolution || team?.selectedProblem?.expectedSolution || prev?.expectedSolution,
+            technologies: matchedProb?.technologies || team?.selectedProblem?.technologies || prev?.technologies,
+            selectedProblem: matchedProb || team?.selectedProblem || prev?.selectedProblem,
+            selectedAt: team?.selectedAt || prev?.selectedAt || new Date(),
             status: 'CONFIRMED'
           }));
         } else {
-          // If the admin deleted/reset selections, purge local cached selection immediately
           setConfirmedData(null);
           try {
             localStorage.removeItem('alpha_confirmed_selection');
-            const savedUserStr = localStorage.getItem('alpha_user');
-            if (savedUserStr) {
-              const parsed = JSON.parse(savedUserStr);
-              if (parsed?.team) {
-                parsed.team.selectionConfirmed = false;
-                parsed.team.selectedProblemCode = 'Not Selected';
-                parsed.team.selectedProblem = null;
-                localStorage.setItem('alpha_user', JSON.stringify(parsed));
-              }
-            }
-            const savedLeadUserStr = localStorage.getItem('alpha_team_lead_user');
-            if (savedLeadUserStr) {
-              const parsed = JSON.parse(savedLeadUserStr);
-              if (parsed?.team) {
-                parsed.team.selectionConfirmed = false;
-                parsed.team.selectedProblemCode = 'Not Selected';
-                parsed.team.selectedProblem = null;
-                localStorage.setItem('alpha_team_lead_user', JSON.stringify(parsed));
-              }
-            }
           } catch (e) {}
         }
       }
@@ -742,8 +707,10 @@ export default function TeamLeadDashboard() {
 
                 {hasConfirmedSelection ? (
                   (() => {
-                    const selCode = myTeamData?.team?.selectedProblemCode || authItem?.fixedProblemStatementId || confirmedData?.problemCode || confirmedData?.problemId || user?.team?.selectedProblemCode;
-                    const selObj = myTeamData?.team?.selectedProblem || TOP_40_PROBLEMS.find(p => p.problemId === selCode) || problems.find(p => p.problemId === selCode) || confirmedData?.selectedProblem || {};
+                    const selCode = isValidProblemCode(myTeamData?.team?.selectedProblemCode)
+                      ? myTeamData.team.selectedProblemCode
+                      : (authItem?.fixedProblemStatementId || (isValidProblemCode(confirmedData?.problemCode) ? confirmedData.problemCode : null) || (isValidProblemCode(confirmedData?.problemId) ? confirmedData.problemId : null));
+                    const selObj = TOP_40_PROBLEMS.find(p => p.problemId === selCode) || (isValidProblemCode(myTeamData?.team?.selectedProblemCode) ? myTeamData?.team?.selectedProblem : null) || confirmedData?.selectedProblem || {};
                     const selTitle = selObj.title || confirmedData?.problemTitle;
                     const selDesc = selObj.description || confirmedData?.description;
 
@@ -783,8 +750,10 @@ export default function TeamLeadDashboard() {
         <div>
           {hasConfirmedSelection ? (
             (() => {
-              const activeSelectedCode = myTeamData?.team?.selectedProblemCode || authItem?.fixedProblemStatementId || confirmedData?.problemId || confirmedData?.problemCode || user?.team?.selectedProblemCode;
-              const selectedProblemObj = myTeamData?.team?.selectedProblem || TOP_40_PROBLEMS.find(p => p.problemId === activeSelectedCode) || problems.find(p => p.problemId === activeSelectedCode) || confirmedData?.selectedProblem || {};
+              const activeSelectedCode = isValidProblemCode(myTeamData?.team?.selectedProblemCode)
+                ? myTeamData.team.selectedProblemCode
+                : (authItem?.fixedProblemStatementId || (isValidProblemCode(confirmedData?.problemId) ? confirmedData.problemId : null) || (isValidProblemCode(confirmedData?.problemCode) ? confirmedData.problemCode : null));
+              const selectedProblemObj = TOP_40_PROBLEMS.find(p => p.problemId === activeSelectedCode) || (isValidProblemCode(myTeamData?.team?.selectedProblemCode) ? myTeamData?.team?.selectedProblem : null) || confirmedData?.selectedProblem || {};
               const activeProblemTitle = selectedProblemObj?.title || confirmedData?.problemTitle || 'Selected Problem Statement';
               const activeProblemDomain = selectedProblemObj?.domain || confirmedData?.domain || '';
               const activeProblemDesc = selectedProblemObj?.description || confirmedData?.description || 'Your selected problem statement has been confirmed and locked in the database.';
@@ -836,9 +805,11 @@ export default function TeamLeadDashboard() {
                         <span style={{ background: 'rgba(0,242,254,0.15)', border: '1px solid #00F2FE', color: '#00F2FE', fontSize: '0.8rem', fontWeight: '800', padding: '0.25rem 0.75rem', borderRadius: '20px', fontFamily: 'Orbitron, monospace' }}>
                           {activeSelectedCode}
                         </span>
-                        <span style={{ marginLeft: '0.75rem', background: 'rgba(255,215,0,0.15)', border: '1px solid #FFD700', color: '#FFD700', fontSize: '0.8rem', fontWeight: '700', padding: '0.25rem 0.75rem', borderRadius: '20px' }}>
-                          {activeProblemDomain}
-                        </span>
+                        {activeProblemDomain && (
+                          <span style={{ marginLeft: '0.75rem', background: 'rgba(255,215,0,0.15)', border: '1px solid #FFD700', color: '#FFD700', fontSize: '0.8rem', fontWeight: '700', padding: '0.25rem 0.75rem', borderRadius: '20px' }}>
+                            {activeProblemDomain}
+                          </span>
+                        )}
                       </div>
                       <span style={{ color: '#00E676', fontSize: '0.82rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <ShieldCheck size={16} /> VERIFIED SELECTION
