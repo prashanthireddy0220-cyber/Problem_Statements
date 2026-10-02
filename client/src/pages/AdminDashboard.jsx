@@ -764,8 +764,47 @@ export default function AdminDashboard() {
     }
   }, [qrModalTeam]);
 
+  const downloadExportFile = async (endpoint, defaultFilename = 'export.csv') => {
+    try {
+      const token = localStorage.getItem('alpha_admin_token') || localStorage.getItem('alpha_token') || '';
+      const response = await axios.get(endpoint, {
+        responseType: 'blob',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+
+      // Check if response is error json disguised as blob
+      if (response.data && response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const errObj = JSON.parse(text);
+        throw new Error(errObj.error || 'Failed to download export');
+      }
+
+      const blob = new Blob([response.data], { type: response.headers['content-type'] || 'text/csv' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      const disposition = response.headers['content-disposition'];
+      let filename = defaultFilename;
+      if (disposition) {
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Direct download failed, falling back to authenticated window.open:', err);
+      const token = localStorage.getItem('alpha_admin_token') || localStorage.getItem('alpha_token') || '';
+      const sep = endpoint.includes('?') ? '&' : '?';
+      window.open(`${endpoint}${sep}token=${encodeURIComponent(token)}`, '_blank');
+    }
+  };
+
   const handleExportCSV = () => {
-    window.open('/api/attendance/admin/export', '_blank');
+    downloadExportFile('/api/attendance/admin/export', 'attendance_report.csv');
   };
 
   // Exact 60 Authorized Teams List (Sanitized & Deduplicated against official table)
@@ -873,7 +912,7 @@ export default function AdminDashboard() {
             <Download size={15} /> Export Attendance CSV
           </button>
           <button 
-            onClick={() => window.open('/api/admin/export-problem-allocations', '_blank')} 
+            onClick={() => downloadExportFile('/api/admin/export-problem-allocations', 'problem_allocations.csv')} 
             className="btn-alpha-gold" 
             style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}
             title="Download full CSV of all 60 teams and their assigned problem statements"
@@ -2181,7 +2220,7 @@ export default function AdminDashboard() {
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
-                onClick={() => window.open('/api/admin/export-problem-allocations', '_blank')}
+                onClick={() => downloadExportFile('/api/admin/export-problem-allocations', 'problem_allocations.csv')}
                 className="btn-alpha-gold"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '0.55rem 1.1rem' }}
                 title="Download CSV report of all problem statements and assigned teams"
@@ -2811,7 +2850,7 @@ export default function AdminDashboard() {
             
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
-                onClick={() => window.open(`/api/attendance/admin/export?sessionId=${attSessionFilter}&status=${attStatusFilter}`, '_blank')}
+                onClick={() => downloadExportFile(`/api/attendance/admin/export?sessionId=${attSessionFilter}&status=${attStatusFilter}`, 'attendance_report.csv')}
                 className="btn-alpha-cyan"
                 style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
@@ -3051,7 +3090,7 @@ export default function AdminDashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <h2 style={{ fontSize: '1.35rem', color: '#F8FAFC' }}>VISUAL ANALYTICS & ATTENDANCE CHARTS</h2>
             <button
-              onClick={() => window.open('/api/attendance/admin/export?sessionId=ALL', '_blank')}
+              onClick={() => downloadExportFile('/api/attendance/admin/export?sessionId=ALL', 'attendance_report.csv')}
               className="btn-alpha-cyan"
               style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
             >
